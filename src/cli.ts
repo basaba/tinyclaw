@@ -6,7 +6,7 @@ import { ContextBuilder } from "./memory/context.js";
 import { CopilotBridgeClient } from "./copilot/client.js";
 import { createMcpServer, startServer } from "./mcp/server.js";
 import { createCopilotAdapters } from "./adapters/index.js";
-import { parseMcpString } from "./agency/mcps.js";
+import { loadMcpConfig, parseMcpFilter } from "./mcp-config/loader.js";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -26,27 +26,35 @@ function printHelp(): void {
   console.log(`lobster-copilot — Run Lobster workflows with Copilot as the LLM engine
 
 Usage:
-  lobster-copilot run <file> [--args-json '{}'] [--mcps teams,mail]
-  lobster-copilot run -p '<pipeline>' [--mcps calendar]
+  lobster-copilot run <file> [options]
+  lobster-copilot run -p '<pipeline>' [options]
   lobster-copilot serve                            Start the MCP bridge server (default)
   lobster-copilot help                             Show this help
 
 Options:
-  --mcps <list>            Comma-separated Agency MCPs to attach (e.g. teams,mail,calendar)
+  --mcp-config <path>      Path to mcp.json config file
+  --mcps <list>            Filter: only attach these MCP servers from config (comma-separated)
   --args-json <json>       JSON object of workflow arguments
+
+MCP Config Resolution (first found wins):
+  1. --mcp-config <path>
+  2. MCP_CONFIG env var
+  3. mcp.json in current directory
+  4. .mcp.json in current directory
+  5. ~/.config/lobster-copilot/mcp.json
 
 Environment:
   COPILOT_CLI_URL          Copilot CLI server URL (optional, auto-discovers)
-  AGENCY_MCPS              Default Agency MCPs to attach (e.g. teams,mail,calendar)
+  MCP_CONFIG               Path to mcp.json config file
   LOBSTER_LLM_PROVIDER     Default LLM provider (set to "copilot" automatically)
   LOG_LEVEL                Log level: debug, info, warn, error (default: info)
 
 Examples:
   lobster-copilot run workflow.yaml
   lobster-copilot run -p "llm.invoke --prompt 'Hello'"
-  lobster-copilot run -p "llm.invoke --prompt 'What meetings today?'" --mcps calendar
-  lobster-copilot run workflow.yaml --mcps teams,mail --args-json '{"topic": "standup"}'
-  AGENCY_MCPS=teams,calendar lobster-copilot run workflow.yaml
+  lobster-copilot run workflow.yaml --mcp-config ./mcp.json
+  lobster-copilot run workflow.yaml --mcps teams,calendar
+  lobster-copilot run workflow.yaml --mcp-config ./mcp.json --mcps teams
   lobster-copilot serve
 `);
 }
@@ -58,7 +66,8 @@ async function runWorkflow(runArgs: string[]): Promise<void> {
   let filePath: string | undefined;
   let pipeline: string | undefined;
   let argsJson: Record<string, unknown> | undefined;
-  let mcpsRaw: string | undefined;
+  let mcpConfigPath: string | undefined;
+  let mcpsFilter: string | undefined;
 
   for (let i = 0; i < runArgs.length; i++) {
     const arg = runArgs[i];
@@ -71,8 +80,10 @@ async function runWorkflow(runArgs: string[]): Promise<void> {
         console.error("❌ --args-json must be valid JSON");
         process.exit(1);
       }
+    } else if (arg === "--mcp-config") {
+      mcpConfigPath = runArgs[++i];
     } else if (arg === "--mcps") {
-      mcpsRaw = runArgs[++i];
+      mcpsFilter = runArgs[++i];
     } else if (!arg.startsWith("-")) {
       filePath = arg;
     }
@@ -83,19 +94,21 @@ async function runWorkflow(runArgs: string[]): Promise<void> {
     process.exit(1);
   }
 
-  // Resolve Agency MCPs from --mcps flag and AGENCY_MCPS env var
-  const envMcps = process.env.AGENCY_MCPS ?? "";
-  const combinedMcps = [mcpsRaw, envMcps].filter(Boolean).join(",");
-  const agencyMcps = parseMcpString(combinedMcps);
+  // Load MCP servers from config file
+  const filter = mcpsFilter ? parseMcpFilter(mcpsFilter) : undefined;
+  const mcpServers = loadMcpConfig({
+    configPath: mcpConfigPath,
+    filter,
+  });
 
-  if (agencyMcps.length > 0) {
-    const names = agencyMcps.map((m) => (typeof m === "string" ? m : m.name));
-    process.stderr.write(`🔌 Attaching Agency MCPs: ${names.join(", ")}\n`);
+  const serverNames = Object.keys(mcpServers);
+  if (serverNames.length > 0) {
+    process.stderr.write(`🔌 MCP servers: ${serverNames.join(", ")}\n`);
   }
 
   const { adapters, dispose } = createCopilotAdapters({
     cliUrl: process.env.COPILOT_CLI_URL,
-    agencyMcps,
+    mcpServers,
   });
 
   try {

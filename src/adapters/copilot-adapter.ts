@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { CopilotBridgeClient, type CopilotBridgeConfig } from "../copilot/client.js";
-import { resolveAgencyMcps, type AgencyMcpEntry } from "../agency/mcps.js";
+import { loadMcpConfig, type McpServerConfig } from "../mcp-config/loader.js";
 
 // ── Lobster-compatible types ────────────────────────────────────────
 
@@ -43,8 +43,10 @@ export interface CopilotAdapterOptions extends CopilotBridgeConfig {
   defaultModel?: string;
   /** Default reasoning effort level */
   defaultReasoningEffort?: "low" | "medium" | "high" | "xhigh";
-  /** Agency MCPs to attach to Copilot sessions */
-  agencyMcps?: AgencyMcpEntry[];
+  /** MCP servers to attach (already resolved configs) */
+  mcpServers?: Record<string, McpServerConfig>;
+  /** Path to mcp.json config file (alternative to passing mcpServers directly) */
+  mcpConfigPath?: string;
 }
 
 const DEFAULT_MAX_ARTIFACT_CHARS = 8000;
@@ -71,19 +73,14 @@ export class CopilotAdapter implements DirectAdapter {
   constructor(options: CopilotAdapterOptions = {}) {
     this.options = options;
 
-    // Resolve Agency MCPs into Copilot SDK config
-    const agencyMcpConfigs = options.agencyMcps?.length
-      ? resolveAgencyMcps(options.agencyMcps)
-      : {};
-    const mcpServers = {
-      ...agencyMcpConfigs,
-      ...(options.mcpServers ?? {}),
-    };
+    // Resolve MCP servers: explicit mcpServers > mcpConfigPath > auto-discover
+    const mcpServers = options.mcpServers
+      ?? (options.mcpConfigPath ? loadMcpConfig({ configPath: options.mcpConfigPath }) : undefined);
 
     this.client = new CopilotBridgeClient({
       cliUrl: options.cliUrl,
       apiKey: options.apiKey,
-      ...(Object.keys(mcpServers).length > 0 ? { mcpServers } : {}),
+      ...(mcpServers && Object.keys(mcpServers).length > 0 ? { mcpServers } : {}),
     });
     // Bind invoke so it works when Lobster extracts it via `direct.invoke`
     this.invoke = this.invoke.bind(this);

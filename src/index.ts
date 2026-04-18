@@ -10,12 +10,15 @@ export {
   type AdapterParams,
 } from "./adapters/index.js";
 export {
-  resolveAgencyMcps,
-  listKnownMcps,
-  parseMcpString,
-  type AgencyMcpEntry,
-  type ResolvedMcpConfig,
-} from "./agency/index.js";
+  loadMcpConfig,
+  filterMcpServers,
+  parseMcpFilter,
+  type McpServerConfig,
+  type McpLocalServer,
+  type McpRemoteServer,
+  type McpConfigFile,
+  type LoadMcpConfigOptions,
+} from "./mcp-config/index.js";
 export { MemoryStore } from "./memory/store.js";
 export { ContextBuilder } from "./memory/context.js";
 export { loadConfig } from "./config.js";
