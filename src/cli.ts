@@ -7,6 +7,9 @@ import { CopilotBridgeClient } from "./copilot/client.js";
 import { createMcpServer, startServer } from "./mcp/server.js";
 import { createCopilotAdapters } from "./adapters/index.js";
 import { loadMcpConfig, parseMcpFilter } from "./mcp-config/loader.js";
+import { createExtendedRegistry } from "./commands/registry.js";
+import { createCopilotReasonCommand } from "./commands/copilot-reason.js";
+import { createMcpCallCommand } from "./commands/mcp-call.js";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -111,12 +114,23 @@ async function runWorkflow(runArgs: string[]): Promise<void> {
     mcpServers,
   });
 
+  // Build extended registry with custom commands
+  const adapter = adapters.copilot as import("./adapters/copilot-adapter.js").CopilotAdapter;
+  const startClient = () => adapter.ensureStarted();
+  const registry = createExtendedRegistry({
+    commands: [
+      createCopilotReasonCommand(() => adapter.client, startClient),
+      createMcpCallCommand(() => adapter.client, () => mcpServers, startClient),
+    ],
+  });
+
   try {
     const result = await runToolRequest({
       ...(filePath ? { filePath } : { pipeline }),
       ...(argsJson ? { args: argsJson } : {}),
       ctx: {
         llmAdapters: adapters,
+        registry,
         env: { ...process.env, LOBSTER_LLM_PROVIDER: "copilot" },
       },
     });

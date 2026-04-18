@@ -65,7 +65,8 @@ Rules:
 export class CopilotAdapter implements DirectAdapter {
   readonly source = "copilot";
 
-  private client: CopilotBridgeClient;
+  /** The underlying Copilot client — exposed for custom commands */
+  readonly client: CopilotBridgeClient;
   private started = false;
   private startPromise: Promise<void> | null = null;
   private options: CopilotAdapterOptions;
@@ -87,7 +88,7 @@ export class CopilotAdapter implements DirectAdapter {
   }
 
   /** Lazy-start the underlying Copilot client on first call. */
-  private async ensureStarted(): Promise<void> {
+  async ensureStarted(): Promise<void> {
     if (this.started) return;
     if (!this.startPromise) {
       this.startPromise = this.client.start().then(() => {

@@ -19,6 +19,14 @@ export {
   type McpConfigFile,
   type LoadMcpConfigOptions,
 } from "./mcp-config/index.js";
+export {
+  createExtendedRegistry,
+  createCopilotReasonCommand,
+  createMcpCallCommand,
+  type ExtendedRegistryOptions,
+  type CommandRegistry,
+  type LobsterCommand,
+} from "./commands/index.js";
 export { MemoryStore } from "./memory/store.js";
 export { ContextBuilder } from "./memory/context.js";
 export { loadConfig } from "./config.js";
