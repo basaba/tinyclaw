@@ -1,0 +1,11 @@
+# Example: Use Agency MCPs to query Microsoft services
+# Run with: lobster-copilot run examples/agency-mcps.yaml --mcps msft-learn
+#
+# Available MCPs: teams, mail, calendar, ado, kusto, sharepoint,
+#   planner, msft-learn, word, workiq, m365-copilot, and more.
+# Run `agency mcp --help` to see the full list.
+
+id: agency-mcp-demo
+steps:
+  - id: learn
+    pipeline: llm.invoke --prompt "Using the msft-learn MCP tools available to you, find documentation about Azure Container Apps. Summarize the key concepts in 3 bullet points."

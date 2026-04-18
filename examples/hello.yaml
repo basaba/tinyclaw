@@ -1,0 +1,7 @@
+name: hello-copilot
+description: Simple workflow that asks Copilot a question
+
+steps:
+  - id: greet
+    pipeline: |
+      llm.invoke --prompt 'Write a haiku about programming'

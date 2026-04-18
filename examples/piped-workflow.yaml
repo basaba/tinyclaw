@@ -1,0 +1,9 @@
+name: piped-workflow
+description: Demonstrates piped syntax in workflow steps
+
+steps:
+  # Chain two LLM calls in a single pipeline with |
+  - id: chain
+    pipeline: |
+      llm.invoke --prompt 'Pick a random country and tell me its capital. Reply with just: Country - Capital'
+        | llm.invoke --prompt 'Write a fun fact about this place in one sentence'

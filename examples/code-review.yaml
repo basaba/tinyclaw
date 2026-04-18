@@ -1,0 +1,7 @@
+name: code-review-workflow
+description: Analyze code quality using Copilot
+
+steps:
+  - id: analyze
+    pipeline: |
+      llm.invoke --provider copilot --model claude-opus-4.6 --prompt 'List 5 common TypeScript anti-patterns and how to fix them' --output-schema '{"type":"object","properties":{"antiPatterns":{"type":"array","items":{"type":"object","properties":{"name":{"type":"string"},"problem":{"type":"string"},"fix":{"type":"string"}},"required":["name","problem","fix"]}}},"required":["antiPatterns"]}'
