@@ -6,6 +6,7 @@ import { CopilotAdapter } from "./adapters/copilot-adapter.js";
 import { createCopilotAdapters } from "./adapters/index.js";
 import { loadMcpConfig, parseMcpFilter } from "./mcp-config/loader.js";
 import { createCopilotCommand } from "./commands/copilot.js";
+import { createMcpCallCommand } from "./commands/mcp.js";
 
 const args = process.argv.slice(2);
 
@@ -174,20 +175,23 @@ async function run(runArgs: string[]): Promise<void> {
   const adapters = { copilot: adapter as any };
   const dispose = () => adapter.dispose();
 
-  // Build extended registry with the `copilot` command
+  // Build extended registry with copilot + mcp commands
   const { createDefaultRegistry } = await import("@clawdbot/lobster/core");
   const defaultRegistry = createDefaultRegistry();
   const copilotCmd = createCopilotCommand(
     () => adapter.client,
     () => adapter.ensureStarted(),
   );
+  const mcpCallCmd = createMcpCallCommand(() => mcpServers);
+  const extraCommands = new Map(
+    [copilotCmd, mcpCallCmd].map((c) => [c.name, c]),
+  );
   const registry = {
     get(name: string) {
-      if (name === copilotCmd.name) return copilotCmd;
-      return defaultRegistry.get(name);
+      return extraCommands.get(name) ?? defaultRegistry.get(name);
     },
     list() {
-      return [...defaultRegistry.list(), copilotCmd.name].sort();
+      return [...defaultRegistry.list(), ...extraCommands.keys()].sort();
     },
   };
 
@@ -220,5 +224,6 @@ async function run(runArgs: string[]): Promise<void> {
     }
   } finally {
     await dispose();
+    process.exit(0);
   }
 }
