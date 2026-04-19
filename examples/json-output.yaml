@@ -2,4 +2,4 @@
 name: json-output
 steps:
   - id: extract
-    pipeline: "llm.invoke --provider copilot --prompt 'List 3 popular programming languages with their year of creation. Return JSON array with name, year, paradigm fields.'"
+    pipeline: "copilot --prompt 'List 3 popular programming languages with their year of creation. Return JSON array with name, year, paradigm fields.'"

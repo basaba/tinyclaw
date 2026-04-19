@@ -2,8 +2,10 @@
 // Suppress Node.js experimental warnings (e.g. SQLite) in this process and subprocesses
 process.env.NODE_NO_WARNINGS = "1";
 
+import { CopilotAdapter } from "./adapters/copilot-adapter.js";
 import { createCopilotAdapters } from "./adapters/index.js";
 import { loadMcpConfig, parseMcpFilter } from "./mcp-config/loader.js";
+import { createCopilotCommand } from "./commands/copilot.js";
 
 const args = process.argv.slice(2);
 
@@ -12,7 +14,11 @@ if (args[0] === "help" || args[0] === "--help" || args[0] === "-h" || !args.leng
   process.exit(0);
 }
 
-run(args);
+if (args[0] === "copilot") {
+  copilot(args.slice(1));
+} else {
+  run(args);
+}
 
 function printHelp(): void {
   console.log(`lobster-copilot — Run Lobster workflows with Copilot as the LLM engine
@@ -20,10 +26,16 @@ function printHelp(): void {
 Usage:
   lobster-copilot <file> [options]
   lobster-copilot -p '<pipeline>' [options]
+  lobster-copilot copilot '<prompt>' [options]
   lobster-copilot help
+
+Commands:
+  copilot                  Send a prompt directly to Copilot (shortcut)
 
 Options:
   -p, --pipeline <text>    Run a pipeline string instead of a file
+  --model <model>          Model to use (e.g. gpt-4o, claude-sonnet-4)
+  --system <prompt>        System prompt override
   --mcp-config <path>      Path to mcp.json config file
   --mcps <list>            Filter MCP servers from config (comma-separated)
   --args-json <json>       JSON object of workflow arguments
@@ -36,12 +48,82 @@ MCP Config Resolution (first found wins):
   5. ~/.config/lobster-copilot/mcp.json
 
 Examples:
+  lobster-copilot copilot 'Explain async/await in TypeScript'
+  lobster-copilot copilot 'Review this code' --model gpt-4o < file.ts
   lobster-copilot examples/piped-steps.yaml
   lobster-copilot -p "llm.invoke --provider copilot --prompt 'Hello'"
   lobster-copilot workflow.yaml --mcp-config ./mcp.json
-  lobster-copilot workflow.yaml --mcps teams,calendar
 `);
 }
+
+// ── copilot shortcut ────────────────────────────────────────────────
+
+async function copilot(copilotArgs: string[]): Promise<void> {
+  let prompt: string | undefined;
+  let model: string | undefined;
+  let systemPrompt: string | undefined;
+  let mcpConfigPath: string | undefined;
+  let mcpsFilter: string | undefined;
+  const positional: string[] = [];
+
+  for (let i = 0; i < copilotArgs.length; i++) {
+    const arg = copilotArgs[i];
+    if (arg === "--model") {
+      model = copilotArgs[++i];
+    } else if (arg === "--system") {
+      systemPrompt = copilotArgs[++i];
+    } else if (arg === "--mcp-config") {
+      mcpConfigPath = copilotArgs[++i];
+    } else if (arg === "--mcps") {
+      mcpsFilter = copilotArgs[++i];
+    } else if (!arg.startsWith("-")) {
+      positional.push(arg);
+    }
+  }
+
+  prompt = positional.join(" ");
+
+  // Read stdin if piped
+  if (!process.stdin.isTTY) {
+    const chunks: Buffer[] = [];
+    for await (const chunk of process.stdin) {
+      chunks.push(chunk);
+    }
+    const stdinText = Buffer.concat(chunks).toString("utf-8").trim();
+    if (stdinText) {
+      prompt = prompt ? `${stdinText}\n\n${prompt}` : stdinText;
+    }
+  }
+
+  if (!prompt) {
+    console.error("❌ Provide a prompt: lobster-copilot copilot 'your question'");
+    process.exit(1);
+  }
+
+  const filter = mcpsFilter ? parseMcpFilter(mcpsFilter) : undefined;
+  const mcpServers = loadMcpConfig({ configPath: mcpConfigPath, filter });
+
+  const adapter = new CopilotAdapter({
+    cliUrl: process.env.COPILOT_CLI_URL,
+    mcpServers,
+  });
+
+  try {
+    await adapter.ensureStarted();
+    const response = await adapter.client.reason(prompt, undefined, systemPrompt, {
+      model,
+      mcpServers,
+    });
+    console.log(response);
+  } catch (err) {
+    console.error("❌", err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  } finally {
+    await adapter.dispose();
+  }
+}
+
+// ── workflow runner ─────────────────────────────────────────────────
 
 async function run(runArgs: string[]): Promise<void> {
   const { runToolRequest } = await import("@clawdbot/lobster/core");
@@ -85,10 +167,29 @@ async function run(runArgs: string[]): Promise<void> {
     process.stderr.write(`🔌 MCP servers: ${serverNames.join(", ")}\n`);
   }
 
-  const { adapters, dispose } = createCopilotAdapters({
+  const adapter = new CopilotAdapter({
     cliUrl: process.env.COPILOT_CLI_URL,
     mcpServers,
   });
+  const adapters = { copilot: adapter as any };
+  const dispose = () => adapter.dispose();
+
+  // Build extended registry with the `copilot` command
+  const { createDefaultRegistry } = await import("@clawdbot/lobster/core");
+  const defaultRegistry = createDefaultRegistry();
+  const copilotCmd = createCopilotCommand(
+    () => adapter.client,
+    () => adapter.ensureStarted(),
+  );
+  const registry = {
+    get(name: string) {
+      if (name === copilotCmd.name) return copilotCmd;
+      return defaultRegistry.get(name);
+    },
+    list() {
+      return [...defaultRegistry.list(), copilotCmd.name].sort();
+    },
+  };
 
   try {
     const result = await runToolRequest({
@@ -96,6 +197,7 @@ async function run(runArgs: string[]): Promise<void> {
       ...(argsJson ? { args: argsJson } : {}),
       ctx: {
         llmAdapters: adapters,
+        registry,
         env: { ...process.env, LOBSTER_LLM_PROVIDER: "copilot" },
       },
     });

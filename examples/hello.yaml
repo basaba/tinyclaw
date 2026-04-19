@@ -2,4 +2,4 @@
 name: hello
 steps:
   - id: ask
-    pipeline: "llm.invoke --provider copilot --prompt 'What are the three laws of robotics? Answer in one sentence each.'"
+    pipeline: "copilot --prompt 'What are the three laws of robotics? Answer in one sentence each.'"

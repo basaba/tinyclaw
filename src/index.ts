@@ -25,3 +25,4 @@ export {
   CODE_REVIEW_SYSTEM_PROMPT,
   LLM_INVOKE_SYSTEM_PROMPT,
 } from "./copilot/prompts.js";
+export { createCopilotCommand, type LobsterCommand } from "./commands/index.js";

@@ -2,4 +2,4 @@
 name: code-review
 steps:
   - id: review
-    pipeline: "llm.invoke --provider copilot --prompt 'Review this code for bugs, security issues, and improvements.'"
+    pipeline: "copilot --prompt 'Review this code for bugs, security issues, and improvements.'"
