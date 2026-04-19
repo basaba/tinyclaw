@@ -20,19 +20,6 @@ export {
   type LoadMcpConfigOptions,
 } from "./mcp-config/index.js";
 export {
-  createExtendedRegistry,
-  createCopilotReasonCommand,
-  createMcpCallCommand,
-  type ExtendedRegistryOptions,
-  type CommandRegistry,
-  type LobsterCommand,
-} from "./commands/index.js";
-export { MemoryStore } from "./memory/store.js";
-export { ContextBuilder } from "./memory/context.js";
-export { loadConfig } from "./config.js";
-export { createLogger } from "./utils/logger.js";
-export { createMcpServer, startServer } from "./mcp/server.js";
-export {
   REASON_SYSTEM_PROMPT,
   SUMMARIZE_SYSTEM_PROMPT,
   CODE_REVIEW_SYSTEM_PROMPT,

@@ -1,7 +1,7 @@
 {
   "name": "lobster-copilot",
   "version": "0.1.0",
-  "description": "Bridge service integrating OpenClaw Lobster workflows with GitHub Copilot as the LLM reasoning engine via MCP",
+  "description": "Copilot adapter and MCP auto-loader for OpenClaw Lobster workflows",
   "type": "module",
   "main": "dist/index.js",
   "exports": {
@@ -21,16 +21,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@clawdbot/lobster": "file:../lobster-upstream",
     "@github/copilot-sdk": "^0.2.2",
-    "@modelcontextprotocol/sdk": "^1.12.0",
-    "better-sqlite3": "^11.8.0",
     "dotenv": "^16.4.0",
-    "pino": "^9.6.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.0",
+    "@clawdbot/lobster": "file:../lobster-upstream",
     "@types/node": "^22.0.0",
     "eslint": "^9.0.0",
     "tsx": "^4.19.0",

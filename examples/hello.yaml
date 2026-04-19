@@ -1,7 +1,5 @@
-name: hello-copilot
-description: Simple workflow that asks Copilot a question
-
+# Simple prompt — ask Copilot a question
+name: hello
 steps:
-  - id: greet
-    pipeline: |
-      llm.invoke --prompt 'Write a haiku about programming'
+  - id: ask
+    pipeline: "llm.invoke --provider copilot --prompt 'What are the three laws of robotics? Answer in one sentence each.'"

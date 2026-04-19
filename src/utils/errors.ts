@@ -14,17 +14,3 @@ export class CopilotError extends BridgeError {
     this.name = "CopilotError";
   }
 }
-
-export class MemoryError extends BridgeError {
-  constructor(message: string, code = "MEMORY_ERROR") {
-    super(message, code);
-    this.name = "MemoryError";
-  }
-}
-
-export class ConfigError extends BridgeError {
-  constructor(message: string, code = "CONFIG_ERROR") {
-    super(message, code);
-    this.name = "ConfigError";
-  }
-}
