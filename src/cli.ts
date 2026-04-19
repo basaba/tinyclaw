@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// Suppress Node.js experimental warnings (e.g. SQLite) in this process and subprocesses
+process.env.NODE_NO_WARNINGS = "1";
+
 import { createCopilotAdapters } from "./adapters/index.js";
 import { loadMcpConfig, parseMcpFilter } from "./mcp-config/loader.js";
 
