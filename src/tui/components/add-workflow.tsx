@@ -8,8 +8,8 @@ interface Props {
   onDone: () => void;
 }
 
-type Field = "name" | "filePath" | "scheduleNum" | "scheduleUnit" | "confirm";
-const FIELDS: Field[] = ["name", "filePath", "scheduleNum", "scheduleUnit", "confirm"];
+type Field = "name" | "filePath" | "scheduleNum" | "scheduleUnit" | "submit";
+const FIELDS: Field[] = ["name", "filePath", "scheduleNum", "scheduleUnit", "submit"];
 
 const UNITS = ["min", "hour", "day"] as const;
 type ScheduleUnit = (typeof UNITS)[number];
@@ -53,7 +53,7 @@ function reducer(state: FormState, action: Action): FormState {
     }
     case "append": {
       const f = state.field;
-      if (f === "confirm" || f === "scheduleUnit") return state;
+      if (f === "submit" || f === "scheduleUnit") return state;
       if (f === "scheduleNum") {
         if (!/^\d$/.test(action.char)) return state;
         return { ...state, scheduleNum: state.scheduleNum + action.char };
@@ -62,7 +62,7 @@ function reducer(state: FormState, action: Action): FormState {
     }
     case "delete_char": {
       const f = state.field;
-      if (f === "confirm" || f === "scheduleUnit") return state;
+      if (f === "submit" || f === "scheduleUnit") return state;
       if (f === "scheduleNum") {
         return { ...state, scheduleNum: state.scheduleNum.slice(0, -1) };
       }
@@ -104,8 +104,8 @@ export function AddWorkflow({ client, onDone }: Props) {
 
       const s = stateRef.current;
 
-      if (s.field === "confirm") {
-        if (input === "y" || key.return) {
+      if (s.field === "submit") {
+        if (key.return) {
           client
             .addWorkflow({
               id: randomUUID().slice(0, 8),
@@ -116,8 +116,10 @@ export function AddWorkflow({ client, onDone }: Props) {
             })
             .then(onDone)
             .catch(() => onDone());
-        } else if (input === "n") {
-          onDone();
+        }
+        // Allow Shift+Tab to go back from submit
+        if (key.tab && key.shift) {
+          dispatch({ type: "prev_field" });
         }
         return;
       }
@@ -204,13 +206,20 @@ export function AddWorkflow({ client, onDone }: Props) {
             <Text color="gray"> ◂/▸ to change</Text>
           )}
         </Box>
-        {state.field === "confirm" && (
-          <Box marginTop={1}>
-            <Text bold color="yellow">
-              Add &quot;{state.name}&quot; ({formatSchedule(state.scheduleNum, state.scheduleUnit)})? (y/n)
+        <Box marginTop={1}>
+          {state.field === "submit" ? (
+            <Text bold inverse color="green">
+              {" [ Add ] "}
             </Text>
-          </Box>
-        )}
+          ) : (
+            <Text color="gray">
+              {" [ Add ] "}
+            </Text>
+          )}
+          {state.field === "submit" && (
+            <Text color="gray"> press Enter to submit</Text>
+          )}
+        </Box>
       </Box>
     </Box>
   );
