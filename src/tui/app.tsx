@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { Box, Text, useApp, useInput } from "ink";
+import { Box, Text, useApp, useInput, useStdout } from "ink";
 import type { View, RunRecord, WorkflowEntry } from "./scheduler/types.js";
 import { DaemonClient } from "./scheduler/daemon-client.js";
 import { WorkflowList } from "./components/workflow-list.js";
@@ -14,10 +14,18 @@ interface AppProps {
 
 export function App({ client }: AppProps) {
   const { exit } = useApp();
+  const { stdout } = useStdout();
   const [view, setView] = useState<View>({ screen: "list" });
   const [workflows, setWorkflows] = useState<WorkflowEntry[]>([]);
   const [daemonRunning, setDaemonRunning] = useState(true);
   const [tick, setTick] = useState(0);
+  const [termSize, setTermSize] = useState({ columns: stdout.columns || 80, rows: stdout.rows || 24 });
+
+  useEffect(() => {
+    const onResize = () => setTermSize({ columns: stdout.columns || 80, rows: stdout.rows || 24 });
+    stdout.on("resize", onResize);
+    return () => { stdout.off("resize", onResize); };
+  }, [stdout]);
 
   const refresh = useCallback(() => {
     setTick((t) => t + 1);
@@ -58,7 +66,7 @@ export function App({ client }: AppProps) {
   );
 
   return (
-    <Box flexDirection="column" padding={1}>
+    <Box flexDirection="column" width={termSize.columns} height={termSize.rows} padding={1}>
       <Box marginBottom={1}>
         <Text bold color="cyan">
           🦞 Lobster Workflow Scheduler
@@ -68,40 +76,42 @@ export function App({ client }: AppProps) {
         </Text>
       </Box>
 
-      {view.screen === "list" && (
-        <WorkflowList
-          client={client}
-          workflows={workflows}
-          onAdd={goAdd}
-          onHistory={goHistory}
-          onViewOutput={goRunDetail}
-          onRefresh={refresh}
-        />
-      )}
+      <Box flexDirection="column" flexGrow={1}>
+        {view.screen === "list" && (
+          <WorkflowList
+            client={client}
+            workflows={workflows}
+            onAdd={goAdd}
+            onHistory={goHistory}
+            onViewOutput={goRunDetail}
+            onRefresh={refresh}
+          />
+        )}
 
-      {view.screen === "add" && (
-        <AddWorkflow client={client} onDone={goList} />
-      )}
+        {view.screen === "add" && (
+          <AddWorkflow client={client} onDone={goList} />
+        )}
 
-      {view.screen === "history" && (
-        <RunHistory
-          client={client}
-          workflowId={view.workflowId}
-          onBack={goList}
-          onSelectRun={goRunDetail}
-        />
-      )}
+        {view.screen === "history" && (
+          <RunHistory
+            client={client}
+            workflowId={view.workflowId}
+            onBack={goList}
+            onSelectRun={goRunDetail}
+          />
+        )}
 
-      {view.screen === "run-detail" && (
-        <RunDetail
-          run={view.run}
-          onBack={
-            view.fromWorkflowId
-              ? () => goHistory(view.fromWorkflowId!)
-              : goList
-          }
-        />
-      )}
+        {view.screen === "run-detail" && (
+          <RunDetail
+            run={view.run}
+            onBack={
+              view.fromWorkflowId
+                ? () => goHistory(view.fromWorkflowId!)
+                : goList
+            }
+          />
+        )}
+      </Box>
 
       <StatusBar view={view} schedulerRunning={daemonRunning} />
     </Box>

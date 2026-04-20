@@ -36,5 +36,14 @@ export async function startTui(): Promise<void> {
     process.exit(1);
   }
 
-  render(<App client={client} />);
+  // Enter alternate screen buffer (like vim/htop)
+  process.stdout.write("\x1b[?1049h");
+  process.stdout.write("\x1b[H");
+
+  const instance = render(<App client={client} />);
+
+  await instance.waitUntilExit();
+
+  // Leave alternate screen buffer
+  process.stdout.write("\x1b[?1049l");
 }
