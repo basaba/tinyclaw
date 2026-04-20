@@ -1,0 +1,66 @@
+# Investigate Azure DevOps build test failures with Copilot
+#
+# Fetches the latest failed build for a pipeline, retrieves test failure
+# details, and asks Copilot to investigate root causes.
+#
+# Prerequisites:
+#   - Azure CLI with azure-devops extension (`az extension add --name azure-devops`)
+#   - Authenticated via `az login`
+#
+# Usage:
+#   npx tsx examples/run-workflow.ts
+
+name: ado-build-investigate
+
+steps:
+  # 1. Get the latest failed build for the pipeline
+  - id: latest-build
+    run: >
+      az pipelines build list
+      --definition-ids 273080
+      --top 1
+      --result failed
+      --status completed
+      --org "https://dev.azure.com/msazure"
+      --project "One"
+      --output json
+
+  # 2. Check if this build was already investigated — skip all remaining steps if so
+  - id: check-new
+    pipeline: "diff.last --key ado-build-investigate:273080"
+    stdin: $latest-build.json.0.id
+
+  - id: guard
+    when: $check-new.json.changed == false
+    run: "echo 'Build already investigated — skipping' && exit 1"
+    on_error: skip_rest
+
+  # 3. Fetch test runs associated with the build
+  - id: test-runs
+    run: >
+      az rest --method get
+      --url "https://dev.azure.com/msazure/One/_apis/test/runs?buildUri=vstfs:///Build/Build/$latest-build.json.0.id&api-version=7.1"
+      --resource "499b84ac-1321-427f-aa17-267ca6975798"
+      --output json
+
+  # 4.  For each test run with failures, fetch and trim failed test results
+  - id: failures
+    for_each: $test-runs.json.value
+    steps:
+      - id: failed-tests
+        when: $item.json.totalTests > $item.json.passedTests
+        run: >
+          az rest --method get
+          --url "https://dev.azure.com/msazure/One/_apis/test/runs/$item.json.id/results?outcomes=Failed&api-version=7.1"
+          --resource "499b84ac-1321-427f-aa17-267ca6975798"
+          --output json
+
+  # 5. Pipe failure data through pick to trim, then into Copilot for analysis
+  - id: investigate
+    pipeline: >
+      copilot --prompt 'You are a build failure investigator. Analyze these
+      Azure DevOps test failures and provide:
+      1. A summary of what failed
+      2. Common patterns or root causes across failures
+      3. Suggested next steps to fix them'
+    stdin: $failures.json

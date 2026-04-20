@@ -17,6 +17,11 @@ if (args[0] === "help" || args[0] === "--help" || args[0] === "-h" || !args.leng
 
 if (args[0] === "copilot") {
   copilot(args.slice(1));
+} else if (args[0] === "tui") {
+  const { startTui } = await import("./tui/index.js");
+  await startTui();
+} else if (args[0] === "daemon") {
+  await handleDaemon(args[1]);
 } else {
   run(args);
 }
@@ -32,6 +37,10 @@ Usage:
 
 Commands:
   copilot                  Send a prompt directly to Copilot (shortcut)
+  tui                      Launch the workflow scheduler TUI (connects to daemon)
+  daemon start             Start the scheduler daemon in the background
+  daemon stop              Stop the running scheduler daemon
+  daemon status            Check if the daemon is running
 
 Options:
   -p, --pipeline <text>    Run a pipeline string instead of a file
@@ -225,5 +234,70 @@ async function run(runArgs: string[]): Promise<void> {
   } finally {
     await dispose();
     process.exit(0);
+  }
+}
+
+// ── daemon management ───────────────────────────────────────────────
+
+async function handleDaemon(subCmd: string | undefined): Promise<void> {
+  const { DaemonClient } = await import("./tui/scheduler/daemon-client.js");
+
+  switch (subCmd) {
+    case "start": {
+      if (DaemonClient.isDaemonRunning()) {
+        const pid = DaemonClient.getDaemonPid();
+        console.log(`🦞 Daemon is already running (pid ${pid})`);
+        return;
+      }
+
+      const { spawnDaemon } = await import("./tui/scheduler/spawn.js");
+      const pid = spawnDaemon();
+      if (pid) {
+        console.log(`🦞 Daemon started (pid ${pid})`);
+      } else {
+        console.error("❌ Failed to start daemon");
+        process.exit(1);
+      }
+      return;
+    }
+
+    case "stop": {
+      if (!DaemonClient.isDaemonRunning()) {
+        console.log("🦞 Daemon is not running");
+        return;
+      }
+      const client = new DaemonClient();
+      try {
+        await client.connect();
+        await client.stopDaemon();
+        console.log("🦞 Daemon stopped");
+      } catch {
+        // Fall back to kill
+        const pid = DaemonClient.getDaemonPid();
+        if (pid) {
+          try {
+            process.kill(pid, "SIGTERM");
+            console.log(`🦞 Daemon stopped (pid ${pid})`);
+          } catch {
+            console.error("❌ Failed to stop daemon");
+          }
+        }
+      }
+      return;
+    }
+
+    case "status": {
+      if (DaemonClient.isDaemonRunning()) {
+        const pid = DaemonClient.getDaemonPid();
+        console.log(`🦞 Daemon is running (pid ${pid})`);
+      } else {
+        console.log("🦞 Daemon is not running");
+      }
+      return;
+    }
+
+    default:
+      console.error("Usage: lobster-copilot daemon <start|stop|status>");
+      process.exit(1);
   }
 }
