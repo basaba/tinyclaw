@@ -4,6 +4,7 @@ import type { View, RunRecord, WorkflowEntry } from "./scheduler/types.js";
 import { DaemonClient } from "./scheduler/daemon-client.js";
 import { WorkflowList } from "./components/workflow-list.js";
 import { AddWorkflow } from "./components/add-workflow.js";
+import { YamlView } from "./components/yaml-view.js";
 import { RunHistory } from "./components/run-history.js";
 import { RunDetail } from "./components/run-detail.js";
 import { StatusBar } from "./components/status-bar.js";
@@ -64,6 +65,10 @@ export function App({ client }: AppProps) {
       setView({ screen: "run-detail", run, fromWorkflowId }),
     [],
   );
+  const goYamlView = useCallback(
+    (filePath: string) => setView({ screen: "yaml-view", filePath }),
+    [],
+  );
 
   return (
     <Box flexDirection="column" width={termSize.columns} height={termSize.rows} padding={1}>
@@ -84,6 +89,7 @@ export function App({ client }: AppProps) {
             onAdd={goAdd}
             onHistory={goHistory}
             onViewOutput={goRunDetail}
+            onViewYaml={goYamlView}
             onRefresh={refresh}
           />
         )}
@@ -110,6 +116,10 @@ export function App({ client }: AppProps) {
                 : goList
             }
           />
+        )}
+
+        {view.screen === "yaml-view" && (
+          <YamlView filePath={view.filePath} onBack={goList} />
         )}
       </Box>
 

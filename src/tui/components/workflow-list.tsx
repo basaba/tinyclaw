@@ -10,10 +10,11 @@ interface Props {
   onAdd: () => void;
   onHistory: (workflowId: string) => void;
   onViewOutput: (run: RunRecord, fromWorkflowId: string) => void;
+  onViewYaml: (filePath: string) => void;
   onRefresh: () => void;
 }
 
-export function WorkflowList({ client, workflows, onAdd, onHistory, onViewOutput, onRefresh }: Props) {
+export function WorkflowList({ client, workflows, onAdd, onHistory, onViewOutput, onViewYaml, onRefresh }: Props) {
   const [cursor, setCursor] = useState(0);
 
   useInput((input, key) => {
@@ -46,6 +47,9 @@ export function WorkflowList({ client, workflows, onAdd, onHistory, onViewOutput
           onViewOutput(runs[0], wf.id);
         }
       }).catch(() => {});
+    }
+    if (input === "v") {
+      onViewYaml(wf.filePath);
     }
   });
 
