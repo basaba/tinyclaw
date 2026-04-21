@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
 import type { RunRecord } from "../scheduler/types.js";
 import type { DaemonClient } from "../scheduler/daemon-client.js";
@@ -10,11 +10,25 @@ interface Props {
   onBack: () => void;
 }
 
-export function RunDetail({ run, availableHeight, client, onBack }: Props) {
+export function RunDetail({ run: initialRun, availableHeight, client, onBack }: Props) {
   const [scrollOffset, setScrollOffset] = useState(0);
-  const [resolving, setResolving] = useState(false);
+  const [resolved, setResolved] = useState<"approved" | "rejected" | null>(null);
+  const [liveRun, setLiveRun] = useState<RunRecord>(initialRun);
 
-  const isPendingApproval = run.status === "pending-approval" && !!run.approvalInfo;
+  // Listen for daemon events to update run data after approval resolves
+  useEffect(() => {
+    if (!client) return;
+    const onEvent = (evt: any) => {
+      if ((evt.kind === "run-complete" || evt.kind === "approval-pending") && evt.run?.id === liveRun.id) {
+        setLiveRun(evt.run);
+      }
+    };
+    client.on("event", onEvent);
+    return () => { client.off("event", onEvent); };
+  }, [client, liveRun.id]);
+
+  const run = liveRun;
+  const isPendingApproval = !resolved && run.status === "pending-approval" && !!run.approvalInfo;
   // Own chrome: header(1) + input(margin+hdr+4fields=6) + result(margin+hdr+3fields=5) + output(margin+hdr=2) + scroll hint(1) + approval block(~4 if shown)
   const approvalChrome = isPendingApproval ? 5 : 0;
   const VISIBLE_LINES = Math.max(3, availableHeight - 14 - approvalChrome);
@@ -30,14 +44,14 @@ export function RunDetail({ run, availableHeight, client, onBack }: Props) {
     if (key.downArrow)
       setScrollOffset((o) => Math.min(o + 1, Math.max(0, outputLines.length - VISIBLE_LINES)));
 
-    if (isPendingApproval && client && !resolving) {
+    if (isPendingApproval && client) {
       if (input === "y") {
-        setResolving(true);
-        client.resolveApproval(run.id, true).catch(() => {}).finally(() => setResolving(false));
+        setResolved("approved");
+        client.resolveApproval(run.id, true).catch(() => {});
       }
       if (input === "n") {
-        setResolving(true);
-        client.resolveApproval(run.id, false).catch(() => {}).finally(() => setResolving(false));
+        setResolved("rejected");
+        client.resolveApproval(run.id, false).catch(() => {});
       }
     }
   });
@@ -110,8 +124,14 @@ export function RunDetail({ run, availableHeight, client, onBack }: Props) {
               ).join(", ")}
             </Text>
           )}
-          <Text color={resolving ? "gray" : "white"}>
-            {resolving ? "Processing..." : "Press y to approve, n to reject"}
+          <Text>Press y to approve, n to reject</Text>
+        </Box>
+      )}
+
+      {resolved && (
+        <Box marginTop={1}>
+          <Text bold color={resolved === "approved" ? "green" : "magenta"}>
+            {resolved === "approved" ? "✅ Approved" : "🚫 Rejected"} — press Esc to go back
           </Text>
         </Box>
       )}
