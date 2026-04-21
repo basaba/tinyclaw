@@ -149,11 +149,24 @@ function stepDetails(step: WorkflowStep): string {
   return "";
 }
 
+/** Collect all step IDs (including nested sub-steps) for reference resolution */
+function collectAllStepIds(steps: WorkflowStep[], prefix = ""): Set<string> {
+  const ids = new Set<string>();
+  for (const step of steps) {
+    const fullId = prefix ? `${prefix}.${step.id}` : step.id;
+    ids.add(step.id);
+    ids.add(fullId);
+    if (step.steps) {
+      for (const id of collectAllStepIds(step.steps, fullId)) ids.add(id);
+    }
+  }
+  return ids;
+}
+
 export function collectGraph(workflow: Workflow): { nodes: GraphNode[]; edges: GraphEdge[] } {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
-  const knownStepIds = new Set(workflow.steps.map((s) => s.id));
-  let prevStepId: string | null = null;
+  const knownStepIds = collectAllStepIds(workflow.steps);
   const seenEdgeKeys = new Set<string>();
 
   const addEdge = (edge: GraphEdge): void => {
@@ -163,39 +176,64 @@ export function collectGraph(workflow: Workflow): { nodes: GraphNode[]; edges: G
     edges.push(edge);
   };
 
-  for (const step of workflow.steps) {
-    const type = stepType(step);
-    const details = stepDetails(step);
-    const label = details ? `${step.id} (${truncate(details, 60)})` : step.id;
+  /**
+   * Process a list of steps, returning the last step ID in the chain.
+   * `prefix` is used to namespace sub-step IDs (e.g. "failures.failed-tests").
+   */
+  function processSteps(steps: WorkflowStep[], prevId: string | null, prefix = ""): string | null {
+    let prevStepId = prevId;
 
-    nodes.push({ id: step.id, type, label });
+    for (const step of steps) {
+      const fullId = prefix ? `${prefix}.${step.id}` : step.id;
+      const type = stepType(step);
+      const details = stepDetails(step);
+      const label = details ? `${fullId} (${truncate(details, 60)})` : fullId;
 
-    if (prevStepId) {
-      addEdge({ from: prevStepId, to: step.id, label: "next" });
-    }
-    prevStepId = step.id;
+      nodes.push({ id: fullId, type, label });
 
-    // stdin data dependencies
-    for (const ref of extractStepRefs(step.stdin)) {
-      if (knownStepIds.has(ref)) addEdge({ from: ref, to: step.id, label: "stdin" });
-    }
+      if (prevStepId) {
+        addEdge({ from: prevStepId, to: fullId, label: "next" });
+      }
 
-    // for_each iteration source
-    if (typeof step.for_each === "string") {
-      for (const ref of extractStepRefs(step.for_each)) {
-        if (knownStepIds.has(ref)) addEdge({ from: ref, to: step.id, label: "for_each" });
+      // stdin data dependencies
+      for (const ref of extractStepRefs(step.stdin)) {
+        const resolvedRef = prefix ? `${prefix}.${ref}` : ref;
+        if (knownStepIds.has(resolvedRef)) addEdge({ from: resolvedRef, to: fullId, label: "stdin" });
+        else if (knownStepIds.has(ref)) addEdge({ from: ref, to: fullId, label: "stdin" });
+      }
+
+      // for_each iteration source
+      if (typeof step.for_each === "string") {
+        for (const ref of extractStepRefs(step.for_each)) {
+          if (knownStepIds.has(ref)) addEdge({ from: ref, to: fullId, label: "for_each" });
+        }
+      }
+
+      // conditional edges
+      const condition = step.when ?? step.condition;
+      if (typeof condition === "string" && condition.trim()) {
+        for (const ref of extractStepRefs(condition)) {
+          const resolvedRef = prefix ? `${prefix}.${ref}` : ref;
+          if (knownStepIds.has(resolvedRef))
+            addEdge({ from: resolvedRef, to: fullId, label: `when: ${truncate(condition.trim(), 50)}` });
+          else if (knownStepIds.has(ref))
+            addEdge({ from: ref, to: fullId, label: `when: ${truncate(condition.trim(), 50)}` });
+        }
+      }
+
+      // Recurse into sub-steps (for_each, parallel, etc.)
+      if (step.steps && step.steps.length > 0) {
+        const lastSubId = processSteps(step.steps, fullId, fullId);
+        prevStepId = lastSubId ?? fullId;
+      } else {
+        prevStepId = fullId;
       }
     }
 
-    // conditional edges
-    const condition = step.when ?? step.condition;
-    if (typeof condition === "string" && condition.trim()) {
-      for (const ref of extractStepRefs(condition)) {
-        if (knownStepIds.has(ref))
-          addEdge({ from: ref, to: step.id, label: `when: ${truncate(condition.trim(), 50)}` });
-      }
-    }
+    return prevStepId;
   }
+
+  processSteps(workflow.steps, null);
 
   return { nodes, edges };
 }
@@ -271,7 +309,15 @@ export function computeLayout(workflow: Workflow): GraphLayout {
 
   // Compute node widths
   const nodeWidths = new Map<string, number>();
-  const stepMap = new Map(workflow.steps.map((s) => [s.id, s]));
+  const stepMap = new Map<string, WorkflowStep>();
+  const buildStepMap = (steps: WorkflowStep[], prefix = "") => {
+    for (const s of steps) {
+      const fullId = prefix ? `${prefix}.${s.id}` : s.id;
+      stepMap.set(fullId, s);
+      if (s.steps) buildStepMap(s.steps, fullId);
+    }
+  };
+  buildStepMap(workflow.steps);
   for (const node of nodes) {
     const line1 = node.id;
     const line2 = `[${node.type}]`;
