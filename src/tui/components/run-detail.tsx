@@ -1,19 +1,27 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import type { RunRecord } from "../scheduler/types.js";
+import type { DaemonClient } from "../scheduler/daemon-client.js";
 
 interface Props {
   run: RunRecord;
   availableHeight: number;
+  client?: DaemonClient;
   onBack: () => void;
 }
 
-export function RunDetail({ run, availableHeight, onBack }: Props) {
+export function RunDetail({ run, availableHeight, client, onBack }: Props) {
   const [scrollOffset, setScrollOffset] = useState(0);
-  // Own chrome: header(1) + input(margin+hdr+4fields=6) + result(margin+hdr+3fields=5) + output(margin+hdr=2) + scroll hint(1) = 15
-  const VISIBLE_LINES = Math.max(5, availableHeight - 14);
+  const [resolving, setResolving] = useState(false);
 
-  useInput((_input, key) => {
+  const isPendingApproval = run.status === "pending-approval" && !!run.approvalInfo;
+  // Own chrome: header(1) + input(margin+hdr+4fields=6) + result(margin+hdr+3fields=5) + output(margin+hdr=2) + scroll hint(1) + approval block(~4 if shown)
+  const approvalChrome = isPendingApproval ? 5 : 0;
+  const VISIBLE_LINES = Math.max(3, availableHeight - 14 - approvalChrome);
+
+  const outputLines = (run.output ?? run.error ?? "No output").split("\n");
+
+  useInput((input, key) => {
     if (key.escape) {
       onBack();
       return;
@@ -21,13 +29,26 @@ export function RunDetail({ run, availableHeight, onBack }: Props) {
     if (key.upArrow) setScrollOffset((o) => Math.max(0, o - 1));
     if (key.downArrow)
       setScrollOffset((o) => Math.min(o + 1, Math.max(0, outputLines.length - VISIBLE_LINES)));
+
+    if (isPendingApproval && client && !resolving) {
+      if (input === "y") {
+        setResolving(true);
+        client.resolveApproval(run.id, true).catch(() => {}).finally(() => setResolving(false));
+      }
+      if (input === "n") {
+        setResolving(true);
+        client.resolveApproval(run.id, false).catch(() => {}).finally(() => setResolving(false));
+      }
+    }
   });
 
   const dur = run.durationMs ? `${(run.durationMs / 1000).toFixed(1)}s` : "—";
   const statusColor =
-    run.status === "success" ? "green" : run.status === "error" ? "red" : "yellow";
+    run.status === "success" ? "green"
+      : run.status === "error" ? "red"
+      : run.status === "pending-approval" ? "yellow"
+      : "yellow";
 
-  const outputLines = (run.output ?? run.error ?? "No output").split("\n");
   const visibleLines = outputLines.slice(
     scrollOffset,
     scrollOffset + VISIBLE_LINES,
@@ -72,6 +93,27 @@ export function RunDetail({ run, availableHeight, onBack }: Props) {
           <Text>{dur}</Text>
         </Box>
       </Box>
+
+      {isPendingApproval && (
+        <Box marginTop={1} flexDirection="column" borderStyle="single" borderColor="yellow" paddingX={1}>
+          <Text bold color="yellow">⏳ Approval Required</Text>
+          <Text>
+            <Text color="gray">Prompt: </Text>
+            {run.approvalInfo!.prompt}
+          </Text>
+          {run.approvalInfo!.items.length > 0 && (
+            <Text>
+              <Text color="gray">Items:  </Text>
+              {run.approvalInfo!.items.map((item) =>
+                typeof item === "string" ? item : JSON.stringify(item),
+              ).join(", ")}
+            </Text>
+          )}
+          <Text color={resolving ? "gray" : "white"}>
+            {resolving ? "Processing..." : "Press y to approve, n to reject"}
+          </Text>
+        </Box>
+      )}
 
       <Box marginTop={1} flexDirection="column">
         <Text bold color="gray">

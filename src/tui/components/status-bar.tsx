@@ -15,7 +15,7 @@ export function StatusBar({ view, schedulerRunning }: Props) {
     add: "enter:Next  esc:Cancel",
     edit: "enter:Next  esc:Cancel",
     history: "enter:Detail  esc:Back",
-    "run-detail": "↑↓:Scroll  esc:Back",
+    "run-detail": "↑↓:Scroll  y:Approve  n:Reject  esc:Back",
     "yaml-view": "↑↓:Scroll  PgUp/PgDn:Page  esc:Back",
     "graph-view": "↑↓←→:Navigate  Tab:Cycle  Enter:Expand  esc:Back",
   };

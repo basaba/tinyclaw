@@ -142,6 +142,7 @@ export function App({ client }: AppProps) {
           <RunDetail
             run={view.run}
             availableHeight={contentHeight}
+            client={client}
             onBack={
               view.fromWorkflowId
                 ? () => goHistory(view.fromWorkflowId!)
