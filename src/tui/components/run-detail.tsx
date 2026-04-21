@@ -141,7 +141,7 @@ export function RunDetail({ run: initialRun, availableHeight, client, onBack }: 
           ── Output ({outputLines.length} lines) ──
         </Text>
         {visibleLines.map((line, i) => (
-          <Text key={i} wrap="truncate">
+          <Text key={i} wrap="wrap">
             {line}
           </Text>
         ))}
