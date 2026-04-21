@@ -6,6 +6,7 @@ import { WorkflowList } from "./components/workflow-list.js";
 import { AddWorkflow } from "./components/add-workflow.js";
 import { EditWorkflow } from "./components/edit-workflow.js";
 import { YamlView } from "./components/yaml-view.js";
+import { GraphView } from "./components/graph-view.js";
 import { RunHistory } from "./components/run-history.js";
 import { RunDetail } from "./components/run-detail.js";
 import { StatusBar } from "./components/status-bar.js";
@@ -74,6 +75,10 @@ export function App({ client }: AppProps) {
     (filePath: string) => setView({ screen: "yaml-view", filePath }),
     [],
   );
+  const goGraphView = useCallback(
+    (filePath: string) => setView({ screen: "graph-view", filePath }),
+    [],
+  );
 
   return (
     <Box flexDirection="column" width={termSize.columns} height={termSize.rows} padding={1}>
@@ -96,6 +101,7 @@ export function App({ client }: AppProps) {
             onHistory={goHistory}
             onViewOutput={goRunDetail}
             onViewYaml={goYamlView}
+            onViewGraph={goGraphView}
             onRefresh={refresh}
           />
         )}
@@ -142,6 +148,10 @@ export function App({ client }: AppProps) {
 
         {view.screen === "yaml-view" && (
           <YamlView filePath={view.filePath} onBack={goList} />
+        )}
+
+        {view.screen === "graph-view" && (
+          <GraphView filePath={view.filePath} onBack={goList} />
         )}
       </Box>
 

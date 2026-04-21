@@ -11,12 +11,13 @@ export function StatusBar({ view, schedulerRunning }: Props) {
   const status = schedulerRunning ? "🟢 Running" : "🔴 Stopped";
 
   const keys: Record<string, string> = {
-    list: "a:Add  e:Edit  d:Delete  r:Run  o:Output  v:YAML  space:Enable/Disable  enter:History  q:Quit",
+    list: "a:Add  e:Edit  d:Delete  r:Run  o:Output  v:YAML  g:Graph  space:Enable/Disable  enter:History  q:Quit",
     add: "enter:Next  esc:Cancel",
     edit: "enter:Next  esc:Cancel",
     history: "enter:Detail  esc:Back",
     "run-detail": "↑↓:Scroll  esc:Back",
     "yaml-view": "↑↓:Scroll  PgUp/PgDn:Page  esc:Back",
+    "graph-view": "↑↓←→:Navigate  Tab:Cycle  Enter:Expand  esc:Back",
   };
 
   return (

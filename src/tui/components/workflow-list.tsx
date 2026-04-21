@@ -66,10 +66,11 @@ interface Props {
   onHistory: (workflowId: string) => void;
   onViewOutput: (run: RunRecord, fromWorkflowId: string) => void;
   onViewYaml: (filePath: string) => void;
+  onViewGraph: (filePath: string) => void;
   onRefresh: () => void;
 }
 
-export function WorkflowList({ client, workflows, onAdd, onEdit, onHistory, onViewOutput, onViewYaml, onRefresh }: Props) {
+export function WorkflowList({ client, workflows, onAdd, onEdit, onHistory, onViewOutput, onViewYaml, onViewGraph, onRefresh }: Props) {
   const [cursor, setCursor] = useState(0);
 
   useInput((input, key) => {
@@ -108,6 +109,9 @@ export function WorkflowList({ client, workflows, onAdd, onEdit, onHistory, onVi
     }
     if (input === "v") {
       onViewYaml(wf.filePath);
+    }
+    if (input === "g") {
+      onViewGraph(wf.filePath);
     }
   });
 

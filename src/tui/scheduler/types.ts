@@ -40,4 +40,5 @@ export type View =
   | { screen: "edit"; workflowId: string }
   | { screen: "history"; workflowId: string }
   | { screen: "run-detail"; run: RunRecord; fromWorkflowId?: string }
-  | { screen: "yaml-view"; filePath: string };
+  | { screen: "yaml-view"; filePath: string }
+  | { screen: "graph-view"; filePath: string };
