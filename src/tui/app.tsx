@@ -80,6 +80,9 @@ export function App({ client }: AppProps) {
     [],
   );
 
+  // Available height for content area: total rows - padding(2) - header+margin(2) - statusbar(1)
+  const contentHeight = Math.max(10, termSize.rows - 5);
+
   return (
     <Box flexDirection="column" width={termSize.columns} height={termSize.rows} padding={1}>
       <Box marginBottom={1}>
@@ -138,6 +141,7 @@ export function App({ client }: AppProps) {
         {view.screen === "run-detail" && (
           <RunDetail
             run={view.run}
+            availableHeight={contentHeight}
             onBack={
               view.fromWorkflowId
                 ? () => goHistory(view.fromWorkflowId!)
@@ -147,11 +151,11 @@ export function App({ client }: AppProps) {
         )}
 
         {view.screen === "yaml-view" && (
-          <YamlView filePath={view.filePath} onBack={goList} />
+          <YamlView filePath={view.filePath} availableHeight={contentHeight} onBack={goList} />
         )}
 
         {view.screen === "graph-view" && (
-          <GraphView filePath={view.filePath} onBack={goList} />
+          <GraphView filePath={view.filePath} availableHeight={contentHeight} onBack={goList} />
         )}
       </Box>
 

@@ -9,17 +9,19 @@ import {
 } from "../utils/workflow-graph.js";
 interface Props {
   filePath: string;
+  availableHeight: number;
   onBack: () => void;
 }
 
-export function GraphView({ filePath, onBack }: Props) {
+export function GraphView({ filePath, availableHeight, onBack }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [expandedNodeId, setExpandedNodeId] = useState<string | null>(null);
   const [viewportRow, setViewportRow] = useState(0);
   const [viewportCol, setViewportCol] = useState(0);
-  const VISIBLE_ROWS = 24;
-  const VISIBLE_COLS = 100;
+  // Own chrome: header(1) + hint(1) + margin(1) = 3
+  const VISIBLE_ROWS = Math.max(5, availableHeight - 3);
+  const VISIBLE_COLS = 120;
   const DETAIL_HEIGHT = 6;
 
   // Compute layout

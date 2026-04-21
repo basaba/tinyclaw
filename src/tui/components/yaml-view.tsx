@@ -5,14 +5,16 @@ import { resolve } from "node:path";
 
 interface Props {
   filePath: string;
+  availableHeight: number;
   onBack: () => void;
 }
 
-export function YamlView({ filePath, onBack }: Props) {
+export function YamlView({ filePath, availableHeight, onBack }: Props) {
   const [scrollOffset, setScrollOffset] = useState(0);
   const [lines, setLines] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const VISIBLE_LINES = 30;
+  // Own chrome: header(1) + hint(1) + margin(1) + scroll hint(1) = 4
+  const VISIBLE_LINES = Math.max(5, availableHeight - 4);
 
   useEffect(() => {
     try {

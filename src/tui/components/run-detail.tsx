@@ -4,12 +4,14 @@ import type { RunRecord } from "../scheduler/types.js";
 
 interface Props {
   run: RunRecord;
+  availableHeight: number;
   onBack: () => void;
 }
 
-export function RunDetail({ run, onBack }: Props) {
+export function RunDetail({ run, availableHeight, onBack }: Props) {
   const [scrollOffset, setScrollOffset] = useState(0);
-  const VISIBLE_LINES = 20;
+  // Own chrome: header(1) + input(margin+hdr+4fields=6) + result(margin+hdr+3fields=5) + output(margin+hdr=2) + scroll hint(1) = 15
+  const VISIBLE_LINES = Math.max(5, availableHeight - 14);
 
   useInput((_input, key) => {
     if (key.escape) {
@@ -17,7 +19,8 @@ export function RunDetail({ run, onBack }: Props) {
       return;
     }
     if (key.upArrow) setScrollOffset((o) => Math.max(0, o - 1));
-    if (key.downArrow) setScrollOffset((o) => o + 1);
+    if (key.downArrow)
+      setScrollOffset((o) => Math.min(o + 1, Math.max(0, outputLines.length - VISIBLE_LINES)));
   });
 
   const dur = run.durationMs ? `${(run.durationMs / 1000).toFixed(1)}s` : "—";
