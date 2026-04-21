@@ -128,7 +128,7 @@ export function WorkflowList({ client, workflows, onAdd, onEdit, onHistory, onVi
         return;
       }
       if (key.return && approvals[approvalCursor]) {
-        onViewOutput(approvals[approvalCursor], approvals[approvalCursor].workflowId);
+        onViewOutput(approvals[approvalCursor], "");
       }
       return;
     }
