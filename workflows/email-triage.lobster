@@ -21,6 +21,10 @@ steps:
       --server mail
       --tool SearchMessagesQueryParameters
       --args '{"queryParameters": "?$filter=isRead eq false&$top=1"}'
+    retry:
+      max: 3
+      backoff: exponential
+      delay_ms: 1000
 
   - id: triage
     stdin: "$fetch.stdout"
@@ -48,16 +52,16 @@ steps:
 
   - id: confirm
     approval: "Review drafted email replies before creating Outlook drafts"
-    stdin: $draft.json
+    stdin: "$draft.json.drafts"
 
-  - id: send
-    when: $confirm.approved
-    for_each: "$draft.json.drafts"
-    item_var: d
-    steps:
-      - id: reply
-        stdin: "$d.json"
-        pipeline: >
-          map id={{messageId}} comment={{replyText}}
-          | pick id comment
-          | agency.mcp.call --server mail --tool ReplyToMessage --args '{"sendImmediately": false}'
+  # - id: send
+  #   when: $confirm.approved
+  #   for_each: "$draft.json.drafts"
+  #   item_var: d
+  #   steps:
+  #     - id: reply
+  #       stdin: "$d.json"
+  #       pipeline: >
+  #         map id={{messageId}} comment={{replyText}}
+  #         | pick id comment
+  #         | agency.mcp.call --server mail --tool ReplyToMessage --args '{"sendImmediately": false}'

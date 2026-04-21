@@ -1,5 +1,8 @@
 import cron from "node-cron";
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { resolve, extname } from "node:path";
+import { createRequire } from "node:module";
 import type { WorkflowEntry, RunRecord, TriggerType, ApprovalInfo } from "./types.js";
 import {
   loadSchedules,
@@ -13,6 +16,35 @@ import { CopilotAdapter } from "../../adapters/copilot-adapter.js";
 import { createCopilotCommand } from "../../commands/copilot.js";
 import { createMcpCallCommand } from "../../commands/mcp.js";
 import { loadMcpConfig } from "../../mcp-config/loader.js";
+
+// ── Workflow file parsing (for step progress) ───────────────────────
+
+interface WorkflowStepInfo {
+  id: string;
+  hasSubSteps: boolean;
+}
+
+function parseWorkflowSteps(filePath: string): WorkflowStepInfo[] {
+  try {
+    const text = readFileSync(resolve(filePath), "utf-8");
+    const ext = extname(filePath).toLowerCase();
+    let parsed: any;
+    if (ext === ".json") {
+      parsed = JSON.parse(text);
+    } else {
+      const req = createRequire(import.meta.url);
+      const { parse: parseYaml } = req("yaml") as { parse: (s: string) => unknown };
+      parsed = parseYaml(text);
+    }
+    if (!parsed?.steps || !Array.isArray(parsed.steps)) return [];
+    return parsed.steps.map((s: any) => ({
+      id: String(s.id ?? "unknown"),
+      hasSubSteps: Array.isArray(s.steps) && s.steps.length > 0,
+    }));
+  } catch {
+    return [];
+  }
+}
 
 // ── Interval parsing ────────────────────────────────────────────────
 
@@ -38,6 +70,7 @@ export type SchedulerEvent =
   | { type: "run-start"; run: RunRecord }
   | { type: "run-complete"; run: RunRecord }
   | { type: "approval-pending"; run: RunRecord }
+  | { type: "step-progress"; runId: string; workflowId: string; stepId: string; stepIndex: number; totalSteps: number; status: "running" | "complete" | "skipped" }
   | { type: "config-changed" };
 
 export class SchedulerEngine extends EventEmitter {
@@ -265,6 +298,10 @@ export class SchedulerEngine extends EventEmitter {
     appendRun(run);
     this.emit("change", { type: "run-start", run } satisfies SchedulerEvent);
 
+    // Parse workflow steps upfront for progress tracking
+    const workflowSteps = parseWorkflowSteps(wf.filePath);
+    const totalSteps = workflowSteps.length;
+
     const startMs = Date.now();
     const mcpServers = loadMcpConfig({});
     const adapter = new CopilotAdapter({
@@ -287,13 +324,51 @@ export class SchedulerEngine extends EventEmitter {
       const extraCommands = new Map(
         [copilotCmd, mcpCallCmd].map((c) => [c.name, c]),
       );
-      const registry = {
+      const baseRegistry = {
         get(name: string) {
           return extraCommands.get(name) ?? defaultRegistry.get(name);
         },
         list() {
           return [...defaultRegistry.list(), ...extraCommands.keys()].sort();
         },
+      };
+
+      // Wrap registry to track step progress via pipeline invocations.
+      // Each workflow step runs a pipeline that calls registry.get() for
+      // its commands. We detect new pipeline invocations by tracking calls
+      // after periods of inactivity (async gaps between workflow steps).
+      let pipelineCount = -1; // -1 because runToolRequest does an initial get for file resolution
+      let lastGetTime = 0;
+      const STEP_GAP_MS = 5; // consecutive get() calls within a step are <5ms apart
+      const registry = {
+        get(name: string) {
+          const now = Date.now();
+          if (now - lastGetTime > STEP_GAP_MS) {
+            pipelineCount++;
+            const stepIndex = Math.min(pipelineCount, totalSteps - 1);
+            if (pipelineCount >= 0 && pipelineCount < totalSteps) {
+              const step = workflowSteps[stepIndex];
+              emitStepProgress(step.id, stepIndex, "running");
+            }
+          }
+          lastGetTime = now;
+          return baseRegistry.get(name);
+        },
+        list() {
+          return baseRegistry.list();
+        },
+      };
+
+      const emitStepProgress = (stepId: string, stepIndex: number, status: "running" | "complete" | "skipped") => {
+        this.emit("change", {
+          type: "step-progress",
+          runId: run.id,
+          workflowId: wf.id,
+          stepId,
+          stepIndex,
+          totalSteps,
+          status,
+        } satisfies SchedulerEvent);
       };
 
       const result: any = await runToolRequest({

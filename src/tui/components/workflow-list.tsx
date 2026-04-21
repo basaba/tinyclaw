@@ -72,6 +72,7 @@ function timeSince(isoDate: string): string {
 interface Props {
   client: DaemonClient;
   workflows: WorkflowEntry[];
+  stepProgress: Map<string, { stepId: string; stepIndex: number; totalSteps: number }>;
   onAdd: () => void;
   onEdit: (workflowId: string) => void;
   onHistory: (workflowId: string) => void;
@@ -81,7 +82,7 @@ interface Props {
   onRefresh: () => void;
 }
 
-export function WorkflowList({ client, workflows, onAdd, onEdit, onHistory, onViewOutput, onViewYaml, onViewGraph, onRefresh }: Props) {
+export function WorkflowList({ client, workflows, stepProgress, onAdd, onEdit, onHistory, onViewOutput, onViewYaml, onViewGraph, onRefresh }: Props) {
   const [cursor, setCursor] = useState(0);
   const [pane, setPane] = useState<"workflows" | "approvals">("workflows");
   const [approvalCursor, setApprovalCursor] = useState(0);
@@ -230,7 +231,13 @@ export function WorkflowList({ client, workflows, onAdd, onEdit, onHistory, onVi
                   : lastRun.status === "error" ? "❌ failed"
                   : lastRun.status === "rejected" ? "🚫 rejected"
                   : lastRun.status === "pending-approval" ? "⏳ approval"
-                  : "🔄 running"
+                  : (() => {
+                      const progress = stepProgress.get(wf.id);
+                      if (progress) {
+                        return `🔄 ${progress.stepIndex + 1}/${progress.totalSteps} ${progress.stepId}`;
+                      }
+                      return "🔄 running";
+                    })()
                 : "—";
               const nextRunStr = formatNextRun(wf, lastRun);
               return (
