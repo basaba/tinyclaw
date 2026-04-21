@@ -46,18 +46,18 @@ steps:
       --output-schema '{"type":"object","properties":{"drafts":{"type":"array","items":{"type":"object","properties":{"messageId":{"type":"string"},"from":{"type":"string"},"subject":{"type":"string"},"summary":{"type":"string"},"replyText":{"type":"string"}},"required":["messageId","from","subject","replyText"]}}},"required":["drafts"]}'
       --schema-version email-draft.v1
 
-  # - id: confirm
-  #   approval: "Review drafted email replies before creating Outlook drafts"
-  #   stdin: $draft.json
+  - id: confirm
+    approval: "Review drafted email replies before creating Outlook drafts"
+    stdin: $draft.json
 
-  # - id: send
-  #   when: $confirm.approved
-  #   for_each: "$draft.json.drafts"
-  #   item_var: d
-  #   steps:
-  #     - id: reply
-  #       stdin: "$d.json"
-  #       pipeline: >
-  #         map id={{messageId}} comment={{replyText}}
-  #         | pick id comment
-  #         | agency.mcp.call --server mail --tool ReplyToMessage --args '{"sendImmediately": false}'
+  - id: send
+    when: $confirm.approved
+    for_each: "$draft.json.drafts"
+    item_var: d
+    steps:
+      - id: reply
+        stdin: "$d.json"
+        pipeline: >
+          map id={{messageId}} comment={{replyText}}
+          | pick id comment
+          | agency.mcp.call --server mail --tool ReplyToMessage --args '{"sendImmediately": false}'

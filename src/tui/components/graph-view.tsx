@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
+import { watch } from "node:fs";
+import { resolve } from "node:path";
 import {
   parseWorkflowFile,
   computeLayout,
@@ -17,6 +19,7 @@ export function GraphView({ filePath, availableHeight, onBack }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [expandedNodeId, setExpandedNodeId] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
   const [viewportRow, setViewportRow] = useState(0);
   const [viewportCol, setViewportCol] = useState(0);
   // Own chrome: header(1) + hint(1) + margin(1) = 3
@@ -24,7 +27,16 @@ export function GraphView({ filePath, availableHeight, onBack }: Props) {
   const VISIBLE_COLS = 120;
   const DETAIL_HEIGHT = 6;
 
-  // Compute layout
+  // Watch file for changes
+  useEffect(() => {
+    const resolved = resolve(filePath);
+    const watcher = watch(resolved, { persistent: false }, (event) => {
+      if (event === "change") setRevision((r) => r + 1);
+    });
+    return () => watcher.close();
+  }, [filePath]);
+
+  // Compute layout (re-parses when file changes)
   const layout = useMemo<GraphLayout | null>(() => {
     try {
       const workflow = parseWorkflowFile(filePath);
@@ -33,7 +45,7 @@ export function GraphView({ filePath, availableHeight, onBack }: Props) {
       setError(err instanceof Error ? err.message : "Failed to render graph");
       return null;
     }
-  }, [filePath]);
+  }, [filePath, revision]);
 
   // Select first node on initial load
   useEffect(() => {

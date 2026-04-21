@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
-import { readFileSync } from "node:fs";
+import { readFileSync, watch } from "node:fs";
 import { resolve } from "node:path";
 
 interface Props {
@@ -17,15 +17,25 @@ export function YamlView({ filePath, availableHeight, onBack }: Props) {
   const VISIBLE_LINES = Math.max(5, availableHeight - 4);
 
   useEffect(() => {
-    try {
-      const resolved = resolve(filePath);
-      const content = readFileSync(resolved, "utf-8");
-      setLines(content.split("\n"));
-    } catch (err: unknown) {
-      setError(
-        err instanceof Error ? err.message : "Failed to read file",
-      );
-    }
+    const resolved = resolve(filePath);
+    const readFile = () => {
+      try {
+        const content = readFileSync(resolved, "utf-8");
+        setLines(content.split("\n"));
+        setError(null);
+      } catch (err: unknown) {
+        setError(
+          err instanceof Error ? err.message : "Failed to read file",
+        );
+      }
+    };
+
+    readFile();
+
+    const watcher = watch(resolved, { persistent: false }, (event) => {
+      if (event === "change") readFile();
+    });
+    return () => watcher.close();
   }, [filePath]);
 
   useInput((_input, key) => {
