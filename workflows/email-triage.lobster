@@ -22,29 +22,29 @@ steps:
       --tool SearchMessagesQueryParameters
       --args '{"queryParameters": "?$filter=isRead eq false&$top=1"}'
 
-  # - id: triage
-  #   stdin: "$fetch.stdout"
-  #   pipeline: >
-  #     llm.invoke
-  #     --prompt 'You are an email triage assistant.
-  #     Analyze the emails and classify each one:
-  #       - "needs-reply": requires a response from me
-  #       - "fyi": informational, no reply needed
-  #       - "ignore": spam, notifications, automated messages
-  #     Include a 1-2 sentence summary and the first 200 chars of body for each.'
-  #     --output-schema '{"type":"object","properties":{"emails":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"from":{"type":"string"},"subject":{"type":"string"},"category":{"type":"string","enum":["needs-reply","fyi","ignore"]},"summary":{"type":"string"},"bodyPreview":{"type":"string"}},"required":["id","from","subject","category","summary"]}}},"required":["emails"]}'
-  #     --schema-version email-triage.v1
+  - id: triage
+    stdin: "$fetch.stdout"
+    pipeline: >
+      llm.invoke
+      --prompt 'You are an email triage assistant.
+      Analyze the emails and classify each one:
+        - "needs-reply": requires a response from me
+        - "fyi": informational, no reply needed
+        - "ignore": spam, notifications, automated messages
+      Include a 1-2 sentence summary and the first 200 chars of body for each.'
+      --output-schema '{"type":"object","properties":{"emails":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"from":{"type":"string"},"subject":{"type":"string"},"category":{"type":"string","enum":["needs-reply","fyi","ignore"]},"summary":{"type":"string"},"bodyPreview":{"type":"string"}},"required":["id","from","subject","category","summary"]}}},"required":["emails"]}'
+      --schema-version email-triage.v1
 
-  # - id: draft
-  #   stdin: "$triage.stdout"
-  #   pipeline: >
-  #     llm.invoke
-  #     --prompt 'You are a professional email assistant.
-  #     For each email classified as "needs-reply" in the input,
-  #     draft a concise, professional reply.
-  #     If no emails need a reply, return an empty array.'
-  #     --output-schema '{"type":"object","properties":{"drafts":{"type":"array","items":{"type":"object","properties":{"messageId":{"type":"string"},"from":{"type":"string"},"subject":{"type":"string"},"summary":{"type":"string"},"replyText":{"type":"string"}},"required":["messageId","from","subject","replyText"]}}},"required":["drafts"]}'
-  #     --schema-version email-draft.v1
+  - id: draft
+    stdin: "$triage.stdout"
+    pipeline: >
+      llm.invoke
+      --prompt 'You are a professional email assistant.
+      For each email classified as "needs-reply" in the input,
+      draft a concise, professional reply.
+      If no emails need a reply, return an empty array.'
+      --output-schema '{"type":"object","properties":{"drafts":{"type":"array","items":{"type":"object","properties":{"messageId":{"type":"string"},"from":{"type":"string"},"subject":{"type":"string"},"summary":{"type":"string"},"replyText":{"type":"string"}},"required":["messageId","from","subject","replyText"]}}},"required":["drafts"]}'
+      --schema-version email-draft.v1
 
   # - id: confirm
   #   approval: "Review drafted email replies before creating Outlook drafts"
