@@ -16,6 +16,13 @@ export function RunHistory({ client, workflowId, onBack, onSelectRun }: Props) {
 
   useEffect(() => {
     client.getHistory(workflowId).then(setRuns).catch(() => {});
+    const onEvent = (evt: any) => {
+      if (evt.kind === "run-complete" || evt.kind === "run-start" || evt.kind === "approval-pending") {
+        client.getHistory(workflowId).then(setRuns).catch(() => {});
+      }
+    };
+    client.on("event", onEvent);
+    return () => { client.off("event", onEvent); };
   }, [client, workflowId]);
 
   useInput((_input, key) => {
@@ -55,7 +62,11 @@ export function RunHistory({ client, workflowId, onBack, onSelectRun }: Props) {
       {runs.map((run, i) => {
         const selected = i === cursor;
         const statusIcon =
-          run.status === "success" ? "✅" : run.status === "error" ? "❌" : "🔄";
+          run.status === "success" ? "✅"
+            : run.status === "error" ? "❌"
+            : run.status === "rejected" ? "🚫"
+            : run.status === "pending-approval" ? "⏳"
+            : "🔄";
         const dur = run.durationMs
           ? `${(run.durationMs / 1000).toFixed(1)}s`
           : "—";
