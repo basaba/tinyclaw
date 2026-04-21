@@ -86,6 +86,7 @@ export function WorkflowList({ client, workflows, onAdd, onEdit, onHistory, onVi
   const [pane, setPane] = useState<"workflows" | "approvals">("workflows");
   const [approvalCursor, setApprovalCursor] = useState(0);
   const [approvals, setApprovals] = useState<RunRecord[]>([]);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const refreshApprovals = useCallback(() => {
     client.listApprovals().then(setApprovals).catch(() => {});
@@ -110,6 +111,26 @@ export function WorkflowList({ client, workflows, onAdd, onEdit, onHistory, onVi
     workflows.find((w) => w.id === wfId)?.name ?? wfId;
 
   useInput((input, key) => {
+    // Delete confirmation
+    if (confirmDelete) {
+      if (input === "y" || input === "Y") {
+        const wf = workflows[cursor];
+        if (wf) {
+          client.removeWorkflow(wf.id).then(() => {
+            setCursor((c) => Math.min(c, workflows.length - 2));
+            onRefresh();
+          }).catch(() => {});
+        }
+        setConfirmDelete(false);
+        return;
+      }
+      if (input === "n" || input === "N" || key.escape) {
+        setConfirmDelete(false);
+        return;
+      }
+      return;
+    }
+
     // Tab switches pane
     if (key.tab) {
       setPane((p) => p === "workflows" ? (approvals.length > 0 ? "approvals" : "workflows") : "workflows");
@@ -151,10 +172,7 @@ export function WorkflowList({ client, workflows, onAdd, onEdit, onHistory, onVi
       onEdit(wf.id);
     }
     if (input === "d") {
-      client.removeWorkflow(wf.id).then(() => {
-        setCursor((c) => Math.min(c, workflows.length - 2));
-        onRefresh();
-      }).catch(() => {});
+      setConfirmDelete(true);
     }
     if (input === "r") {
       client.runNow(wf.id).catch(() => {});
@@ -236,6 +254,14 @@ export function WorkflowList({ client, workflows, onAdd, onEdit, onHistory, onVi
           </>
         )}
       </Box>
+
+      {confirmDelete && workflows[cursor] && (
+        <Box marginTop={1}>
+          <Text bold color="red">
+            Delete "{workflows[cursor].name}"? (y/n)
+          </Text>
+        </Box>
+      )}
 
       {/* ── Approvals pane ── */}
       <Box flexDirection="column" marginTop={1}>
