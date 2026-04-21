@@ -137,6 +137,17 @@ export class DaemonClient extends EventEmitter {
     throw new Error(resp.type === "error" ? resp.message : "Unexpected response");
   }
 
+  async listApprovals(): Promise<RunRecord[]> {
+    const resp = await this.send({ cmd: "list-approvals" });
+    if (resp.type === "approvals") return resp.runs;
+    throw new Error(resp.type === "error" ? resp.message : "Unexpected response");
+  }
+
+  async resolveApproval(runId: string, approved: boolean): Promise<void> {
+    const resp = await this.send({ cmd: "resolve-approval", runId, approved });
+    if (resp.type === "error") throw new Error(resp.message);
+  }
+
   async stopDaemon(): Promise<void> {
     try {
       await this.send({ cmd: "stop-daemon" });

@@ -34,7 +34,7 @@ function broadcast(msg: DaemonResponse): void {
   }
 }
 
-function handleRequest(req: DaemonRequest): DaemonResponse {
+function handleRequest(req: DaemonRequest): DaemonResponse | Promise<DaemonResponse> {
   switch (req.cmd) {
     case "status":
       return {
@@ -70,6 +70,14 @@ function handleRequest(req: DaemonRequest): DaemonResponse {
     case "get-history":
       return { type: "history", runs: getRunsForWorkflow(req.workflowId) };
 
+    case "list-approvals":
+      return { type: "approvals", runs: engine.listPendingApprovals() };
+
+    case "resolve-approval":
+      // Fire-and-forget — result comes via events
+      engine.resolveApproval(req.runId, req.approved).catch(() => {});
+      return { type: "ok", message: req.approved ? "approving" : "rejecting" };
+
     case "stop-daemon":
       cleanup();
       process.exit(0);
@@ -94,8 +102,17 @@ const server = net.createServer((socket) => {
       if (!line) continue;
       try {
         const req = JSON.parse(line) as DaemonRequest;
-        const resp = handleRequest(req);
-        socket.write(JSON.stringify(resp) + "\n");
+        const result = handleRequest(req);
+        Promise.resolve(result).then((resp) => {
+          socket.write(JSON.stringify(resp) + "\n");
+        }).catch((err) => {
+          socket.write(
+            JSON.stringify({
+              type: "error",
+              message: err instanceof Error ? err.message : String(err),
+            } satisfies DaemonResponse) + "\n",
+          );
+        });
       } catch (err) {
         socket.write(
           JSON.stringify({
@@ -118,7 +135,9 @@ engine.on("change", (evt: { type: string; run?: any }) => {
       ? { kind: "run-start", run: evt.run }
       : evt.type === "run-complete"
         ? { kind: "run-complete", run: evt.run }
-        : { kind: "config-changed" };
+        : evt.type === "approval-pending"
+          ? { kind: "approval-pending", run: evt.run }
+          : { kind: "config-changed" };
 
   broadcast({ type: "event", event });
 });

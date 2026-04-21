@@ -13,6 +13,14 @@ export interface ScheduleConfig {
 
 export type TriggerType = "schedule" | "manual";
 
+export interface ApprovalInfo {
+  prompt: string;
+  items: unknown[];
+  preview?: string;
+  resumeToken: string;
+  approvalId: string;
+}
+
 export interface RunRecord {
   id: string;
   workflowId: string;
@@ -20,7 +28,7 @@ export interface RunRecord {
   triggeredAt: string; // ISO timestamp
   completedAt?: string;
   durationMs?: number;
-  status: "running" | "success" | "error";
+  status: "running" | "success" | "error" | "pending-approval";
   input: {
     filePath: string;
     args?: Record<string, unknown>;
@@ -28,6 +36,7 @@ export interface RunRecord {
   };
   output?: string;
   error?: string;
+  approvalInfo?: ApprovalInfo;
 }
 
 export interface RunHistory {

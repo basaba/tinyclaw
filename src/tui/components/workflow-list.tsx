@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
 import type { DaemonClient } from "../scheduler/daemon-client.js";
 import type { RunRecord, WorkflowEntry } from "../scheduler/types.js";
@@ -58,6 +58,17 @@ function formatNextRun(wf: WorkflowEntry, lastRun: RunRecord | null): string {
   return `${next.getMonth() + 1}/${next.getDate()} ${formatTime(next)}`;
 }
 
+function timeSince(isoDate: string): string {
+  const ms = Date.now() - new Date(isoDate).getTime();
+  const secs = Math.floor(ms / 1000);
+  if (secs < 60) return `${secs}s ago`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
 interface Props {
   client: DaemonClient;
   workflows: WorkflowEntry[];
@@ -72,8 +83,57 @@ interface Props {
 
 export function WorkflowList({ client, workflows, onAdd, onEdit, onHistory, onViewOutput, onViewYaml, onViewGraph, onRefresh }: Props) {
   const [cursor, setCursor] = useState(0);
+  const [pane, setPane] = useState<"workflows" | "approvals">("workflows");
+  const [approvalCursor, setApprovalCursor] = useState(0);
+  const [approvals, setApprovals] = useState<RunRecord[]>([]);
+
+  const refreshApprovals = useCallback(() => {
+    client.listApprovals().then(setApprovals).catch(() => {});
+  }, [client]);
+
+  useEffect(() => {
+    refreshApprovals();
+    client.on("change", refreshApprovals);
+    return () => { client.off("change", refreshApprovals); };
+  }, [client, refreshApprovals]);
+
+  // Keep cursors in bounds
+  useEffect(() => {
+    if (cursor >= workflows.length && workflows.length > 0) setCursor(workflows.length - 1);
+  }, [workflows.length, cursor]);
+  useEffect(() => {
+    if (approvalCursor >= approvals.length && approvals.length > 0) setApprovalCursor(approvals.length - 1);
+    if (approvals.length === 0 && pane === "approvals") setPane("workflows");
+  }, [approvals.length, approvalCursor, pane]);
+
+  const workflowName = (wfId: string) =>
+    workflows.find((w) => w.id === wfId)?.name ?? wfId;
 
   useInput((input, key) => {
+    // Tab switches pane
+    if (key.tab) {
+      setPane((p) => p === "workflows" ? (approvals.length > 0 ? "approvals" : "workflows") : "workflows");
+      return;
+    }
+
+    if (pane === "approvals") {
+      if (key.upArrow) setApprovalCursor((c) => Math.max(0, c - 1));
+      if (key.downArrow) setApprovalCursor((c) => Math.min(approvals.length - 1, c + 1));
+      if (input === "y" && approvals[approvalCursor]) {
+        client.resolveApproval(approvals[approvalCursor].id, true).catch(() => {});
+        return;
+      }
+      if (input === "n" && approvals[approvalCursor]) {
+        client.resolveApproval(approvals[approvalCursor].id, false).catch(() => {});
+        return;
+      }
+      if (key.return && approvals[approvalCursor]) {
+        onViewOutput(approvals[approvalCursor], approvals[approvalCursor].workflowId);
+      }
+      return;
+    }
+
+    // Workflow pane
     if (key.upArrow) setCursor((c) => Math.max(0, c - 1));
     if (key.downArrow) setCursor((c) => Math.min(workflows.length - 1, c + 1));
 
@@ -115,56 +175,105 @@ export function WorkflowList({ client, workflows, onAdd, onEdit, onHistory, onVi
     }
   });
 
-  if (workflows.length === 0) {
-    return (
-      <Box flexDirection="column">
-        <Text color="gray">No workflows configured. Press </Text>
-        <Text bold color="green">a</Text>
-        <Text color="gray"> to add one.</Text>
-      </Box>
-    );
-  }
+  const wfFocused = pane === "workflows";
+  const apFocused = pane === "approvals";
 
   return (
     <Box flexDirection="column">
-      <Box>
-        <Text bold>
-          {"  "}
-          {"Status".padEnd(10)}
-          {"Name".padEnd(25)}
-          {"Schedule".padEnd(20)}
-          {"Next Run".padEnd(14)}
-          {"Last Run".padEnd(14)}
-          {"File"}
-        </Text>
+      {/* ── Workflows pane ── */}
+      <Box flexDirection="column">
+        <Box>
+          <Text bold color={wfFocused ? "cyan" : "gray"}>
+            📋 Workflows
+          </Text>
+        </Box>
+        {workflows.length === 0 ? (
+          <Text color="gray">  No workflows configured. Press a to add one.</Text>
+        ) : (
+          <>
+            <Box>
+              <Text bold color="gray">
+                {"  "}
+                {"Status".padEnd(10)}
+                {"Name".padEnd(25)}
+                {"Schedule".padEnd(20)}
+                {"Next Run".padEnd(14)}
+                {"Last Run".padEnd(14)}
+                {"File"}
+              </Text>
+            </Box>
+            {workflows.map((wf, i) => {
+              const selected = wfFocused && i === cursor;
+              const status = wf.enabled ? "✅" : "⏸️";
+              const runs = getRunsForWorkflow(wf.id);
+              const lastRun = runs.length > 0 ? runs[0] : null;
+              const lastRunStr = lastRun
+                ? lastRun.status === "success" ? "✅ success"
+                  : lastRun.status === "error" ? "❌ failed"
+                  : lastRun.status === "pending-approval" ? "⏳ approval"
+                  : "🔄 running"
+                : "—";
+              const nextRunStr = formatNextRun(wf, lastRun);
+              return (
+                <Box key={wf.id}>
+                  <Text
+                    color={selected ? "cyan" : undefined}
+                    bold={selected}
+                    inverse={selected}
+                  >
+                    {selected ? "▸ " : "  "}
+                    {status.padEnd(10)}
+                    {wf.name.padEnd(25)}
+                    {wf.schedule.padEnd(20)}
+                    {nextRunStr.padEnd(14)}
+                    {lastRunStr.padEnd(14)}
+                    {wf.filePath}
+                  </Text>
+                </Box>
+              );
+            })}
+          </>
+        )}
       </Box>
-      {workflows.map((wf, i) => {
-        const selected = i === cursor;
-        const status = wf.enabled ? "✅" : "⏸️";
-        const runs = getRunsForWorkflow(wf.id);
-        const lastRun = runs.length > 0 ? runs[0] : null;
-        const lastRunStr = lastRun
-          ? lastRun.status === "success" ? "✅ success" : lastRun.status === "error" ? "❌ failed" : "🔄 running"
-          : "—";
-        const nextRunStr = formatNextRun(wf, lastRun);
-        return (
-          <Box key={wf.id}>
-            <Text
-              color={selected ? "cyan" : undefined}
-              bold={selected}
-              inverse={selected}
-            >
-              {selected ? "▸ " : "  "}
-              {status.padEnd(10)}
-              {wf.name.padEnd(25)}
-              {wf.schedule.padEnd(20)}
-              {nextRunStr.padEnd(14)}
-              {lastRunStr.padEnd(14)}
-              {wf.filePath}
-            </Text>
-          </Box>
-        );
-      })}
+
+      {/* ── Approvals pane ── */}
+      <Box flexDirection="column" marginTop={1}>
+        <Box>
+          <Text bold color={apFocused ? "yellow" : "gray"}>
+            🔔 Pending Approvals
+          </Text>
+          <Text color="gray"> ({approvals.length})</Text>
+          {approvals.length > 0 && !apFocused && (
+            <Text color="gray"> — press Tab to focus</Text>
+          )}
+        </Box>
+
+        {approvals.length === 0 ? (
+          <Text color="gray">  No pending approvals</Text>
+        ) : (
+          approvals.map((run, i) => {
+            const selected = apFocused && i === approvalCursor;
+            const prompt = run.approvalInfo?.prompt ?? "Approval required";
+            const truncPrompt = prompt.length > 50 ? prompt.slice(0, 47) + "..." : prompt;
+            const age = timeSince(run.triggeredAt);
+            return (
+              <Box key={run.id}>
+                <Text
+                  color={selected ? "yellow" : undefined}
+                  bold={selected}
+                  inverse={selected}
+                >
+                  {selected ? "▸ " : "  "}
+                  <Text color="yellow">⏳</Text>
+                  {" "}{workflowName(run.workflowId).padEnd(20)}
+                  {truncPrompt.padEnd(52)}
+                  <Text color="gray">{age}</Text>
+                </Text>
+              </Box>
+            );
+          })
+        )}
+      </Box>
     </Box>
   );
 }

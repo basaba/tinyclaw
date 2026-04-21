@@ -1,11 +1,12 @@
 import cron from "node-cron";
 import { randomUUID } from "node:crypto";
-import type { WorkflowEntry, RunRecord, TriggerType } from "./types.js";
+import type { WorkflowEntry, RunRecord, TriggerType, ApprovalInfo } from "./types.js";
 import {
   loadSchedules,
   saveSchedules,
   appendRun,
   updateRun,
+  loadHistory,
 } from "./config.js";
 import { EventEmitter } from "node:events";
 import { CopilotAdapter } from "../../adapters/copilot-adapter.js";
@@ -36,6 +37,7 @@ function isCron(expr: string): boolean {
 export type SchedulerEvent =
   | { type: "run-start"; run: RunRecord }
   | { type: "run-complete"; run: RunRecord }
+  | { type: "approval-pending"; run: RunRecord }
   | { type: "config-changed" };
 
 export class SchedulerEngine extends EventEmitter {
@@ -110,6 +112,109 @@ export class SchedulerEngine extends EventEmitter {
     const wf = this.getWorkflows().find((w) => w.id === workflowId);
     if (!wf) throw new Error(`Workflow ${workflowId} not found`);
     return this.executeWorkflow(wf, "manual");
+  }
+
+  listPendingApprovals(): RunRecord[] {
+    return loadHistory().runs.filter((r) => r.status === "pending-approval");
+  }
+
+  async resolveApproval(runId: string, approved: boolean): Promise<RunRecord> {
+    const history = loadHistory();
+    const run = history.runs.find((r) => r.id === runId);
+    if (!run) throw new Error(`Run ${runId} not found`);
+    if (run.status !== "pending-approval") throw new Error(`Run ${runId} is not pending approval`);
+    if (!run.approvalInfo?.resumeToken) throw new Error(`Run ${runId} has no resume token`);
+
+    const lobsterCore = await import("@basaba/lobster/core") as any;
+    const { resumeToolRequest, createDefaultRegistry } = lobsterCore;
+
+    const mcpServers = loadMcpConfig({});
+    const adapter = new CopilotAdapter({
+      cliUrl: process.env.COPILOT_CLI_URL,
+      mcpServers,
+    });
+
+    try {
+      const defaultRegistry = createDefaultRegistry();
+      const copilotCmd = createCopilotCommand(
+        () => adapter.client,
+        () => adapter.ensureStarted(),
+      );
+      const mcpCallCmd = createMcpCallCommand(() => mcpServers);
+      const extraCommands = new Map(
+        [copilotCmd, mcpCallCmd].map((c: any) => [c.name, c]),
+      );
+      const registry = {
+        get(name: string) {
+          return extraCommands.get(name) ?? defaultRegistry.get(name);
+        },
+        list() {
+          return [...defaultRegistry.list(), ...extraCommands.keys()].sort();
+        },
+      };
+
+      const result = await resumeToolRequest({
+        token: run.approvalInfo.resumeToken,
+        approved,
+        cancel: !approved,
+        ctx: {
+          llmAdapters: { copilot: adapter as any },
+          registry,
+          env: { ...process.env, LOBSTER_LLM_PROVIDER: "copilot" },
+        },
+      });
+
+      // Check if another approval is needed (chained approvals)
+      if (result.status === "needs_approval" && result.requiresApproval) {
+        const patch: Partial<RunRecord> = {
+          approvalInfo: {
+            prompt: result.requiresApproval.prompt ?? "Approval required",
+            items: result.requiresApproval.items ?? [],
+            preview: result.requiresApproval.preview,
+            resumeToken: result.requiresApproval.resumeToken!,
+            approvalId: result.requiresApproval.approvalId!,
+          },
+        };
+        updateRun(run.id, patch);
+        const updated = { ...run, ...patch };
+        this.emit("change", { type: "approval-pending", run: updated } satisfies SchedulerEvent);
+        return updated;
+      }
+
+      const output = result.ok
+        ? (result.output ?? [])
+            .map((item: unknown) =>
+              typeof item === "string" ? item : JSON.stringify(item, null, 2),
+            )
+            .join("\n")
+        : undefined;
+      const error = result.ok ? undefined : result.error?.message ?? "Unknown error";
+
+      const patch: Partial<RunRecord> = {
+        completedAt: new Date().toISOString(),
+        status: approved && result.ok ? "success" : "error",
+        output: output || (approved ? undefined : "Approval rejected"),
+        error: approved ? error : "Rejected by user",
+        approvalInfo: undefined,
+      };
+      updateRun(run.id, patch);
+      const completed = { ...run, ...patch };
+      this.emit("change", { type: "run-complete", run: completed } satisfies SchedulerEvent);
+      return completed;
+    } catch (err) {
+      const patch: Partial<RunRecord> = {
+        completedAt: new Date().toISOString(),
+        status: "error",
+        error: err instanceof Error ? err.message : String(err),
+        approvalInfo: undefined,
+      };
+      updateRun(run.id, patch);
+      const completed = { ...run, ...patch };
+      this.emit("change", { type: "run-complete", run: completed } satisfies SchedulerEvent);
+      return completed;
+    } finally {
+      await adapter.dispose().catch(() => {});
+    }
   }
 
   // ── Internal ────────────────────────────────────────────────────
@@ -191,7 +296,7 @@ export class SchedulerEngine extends EventEmitter {
         },
       };
 
-      const result = await runToolRequest({
+      const result: any = await runToolRequest({
         filePath: wf.filePath,
         ...(wf.args ? { args: wf.args } : {}),
         ctx: {
@@ -202,6 +307,26 @@ export class SchedulerEngine extends EventEmitter {
       });
 
       const durationMs = Date.now() - startMs;
+
+      // Handle approval-pending result
+      if (result.status === "needs_approval" && result.requiresApproval) {
+        const patch: Partial<RunRecord> = {
+          durationMs,
+          status: "pending-approval",
+          approvalInfo: {
+            prompt: result.requiresApproval.prompt ?? "Approval required",
+            items: result.requiresApproval.items ?? [],
+            preview: result.requiresApproval.preview,
+            resumeToken: result.requiresApproval.resumeToken!,
+            approvalId: result.requiresApproval.approvalId!,
+          },
+        };
+        updateRun(run.id, patch);
+        const pending = { ...run, ...patch };
+        this.emit("change", { type: "approval-pending", run: pending } satisfies SchedulerEvent);
+        return pending;
+      }
+
       const output = result.ok
         ? (result.output ?? [])
             .map((item: unknown) =>

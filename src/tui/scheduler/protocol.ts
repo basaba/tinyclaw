@@ -19,6 +19,8 @@ export type DaemonRequest =
   | { cmd: "update-workflow"; id: string; patch: Partial<WorkflowEntry> }
   | { cmd: "run-now"; id: string }
   | { cmd: "get-history"; workflowId: string }
+  | { cmd: "list-approvals" }
+  | { cmd: "resolve-approval"; runId: string; approved: boolean }
   | { cmd: "stop-daemon" };
 
 // ── Response messages (Daemon → TUI) ────────────────────────────────
@@ -27,6 +29,7 @@ export type DaemonResponse =
   | { type: "status"; running: boolean; pid: number; workflows: WorkflowEntry[] }
   | { type: "workflows"; workflows: WorkflowEntry[] }
   | { type: "history"; runs: RunRecord[] }
+  | { type: "approvals"; runs: RunRecord[] }
   | { type: "ok"; message?: string }
   | { type: "error"; message: string }
   | { type: "event"; event: DaemonEvent };
@@ -36,4 +39,5 @@ export type DaemonResponse =
 export type DaemonEvent =
   | { kind: "run-start"; run: RunRecord }
   | { kind: "run-complete"; run: RunRecord }
+  | { kind: "approval-pending"; run: RunRecord }
   | { kind: "config-changed" };
