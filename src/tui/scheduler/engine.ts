@@ -70,7 +70,7 @@ export type SchedulerEvent =
   | { type: "run-start"; run: RunRecord }
   | { type: "run-complete"; run: RunRecord }
   | { type: "approval-pending"; run: RunRecord }
-  | { type: "step-progress"; runId: string; workflowId: string; stepId: string; stepIndex: number; totalSteps: number; status: "running" | "complete" | "skipped" }
+  | { type: "step-progress"; runId: string; workflowId: string; stepId: string; stepIndex: number; totalSteps: number; status: "running" | "complete" | "skipped" | "failed" }
   | { type: "config-changed" };
 
 export class SchedulerEngine extends EventEmitter {
@@ -309,6 +309,25 @@ export class SchedulerEngine extends EventEmitter {
       mcpServers,
     });
 
+    let currentStepId: string | undefined;
+
+    const emitStepProgress = (stepId: string, stepIndex: number, status: "running" | "complete" | "skipped" | "failed") => {
+      if (status === "running") {
+        currentStepId = stepId;
+      } else if (status === "complete" || status === "failed") {
+        if (currentStepId === stepId) currentStepId = undefined;
+      }
+      this.emit("change", {
+        type: "step-progress",
+        runId: run.id,
+        workflowId: wf.id,
+        stepId,
+        stepIndex,
+        totalSteps,
+        status,
+      } satisfies SchedulerEvent);
+    };
+
     try {
       const { runToolRequest, createDefaultRegistry } = await import(
         "@basaba/lobster/core"
@@ -359,18 +378,6 @@ export class SchedulerEngine extends EventEmitter {
         },
       };
 
-      const emitStepProgress = (stepId: string, stepIndex: number, status: "running" | "complete" | "skipped") => {
-        this.emit("change", {
-          type: "step-progress",
-          runId: run.id,
-          workflowId: wf.id,
-          stepId,
-          stepIndex,
-          totalSteps,
-          status,
-        } satisfies SchedulerEvent);
-      };
-
       const result: any = await runToolRequest({
         filePath: wf.filePath,
         ...(wf.args ? { args: wf.args } : {}),
@@ -411,12 +418,21 @@ export class SchedulerEngine extends EventEmitter {
         : undefined;
       const error = result.ok ? undefined : result.error?.message ?? "Unknown error";
 
+      // Emit failed step-progress event when a step was running at time of error
+      if (!result.ok && currentStepId) {
+        const stepIndex = workflowSteps.findIndex(s => s.id === currentStepId);
+        if (stepIndex >= 0) {
+          emitStepProgress(currentStepId, stepIndex, "failed");
+        }
+      }
+
       const patch: Partial<RunRecord> = {
         completedAt: new Date().toISOString(),
         durationMs,
         status: result.ok ? "success" : "error",
         output,
         error,
+        ...(!result.ok && currentStepId ? { failedStepId: currentStepId } : {}),
       };
 
       updateRun(run.id, patch);
@@ -425,11 +441,21 @@ export class SchedulerEngine extends EventEmitter {
       return completed;
     } catch (err) {
       const durationMs = Date.now() - startMs;
+
+      // Emit failed step-progress event when a step was running at time of exception
+      if (currentStepId) {
+        const stepIndex = workflowSteps.findIndex(s => s.id === currentStepId);
+        if (stepIndex >= 0) {
+          emitStepProgress(currentStepId, stepIndex, "failed");
+        }
+      }
+
       const patch: Partial<RunRecord> = {
         completedAt: new Date().toISOString(),
         durationMs,
         status: "error",
         error: err instanceof Error ? err.message : String(err),
+        ...(currentStepId ? { failedStepId: currentStepId } : {}),
       };
       updateRun(run.id, patch);
       const completed = { ...run, ...patch };

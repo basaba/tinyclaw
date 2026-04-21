@@ -23,7 +23,7 @@ interface StepHistoryEntry {
   stepId: string;
   stepIndex: number;
   totalSteps: number;
-  status: "running" | "complete" | "skipped";
+  status: "running" | "complete" | "skipped" | "failed";
 }
 
 interface AppProps {
@@ -85,12 +85,27 @@ export function App({ client }: AppProps) {
           next.delete(evt.run.workflowId);
           return next;
         });
-        // Clean up step history for completed runs
-        setStepHistory((prev) => {
-          const next = new Map(prev);
-          next.delete(evt.run.id);
-          return next;
-        });
+        // Mark any still-running steps as failed if the run errored
+        if (evt.run.status === "error") {
+          setStepHistory((prev) => {
+            const next = new Map(prev);
+            const list = [...(prev.get(evt.run.id) ?? [])];
+            for (let i = 0; i < list.length; i++) {
+              if (list[i].status === "running") {
+                list[i] = { ...list[i], status: "failed" };
+              }
+            }
+            next.set(evt.run.id, list);
+            return next;
+          });
+        } else {
+          // Clean up step history for successful runs
+          setStepHistory((prev) => {
+            const next = new Map(prev);
+            next.delete(evt.run.id);
+            return next;
+          });
+        }
       }
     };
     client.on("event", handler);

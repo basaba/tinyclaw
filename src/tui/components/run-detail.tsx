@@ -7,7 +7,7 @@ interface StepProgressInfo {
   stepId: string;
   stepIndex: number;
   totalSteps: number;
-  status: "running" | "complete" | "skipped";
+  status: "running" | "complete" | "skipped" | "failed";
 }
 
 interface Props {
@@ -121,6 +121,12 @@ export function RunDetail({ run: initialRun, availableHeight, client, stepHistor
           <Text color="gray">Duration:  </Text>
           <Text>{dur}</Text>
         </Box>
+        {run.status === "error" && run.failedStepId && (
+          <Box>
+            <Text color="gray">Failed at: </Text>
+            <Text color="red">{run.failedStepId}</Text>
+          </Box>
+        )}
       </Box>
 
       {showSteps && (
@@ -132,9 +138,11 @@ export function RunDetail({ run: initialRun, availableHeight, client, stepHistor
           {steps.map((s) => {
             const icon = s.status === "complete" ? "✅"
               : s.status === "skipped" ? "⏭️"
+              : s.status === "failed" ? "❌"
               : "🔄";
             const color = s.status === "complete" ? "green"
               : s.status === "skipped" ? "gray"
+              : s.status === "failed" ? "red"
               : "yellow";
             return (
               <Text key={s.stepIndex} color={color}>

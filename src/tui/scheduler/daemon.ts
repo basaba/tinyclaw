@@ -138,7 +138,7 @@ engine.on("change", (evt: { type: string; run?: any; runId?: string; workflowId?
         : evt.type === "approval-pending"
           ? { kind: "approval-pending", run: evt.run }
           : evt.type === "step-progress"
-            ? { kind: "step-progress", runId: evt.runId!, workflowId: evt.workflowId!, stepId: evt.stepId!, stepIndex: evt.stepIndex!, totalSteps: evt.totalSteps!, status: evt.status as "running" | "complete" | "skipped" }
+            ? { kind: "step-progress", runId: evt.runId!, workflowId: evt.workflowId!, stepId: evt.stepId!, stepIndex: evt.stepIndex!, totalSteps: evt.totalSteps!, status: evt.status as "running" | "complete" | "skipped" | "failed" }
             : { kind: "config-changed" };
 
   broadcast({ type: "event", event });
