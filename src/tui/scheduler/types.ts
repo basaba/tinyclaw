@@ -28,7 +28,7 @@ export interface RunRecord {
   triggeredAt: string; // ISO timestamp
   completedAt?: string;
   durationMs?: number;
-  status: "running" | "success" | "error" | "pending-approval";
+  status: "running" | "success" | "error" | "pending-approval" | "rejected";
   input: {
     filePath: string;
     args?: Record<string, unknown>;

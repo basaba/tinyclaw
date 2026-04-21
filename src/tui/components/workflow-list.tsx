@@ -210,6 +210,7 @@ export function WorkflowList({ client, workflows, onAdd, onEdit, onHistory, onVi
               const lastRunStr = lastRun
                 ? lastRun.status === "success" ? "✅ success"
                   : lastRun.status === "error" ? "❌ failed"
+                  : lastRun.status === "rejected" ? "🚫 rejected"
                   : lastRun.status === "pending-approval" ? "⏳ approval"
                   : "🔄 running"
                 : "—";

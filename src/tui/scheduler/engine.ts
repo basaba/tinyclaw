@@ -192,7 +192,7 @@ export class SchedulerEngine extends EventEmitter {
 
       const patch: Partial<RunRecord> = {
         completedAt: new Date().toISOString(),
-        status: approved && result.ok ? "success" : "error",
+        status: approved ? (result.ok ? "success" : "error") : "rejected",
         output: output || (approved ? undefined : "Approval rejected"),
         error: approved ? error : "Rejected by user",
         approvalInfo: undefined,

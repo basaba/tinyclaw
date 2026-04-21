@@ -46,6 +46,7 @@ export function RunDetail({ run, availableHeight, client, onBack }: Props) {
   const statusColor =
     run.status === "success" ? "green"
       : run.status === "error" ? "red"
+      : run.status === "rejected" ? "magenta"
       : run.status === "pending-approval" ? "yellow"
       : "yellow";
 
