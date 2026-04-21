@@ -4,6 +4,7 @@ import type { View, RunRecord, WorkflowEntry } from "./scheduler/types.js";
 import { DaemonClient } from "./scheduler/daemon-client.js";
 import { WorkflowList } from "./components/workflow-list.js";
 import { AddWorkflow } from "./components/add-workflow.js";
+import { EditWorkflow } from "./components/edit-workflow.js";
 import { YamlView } from "./components/yaml-view.js";
 import { RunHistory } from "./components/run-history.js";
 import { RunDetail } from "./components/run-detail.js";
@@ -65,6 +66,10 @@ export function App({ client }: AppProps) {
       setView({ screen: "run-detail", run, fromWorkflowId }),
     [],
   );
+  const goEdit = useCallback(
+    (workflowId: string) => setView({ screen: "edit", workflowId }),
+    [],
+  );
   const goYamlView = useCallback(
     (filePath: string) => setView({ screen: "yaml-view", filePath }),
     [],
@@ -87,6 +92,7 @@ export function App({ client }: AppProps) {
             client={client}
             workflows={workflows}
             onAdd={goAdd}
+            onEdit={goEdit}
             onHistory={goHistory}
             onViewOutput={goRunDetail}
             onViewYaml={goYamlView}
@@ -97,6 +103,22 @@ export function App({ client }: AppProps) {
         {view.screen === "add" && (
           <AddWorkflow client={client} onDone={goList} />
         )}
+
+        {view.screen === "edit" && (() => {
+          const wf = workflows.find((w) => w.id === view.workflowId);
+          if (!wf) {
+            // Workflow was deleted while we were trying to edit — go back
+            setTimeout(goList, 0);
+            return (
+              <Box flexDirection="column">
+                <Text color="red">Workflow not found — it may have been deleted.</Text>
+              </Box>
+            );
+          }
+          return (
+            <EditWorkflow client={client} workflow={wf} onDone={goList} />
+          );
+        })()}
 
         {view.screen === "history" && (
           <RunHistory

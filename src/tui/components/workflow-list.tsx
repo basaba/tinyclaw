@@ -62,13 +62,14 @@ interface Props {
   client: DaemonClient;
   workflows: WorkflowEntry[];
   onAdd: () => void;
+  onEdit: (workflowId: string) => void;
   onHistory: (workflowId: string) => void;
   onViewOutput: (run: RunRecord, fromWorkflowId: string) => void;
   onViewYaml: (filePath: string) => void;
   onRefresh: () => void;
 }
 
-export function WorkflowList({ client, workflows, onAdd, onHistory, onViewOutput, onViewYaml, onRefresh }: Props) {
+export function WorkflowList({ client, workflows, onAdd, onEdit, onHistory, onViewOutput, onViewYaml, onRefresh }: Props) {
   const [cursor, setCursor] = useState(0);
 
   useInput((input, key) => {
@@ -84,6 +85,9 @@ export function WorkflowList({ client, workflows, onAdd, onHistory, onViewOutput
     if (key.return) onHistory(wf.id);
     if (input === " ") {
       client.toggleWorkflow(wf.id).then(onRefresh).catch(() => {});
+    }
+    if (input === "e") {
+      onEdit(wf.id);
     }
     if (input === "d") {
       client.removeWorkflow(wf.id).then(() => {
@@ -122,7 +126,7 @@ export function WorkflowList({ client, workflows, onAdd, onHistory, onViewOutput
       <Box>
         <Text bold>
           {"  "}
-          {"Status".padEnd(8)}
+          {"Status".padEnd(10)}
           {"Name".padEnd(25)}
           {"Schedule".padEnd(20)}
           {"Next Run".padEnd(14)}
@@ -147,7 +151,7 @@ export function WorkflowList({ client, workflows, onAdd, onHistory, onViewOutput
               inverse={selected}
             >
               {selected ? "▸ " : "  "}
-              {status.padEnd(8)}
+              {status.padEnd(10)}
               {wf.name.padEnd(25)}
               {wf.schedule.padEnd(20)}
               {nextRunStr.padEnd(14)}
