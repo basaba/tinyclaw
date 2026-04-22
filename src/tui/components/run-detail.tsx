@@ -9,6 +9,7 @@ interface Props {
   client?: DaemonClient;
   liveOutput: Map<string, string>;
   onBack: () => void;
+  onOpenFile: (filePath: string) => void;
 }
 
 // Format a value for display without raw JSON
@@ -96,7 +97,7 @@ function formatApprovalItem(item: unknown, index: number): string[] {
   return lines;
 }
 
-export function RunDetail({ run: initialRun, availableHeight, client, liveOutput, onBack }: Props) {
+export function RunDetail({ run: initialRun, availableHeight, client, liveOutput, onBack, onOpenFile }: Props) {
   const [scrollOffset, setScrollOffset] = useState(0);
   const [itemScrollOffset, setItemScrollOffset] = useState(0);
   const [resolved, setResolved] = useState<"approved" | "rejected" | null>(null);
@@ -206,6 +207,10 @@ export function RunDetail({ run: initialRun, availableHeight, client, liveOutput
         client.resolveApproval(run.id, false).catch(() => {});
       }
     }
+
+    if (input === "o") {
+      onOpenFile(run.input.filePath);
+    }
   });
 
   const dur = run.durationMs ? `${(run.durationMs / 1000).toFixed(1)}s` : "—";
@@ -218,7 +223,7 @@ export function RunDetail({ run: initialRun, availableHeight, client, liveOutput
 
   return (
     <Box flexDirection="column">
-      <Text bold>Run Detail — Esc to go back</Text>
+      <Text bold>Run Detail — Esc to go back | o: open file</Text>
 
       <Box marginTop={1} flexDirection="column">
         <Text bold color="gray">── Input ──</Text>

@@ -92,7 +92,7 @@ export function App({ client }: AppProps) {
     [],
   );
   const goYamlView = useCallback(
-    (filePath: string) => setView({ screen: "yaml-view", filePath }),
+    (filePath: string, fromView?: View) => setView({ screen: "yaml-view", filePath, fromView }),
     [],
   );
   const goGraphView = useCallback(
@@ -169,11 +169,14 @@ export function App({ client }: AppProps) {
                 ? () => goHistory(view.fromWorkflowId!)
                 : goList
             }
+            onOpenFile={(filePath) => goYamlView(filePath, view)}
           />
         )}
 
         {view.screen === "yaml-view" && (
-          <YamlView filePath={view.filePath} availableHeight={contentHeight} onBack={goList} />
+          <YamlView filePath={view.filePath} availableHeight={contentHeight} onBack={
+            view.fromView ? () => setView(view.fromView!) : goList
+          } />
         )}
 
         {view.screen === "graph-view" && (

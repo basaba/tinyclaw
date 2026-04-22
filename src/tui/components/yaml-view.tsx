@@ -11,10 +11,12 @@ interface Props {
 
 export function YamlView({ filePath, availableHeight, onBack }: Props) {
   const [scrollOffset, setScrollOffset] = useState(0);
+  const [hScrollOffset, setHScrollOffset] = useState(0);
   const [lines, setLines] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   // Own chrome: header(1) + hint(1) + margin(1) + scroll hint(1) = 4
   const VISIBLE_LINES = Math.max(5, availableHeight - 4);
+  const H_SCROLL_STEP = 8;
 
   useEffect(() => {
     const resolved = resolve(filePath);
@@ -51,6 +53,8 @@ export function YamlView({ filePath, availableHeight, onBack }: Props) {
       setScrollOffset((o) =>
         Math.min(o + VISIBLE_LINES, Math.max(0, lines.length - VISIBLE_LINES)),
       );
+    if (key.leftArrow) setHScrollOffset((o) => Math.max(0, o - H_SCROLL_STEP));
+    if (key.rightArrow) setHScrollOffset((o) => o + H_SCROLL_STEP);
   });
 
   if (error) {
@@ -72,27 +76,29 @@ export function YamlView({ filePath, availableHeight, onBack }: Props) {
       <Text bold>
         YAML View — <Text color="cyan">{filePath}</Text>
       </Text>
-      <Text color="gray">↑/↓ to scroll, PgUp/PgDn for pages, Esc to go back</Text>
+      <Text color="gray">↑/↓ scroll, ←/→ pan, PgUp/PgDn pages, Esc back</Text>
 
-      <Box marginTop={1} flexDirection="column">
+      <Box marginTop={1} flexDirection="column" overflow="hidden">
         {visibleLines.map((line, i) => {
           const lineNum = scrollOffset + i + 1;
+          const sliced = line.length > hScrollOffset ? line.slice(hScrollOffset) : "";
           return (
             <Box key={lineNum}>
               <Text color="gray">
                 {String(lineNum).padStart(gutterWidth, " ")} │ 
               </Text>
-              <Text>{colorYamlLine(line)}</Text>
+              <Text wrap="truncate">{colorYamlLine(sliced)}</Text>
             </Box>
           );
         })}
       </Box>
 
-      {lines.length > VISIBLE_LINES && (
+      {(lines.length > VISIBLE_LINES || hScrollOffset > 0) && (
         <Box marginTop={1}>
           <Text color="gray" dimColor>
             Lines {scrollOffset + 1}-
             {Math.min(scrollOffset + VISIBLE_LINES, lines.length)}/{lines.length}
+            {hScrollOffset > 0 && ` · Col ${hScrollOffset + 1}+`}
           </Text>
         </Box>
       )}
