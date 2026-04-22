@@ -4,9 +4,8 @@
  * Fetches PRs matching search criteria, diffs against the last-known
  * snapshot, and reports what changed (new, removed, updated PRs).
  *
- * State is persisted to a JSON file so the monitor can detect changes
- * across scheduler runs without needing the Lobster SDK diffLast
- * primitive.
+ * Uses the Lobster SDK's built-in state management (`diffAndStore`)
+ * for persistence and change detection across scheduler runs.
  *
  * @example
  *   import { adoPrMonitor } from "../recipes/ado/index.js";
@@ -18,33 +17,9 @@
  *   });
  */
 
-import fs from "node:fs";
-import path from "node:path";
-import os from "node:os";
 import { fetchAdoPrs, type AdoPrListOptions } from "./pr-list.js";
-
-// ── State persistence ───────────────────────────────────────────────
-
-const STATE_DIR = path.join(os.homedir(), ".lobster-copilot", "state");
-
-function stateFile(key: string): string {
-  const safe = key.replace(/[^a-zA-Z0-9._-]/g, "_");
-  return path.join(STATE_DIR, `ado-pr-${safe}.json`);
-}
-
-function loadState(key: string): Record<number, any> | null {
-  const fp = stateFile(key);
-  try {
-    return JSON.parse(fs.readFileSync(fp, "utf8"));
-  } catch {
-    return null;
-  }
-}
-
-function saveState(key: string, snapshot: Record<number, any>): void {
-  fs.mkdirSync(STATE_DIR, { recursive: true });
-  fs.writeFileSync(stateFile(key), JSON.stringify(snapshot, null, 2));
-}
+// @ts-ignore — lobster state export is JS-only, no .d.ts yet
+import { diffAndStore } from "@basaba/lobster/state";
 
 // ── PR normalization ────────────────────────────────────────────────
 
@@ -176,6 +151,7 @@ export interface AdoPrMonitorResult {
   key: string;
   changed: boolean;
   totalPrs: number;
+  prs: any[];
   summary: PrChangeSummary;
   message: string;
   snapshot: Record<number, any>;
@@ -185,14 +161,14 @@ export interface AdoPrMonitorResult {
 /**
  * Fetch ADO PRs, diff against last known state, return change report.
  *
- * State is persisted to `~/.lobster-copilot/state/` so repeated runs
- * (e.g. via the scheduler) detect changes across invocations.
+ * Uses the Lobster SDK's `diffAndStore` for state persistence
+ * (defaults to `~/.lobster/state/`).
  */
 export async function adoPrMonitor(
   options: AdoPrMonitorOptions,
   env?: Record<string, string | undefined>,
 ): Promise<AdoPrMonitorResult> {
-  const key = buildKey(options);
+  const key = `ado-pr-${buildKey(options)}`;
 
   let prs = await fetchAdoPrs(options, env);
 
@@ -206,17 +182,32 @@ export async function adoPrMonitor(
   }
 
   const snapshot = normalizeSnapshot(prs);
-  const before = loadState(key);
 
-  const changed = before === null || JSON.stringify(before) !== JSON.stringify(snapshot);
+  // Use Lobster SDK state management for persistence & diff
+  const { before, changed } = await diffAndStore({
+    env: env ?? process.env,
+    key,
+    value: snapshot,
+  });
+
   const summary = buildChangeSummary(before, snapshot);
+
+  // Annotate each PR with its change status
+  const addedIds = new Set(summary.added.map((p) => p.pullRequestId));
+  const modifiedIds = new Set(summary.modified.map((m) => m.pr.pullRequestId));
+  const annotatedPrs = Object.values(snapshot).map((pr) => ({
+    ...pr,
+    changed: addedIds.has(pr.pullRequestId) || modifiedIds.has(pr.pullRequestId),
+  }));
+  // Include removed PRs as well
+  for (const pr of summary.removed) {
+    annotatedPrs.push({ ...pr, changed: true });
+  }
+
   const totalPrs = Object.keys(snapshot).length;
   const message = changed
     ? formatChangeMessage(options.project, summary, totalPrs)
     : `No changes in ${options.project} (${totalPrs} PRs)`;
-
-  // Persist new state
-  saveState(key, snapshot);
 
   if (options.changesOnly && !changed) {
     return {
@@ -225,6 +216,7 @@ export async function adoPrMonitor(
       key,
       changed: false,
       totalPrs,
+      prs: annotatedPrs,
       summary,
       message,
       snapshot,
@@ -238,6 +230,7 @@ export async function adoPrMonitor(
     key,
     changed,
     totalPrs,
+    prs: annotatedPrs,
     summary,
     message,
     snapshot,

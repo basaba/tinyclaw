@@ -76,7 +76,6 @@ steps:
       --creator "${creator}"
       --reviewer "${reviewer}"
       --days "${days}"
-      | where changed==true
       | copilot --prompt 'You are a PR activity summarizer.
       Analyze this Azure DevOps PR monitor result and produce a concise summary:
       1. Total PR count

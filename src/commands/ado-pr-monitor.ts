@@ -59,7 +59,7 @@ export function createAdoPrMonitorCommand(): LobsterCommand {
         "",
         "Fetches PRs matching filters, compares against last-known state,",
         "and reports new, removed, and updated PRs.",
-        "State is persisted in ~/.lobster-copilot/state/.",
+        "State is persisted via the Lobster SDK state store (~/.lobster/state/).",
       ].join("\n");
     },
     async run({
@@ -111,7 +111,7 @@ export function createAdoPrMonitorCommand(): LobsterCommand {
 
       const result = await adoPrMonitor(options, process.env as any);
 
-      return { output: asStream([result]) };
+      return { output: asStream(result.prs) };
     },
   };
 }
