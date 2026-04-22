@@ -39,5 +39,6 @@ export type DaemonResponse =
 export type DaemonEvent =
   | { kind: "run-start"; run: RunRecord }
   | { kind: "run-complete"; run: RunRecord }
+  | { kind: "run-output"; runId: string; text: string }
   | { kind: "approval-pending"; run: RunRecord }
   | { kind: "config-changed" };

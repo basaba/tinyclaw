@@ -7,6 +7,7 @@ interface Props {
   run: RunRecord;
   availableHeight: number;
   client?: DaemonClient;
+  liveOutput: Map<string, string>;
   onBack: () => void;
 }
 
@@ -95,7 +96,7 @@ function formatApprovalItem(item: unknown, index: number): string[] {
   return lines;
 }
 
-export function RunDetail({ run: initialRun, availableHeight, client, onBack }: Props) {
+export function RunDetail({ run: initialRun, availableHeight, client, liveOutput, onBack }: Props) {
   const [scrollOffset, setScrollOffset] = useState(0);
   const [itemScrollOffset, setItemScrollOffset] = useState(0);
   const [resolved, setResolved] = useState<"approved" | "rejected" | null>(null);
@@ -133,7 +134,20 @@ export function RunDetail({ run: initialRun, availableHeight, client, onBack }: 
     : 0;
   const VISIBLE_LINES = Math.max(3, availableHeight - 14 - approvalChrome);
 
-  const outputLines = (run.output ?? run.error ?? "No output").split("\n");
+  const isRunning = run.status === "running";
+  const streamingText = liveOutput.get(run.id);
+  const outputText = isRunning
+    ? (streamingText || "⏳ Workflow is running…")
+    : (run.output ?? run.error ?? "No output");
+  const outputLines = outputText.split("\n");
+
+  // Auto-scroll to bottom when new live output arrives
+  const [autoScroll, setAutoScroll] = useState(true);
+  useEffect(() => {
+    if (isRunning && autoScroll && outputLines.length > VISIBLE_LINES) {
+      setScrollOffset(Math.max(0, outputLines.length - VISIBLE_LINES));
+    }
+  }, [outputLines.length, isRunning, autoScroll, VISIBLE_LINES]);
 
   useInput((input, key) => {
     if (key.escape) {
@@ -148,9 +162,17 @@ export function RunDetail({ run: initialRun, availableHeight, client, onBack }: 
         setItemScrollOffset((o) => Math.min(o + 1, Math.max(0, approvalItemLines.length - MAX_APPROVAL_ITEM_LINES)));
     } else {
       // Otherwise scroll the output
-      if (key.upArrow) setScrollOffset((o) => Math.max(0, o - 1));
-      if (key.downArrow)
-        setScrollOffset((o) => Math.min(o + 1, Math.max(0, outputLines.length - VISIBLE_LINES)));
+      if (key.upArrow) {
+        setAutoScroll(false);
+        setScrollOffset((o) => Math.max(0, o - 1));
+      }
+      if (key.downArrow) {
+        setScrollOffset((o) => {
+          const next = Math.min(o + 1, Math.max(0, outputLines.length - VISIBLE_LINES));
+          if (next >= outputLines.length - VISIBLE_LINES) setAutoScroll(true);
+          return next;
+        });
+      }
     }
 
     if (isPendingApproval && client) {
@@ -264,7 +286,7 @@ export function RunDetail({ run: initialRun, availableHeight, client, onBack }: 
 
       <Box marginTop={1} flexDirection="column">
         <Text bold color="gray">
-          ── Output ({outputLines.length} lines) ──
+          ── Output ({outputLines.length} lines){isRunning && streamingText ? " 🔴 Live" : ""} ──
         </Text>
         {visibleLines.map((line, i) => (
           <Text key={i} wrap="wrap">

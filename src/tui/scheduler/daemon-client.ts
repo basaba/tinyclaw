@@ -45,7 +45,10 @@ export class DaemonClient extends EventEmitter {
             if (msg.type === "event") {
               // Push event — emit for TUI to react
               this.emit("event", msg.event);
-              this.emit("change"); // generic refresh trigger
+              // Skip generic refresh for high-frequency run-output events
+              if ((msg.event as any).kind !== "run-output") {
+                this.emit("change"); // generic refresh trigger
+              }
             } else {
               // Response to a pending request
               const cb = this.pending.shift();

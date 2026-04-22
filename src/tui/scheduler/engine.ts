@@ -1,5 +1,6 @@
 import cron from "node-cron";
 import { randomUUID } from "node:crypto";
+import { PassThrough } from "node:stream";
 import type { WorkflowEntry, RunRecord, TriggerType, ApprovalInfo } from "./types.js";
 import {
   loadSchedules,
@@ -13,8 +14,6 @@ import { CopilotAdapter } from "../../adapters/copilot-adapter.js";
 import { createCopilotCommand } from "../../commands/copilot.js";
 import { createMcpCallCommand } from "../../commands/mcp.js";
 import { loadMcpConfig } from "../../mcp-config/loader.js";
-
-// ── Interval parsing ────────────────────────────────────────────────
 
 const INTERVAL_RE = /^every\s+(\d+)\s*(s|sec|seconds?|m|min|minutes?|h|hr|hours?)$/i;
 
@@ -37,6 +36,7 @@ function isCron(expr: string): boolean {
 export type SchedulerEvent =
   | { type: "run-start"; run: RunRecord }
   | { type: "run-complete"; run: RunRecord }
+  | { type: "run-output"; runId: string; text: string }
   | { type: "approval-pending"; run: RunRecord }
   | { type: "config-changed" };
 
@@ -153,6 +153,20 @@ export class SchedulerEngine extends EventEmitter {
         },
       };
 
+      const stdout = new PassThrough();
+      const stderr = new PassThrough();
+      const logs: string[] = [];
+      stdout.on("data", (chunk: Buffer) => {
+        const text = chunk.toString();
+        logs.push(text);
+        this.emit("change", { type: "run-output", runId: run.id, text } satisfies SchedulerEvent);
+      });
+      stderr.on("data", (chunk: Buffer) => {
+        const text = chunk.toString();
+        logs.push(text);
+        this.emit("change", { type: "run-output", runId: run.id, text } satisfies SchedulerEvent);
+      });
+
       const result = await resumeToolRequest({
         token: run.approvalInfo.resumeToken,
         approved,
@@ -160,9 +174,13 @@ export class SchedulerEngine extends EventEmitter {
         ctx: {
           llmAdapters: { copilot: adapter as any },
           registry,
+          stdout,
+          stderr,
           env: { ...process.env, LOBSTER_LLM_PROVIDER: "copilot" },
         },
       });
+
+      const capturedOutput = logs.join("").trim();
 
       // Check if another approval is needed (chained approvals)
       if (result.status === "needs_approval" && result.requiresApproval) {
@@ -181,7 +199,7 @@ export class SchedulerEngine extends EventEmitter {
         return updated;
       }
 
-      const output = result.ok
+      const resultOutput = result.ok
         ? (result.output ?? [])
             .map((item: unknown) =>
               typeof item === "string" ? item : JSON.stringify(item, null, 2),
@@ -189,6 +207,7 @@ export class SchedulerEngine extends EventEmitter {
             .join("\n")
         : undefined;
       const error = result.ok ? undefined : result.error?.message ?? "Unknown error";
+      const output = [capturedOutput, resultOutput].filter(Boolean).join("\n") || undefined;
 
       const patch: Partial<RunRecord> = {
         completedAt: new Date().toISOString(),
@@ -296,23 +315,41 @@ export class SchedulerEngine extends EventEmitter {
         },
       };
 
+      const stdout = new PassThrough();
+      const stderr = new PassThrough();
+      const logs: string[] = [];
+      stdout.on("data", (chunk: Buffer) => {
+        const text = chunk.toString();
+        logs.push(text);
+        this.emit("change", { type: "run-output", runId: run.id, text } satisfies SchedulerEvent);
+      });
+      stderr.on("data", (chunk: Buffer) => {
+        const text = chunk.toString();
+        logs.push(text);
+        this.emit("change", { type: "run-output", runId: run.id, text } satisfies SchedulerEvent);
+      });
+
       const result: any = await runToolRequest({
         filePath: wf.filePath,
         ...(wf.args ? { args: wf.args } : {}),
         ctx: {
           llmAdapters: { copilot: adapter as any },
           registry,
+          stdout,
+          stderr,
           env: { ...process.env, LOBSTER_LLM_PROVIDER: "copilot" },
         },
       });
 
       const durationMs = Date.now() - startMs;
+      const capturedOutput = logs.join("").trim();
 
       // Handle approval-pending result
       if (result.status === "needs_approval" && result.requiresApproval) {
         const patch: Partial<RunRecord> = {
           durationMs,
           status: "pending-approval",
+          output: capturedOutput || undefined,
           approvalInfo: {
             prompt: result.requiresApproval.prompt ?? "Approval required",
             items: result.requiresApproval.items ?? [],
@@ -327,13 +364,14 @@ export class SchedulerEngine extends EventEmitter {
         return pending;
       }
 
-      const output = result.ok
+      const resultOutput = result.ok
         ? (result.output ?? [])
             .map((item: unknown) =>
               typeof item === "string" ? item : JSON.stringify(item, null, 2),
             )
             .join("\n")
         : undefined;
+      const output = [capturedOutput, resultOutput].filter(Boolean).join("\n") || undefined;
       const error = result.ok ? undefined : result.error?.message ?? "Unknown error";
 
       const patch: Partial<RunRecord> = {

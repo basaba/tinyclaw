@@ -24,6 +24,29 @@ export function App({ client }: AppProps) {
   const [daemonRunning, setDaemonRunning] = useState(true);
   const [tick, setTick] = useState(0);
   const [termSize, setTermSize] = useState({ columns: stdout.columns || 80, rows: stdout.rows || 24 });
+  // Live output per runId — accumulated from run-output events
+  const [liveOutput, setLiveOutput] = useState<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    const handler = (evt: DaemonEvent) => {
+      if (evt.kind === "run-output") {
+        setLiveOutput((prev) => {
+          const next = new Map(prev);
+          next.set(evt.runId, (prev.get(evt.runId) ?? "") + evt.text);
+          return next;
+        });
+      } else if (evt.kind === "run-complete") {
+        // Clean up live output once the run is done (final output is on the RunRecord)
+        setLiveOutput((prev) => {
+          const next = new Map(prev);
+          next.delete(evt.run.id);
+          return next;
+        });
+      }
+    };
+    client.on("event", handler);
+    return () => { client.off("event", handler); };
+  }, [client]);
 
   useEffect(() => {
     const onResize = () => setTermSize({ columns: stdout.columns || 80, rows: stdout.rows || 24 });
@@ -144,6 +167,7 @@ export function App({ client }: AppProps) {
             run={view.run}
             availableHeight={contentHeight}
             client={client}
+            liveOutput={liveOutput}
             onBack={
               view.fromWorkflowId
                 ? () => goHistory(view.fromWorkflowId!)
