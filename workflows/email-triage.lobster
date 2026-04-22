@@ -46,11 +46,12 @@ steps:
       --prompt 'You are a professional email assistant.
       For each email classified as "needs-reply" in the input,
       draft a concise, professional reply.
-      If no emails need a reply, return an empty array.'
-      --output-schema '{"type":"object","properties":{"drafts":{"type":"array","items":{"type":"object","properties":{"messageId":{"type":"string"},"from":{"type":"string"},"subject":{"type":"string"},"summary":{"type":"string"},"replyText":{"type":"string"}},"required":["messageId","from","subject","replyText"]}}},"required":["drafts"]}'
-      --schema-version email-draft.v1
+      If no emails need a reply, return an empty array for drafts and set hasDrafts to false.'
+      --output-schema '{"type":"object","properties":{"hasDrafts":{"type":"boolean"},"drafts":{"type":"array","items":{"type":"object","properties":{"messageId":{"type":"string"},"from":{"type":"string"},"subject":{"type":"string"},"summary":{"type":"string"},"replyText":{"type":"string"}},"required":["messageId","from","subject","replyText"]}}},"required":["hasDrafts","drafts"]}'
+      --schema-version email-draft.v2
 
   - id: confirm
+    when: $draft.json.hasDrafts == true
     approval: "Review drafted email replies before creating Outlook drafts"
     stdin: "$draft.json.drafts"
 

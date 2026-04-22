@@ -18,8 +18,94 @@ interface Props {
   onBack: () => void;
 }
 
+// Format a value for display without raw JSON
+function formatValue(v: unknown): string {
+  if (v == null) return "—";
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (Array.isArray(v)) {
+    if (v.length === 0) return "(none)";
+    // Array of primitives: join with commas
+    if (v.every((item) => typeof item === "string" || typeof item === "number"))
+      return v.join(", ");
+    return `${v.length} items`;
+  }
+  if (typeof v === "object") {
+    // Flat object: show as "key: val, key: val"
+    const entries = Object.entries(v as Record<string, unknown>);
+    const parts = entries.map(([k, val]) =>
+      `${k}: ${typeof val === "string" || typeof val === "number" || typeof val === "boolean" ? String(val) : "…"}`,
+    );
+    return parts.join(", ");
+  }
+  return String(v);
+}
+
+// Format a single approval item for display.
+// Renders known fields on labeled lines, falls back to readable format for unknowns.
+function formatApprovalItem(item: unknown, index: number): string[] {
+  if (typeof item === "string") return [`${item}`];
+  if (item == null) return ["(empty)"];
+  if (typeof item !== "object") return [String(item)];
+
+  const obj = item as Record<string, unknown>;
+  const lines: string[] = [];
+
+  // Title line: use subject, name, title, or id as the heading
+  const heading = obj.subject ?? obj.title ?? obj.name ?? obj.id;
+  if (heading) {
+    lines.push(`#${index + 1}: ${String(heading)}`);
+  } else {
+    lines.push(`#${index + 1}`);
+  }
+
+  // Render well-known fields with labels
+  const knownFields: Array<[string, string]> = [
+    ["from", "From"],
+    ["to", "To"],
+    ["category", "Category"],
+    ["summary", "Summary"],
+    ["replyText", "Reply"],
+    ["bodyPreview", "Preview"],
+    ["status", "Status"],
+    ["description", "Desc"],
+    ["message", "Message"],
+    ["url", "URL"],
+  ];
+
+  const rendered = new Set<string>(["subject", "title", "name", "id"]);
+  for (const [key, label] of knownFields) {
+    if (key in obj && obj[key] != null) {
+      const val = formatValue(obj[key]);
+      if (val.length > 80) {
+        lines.push(`  ${label}: ${val.slice(0, 77)}...`);
+      } else {
+        lines.push(`  ${label}: ${val}`);
+      }
+      rendered.add(key);
+    }
+  }
+
+  // Show remaining fields compactly, formatting nested values readably
+  const remaining = Object.entries(obj).filter(([k]) => !rendered.has(k));
+  if (remaining.length > 0) {
+    for (const [k, v] of remaining) {
+      const label = k.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()).trim();
+      const val = formatValue(v);
+      if (val.length > 60) {
+        lines.push(`  ${label}: ${val.slice(0, 57)}...`);
+      } else {
+        lines.push(`  ${label}: ${val}`);
+      }
+    }
+  }
+
+  return lines;
+}
+
 export function RunDetail({ run: initialRun, availableHeight, client, stepHistory, onBack }: Props) {
   const [scrollOffset, setScrollOffset] = useState(0);
+  const [itemScrollOffset, setItemScrollOffset] = useState(0);
   const [resolved, setResolved] = useState<"approved" | "rejected" | null>(null);
   const [liveRun, setLiveRun] = useState<RunRecord>(initialRun);
 
@@ -42,8 +128,22 @@ export function RunDetail({ run: initialRun, availableHeight, client, stepHistor
   const isPendingApproval = !resolved && run.status === "pending-approval" && !!run.approvalInfo;
   const isRunning = run.status === "running";
   const showSteps = steps.length > 0 || isRunning;
-  // Chrome: header(1) + input(margin+hdr+4fields=6) + result(margin+hdr+3fields=5) + output(margin+hdr=2) + scroll hint(1) + approval(~5) + steps(margin+hdr+items)
-  const approvalChrome = isPendingApproval ? 5 : 0;
+
+  // Format approval items into displayable lines
+  const approvalItemLines: string[] = isPendingApproval && run.approvalInfo!.items.length > 0
+    ? run.approvalInfo!.items.flatMap((item, i) => [
+        ...formatApprovalItem(item, i),
+        "",  // blank separator between items
+      ]).slice(0, -1)  // remove trailing blank
+    : [];
+
+  // Chrome: header(1) + input(margin+hdr+4fields=6) + result(margin+hdr+3-4fields=5-6) + output(margin+hdr=2) + scroll hint(1) + steps(margin+hdr+items)
+  // Approval section: border(2) + prompt(1) + preview?(1) + header(1) + visible items + hint(1) + action(1)
+  const MAX_APPROVAL_ITEM_LINES = 8;
+  const visibleApprovalItemCount = Math.min(approvalItemLines.length, MAX_APPROVAL_ITEM_LINES);
+  const approvalChrome = isPendingApproval
+    ? 2 + 1 + (run.approvalInfo!.preview && approvalItemLines.length === 0 ? 1 : 0) + (approvalItemLines.length > 0 ? 1 + visibleApprovalItemCount + (approvalItemLines.length > MAX_APPROVAL_ITEM_LINES ? 1 : 0) : 0) + 1
+    : 0;
   const stepsChrome = showSteps ? 2 + Math.min(steps.length || 1, 8) : 0;
   const VISIBLE_LINES = Math.max(3, availableHeight - 14 - approvalChrome - stepsChrome);
 
@@ -54,9 +154,18 @@ export function RunDetail({ run: initialRun, availableHeight, client, stepHistor
       onBack();
       return;
     }
-    if (key.upArrow) setScrollOffset((o) => Math.max(0, o - 1));
-    if (key.downArrow)
-      setScrollOffset((o) => Math.min(o + 1, Math.max(0, outputLines.length - VISIBLE_LINES)));
+
+    if (isPendingApproval) {
+      // In approval mode, arrows scroll the items list
+      if (key.upArrow) setItemScrollOffset((o) => Math.max(0, o - 1));
+      if (key.downArrow)
+        setItemScrollOffset((o) => Math.min(o + 1, Math.max(0, approvalItemLines.length - MAX_APPROVAL_ITEM_LINES)));
+    } else {
+      // Otherwise scroll the output
+      if (key.upArrow) setScrollOffset((o) => Math.max(0, o - 1));
+      if (key.downArrow)
+        setScrollOffset((o) => Math.min(o + 1, Math.max(0, outputLines.length - VISIBLE_LINES)));
+    }
 
     if (isPendingApproval && client) {
       if (input === "y") {
@@ -160,15 +269,32 @@ export function RunDetail({ run: initialRun, availableHeight, client, stepHistor
             <Text color="gray">Prompt: </Text>
             {run.approvalInfo!.prompt}
           </Text>
-          {run.approvalInfo!.items.length > 0 && (
-            <Text>
-              <Text color="gray">Items:  </Text>
-              {run.approvalInfo!.items.map((item) =>
-                typeof item === "string" ? item : JSON.stringify(item),
-              ).join(", ")}
+          {run.approvalInfo!.preview && approvalItemLines.length === 0 && (
+            <Text wrap="wrap">
+              <Text color="gray">Preview: </Text>
+              {run.approvalInfo!.preview}
             </Text>
           )}
-          <Text>Press y to approve, n to reject</Text>
+          {approvalItemLines.length > 0 && (
+            <Box flexDirection="column" marginTop={0}>
+              <Text bold color="gray">── Items ({run.approvalInfo!.items.length}) ──</Text>
+              {approvalItemLines
+                .slice(itemScrollOffset, itemScrollOffset + MAX_APPROVAL_ITEM_LINES)
+                .map((line, i) => (
+                  <Text key={i} color={line.startsWith("#") ? "white" : "gray"} bold={line.startsWith("#")} wrap="truncate">
+                    {line}
+                  </Text>
+                ))}
+              {approvalItemLines.length > MAX_APPROVAL_ITEM_LINES && (
+                <Text color="gray" dimColor>
+                  ↑/↓ to scroll ({itemScrollOffset + 1}-
+                  {Math.min(itemScrollOffset + MAX_APPROVAL_ITEM_LINES, approvalItemLines.length)}/
+                  {approvalItemLines.length})
+                </Text>
+              )}
+            </Box>
+          )}
+          <Text>Press <Text bold color="green">y</Text> to approve, <Text bold color="red">n</Text> to reject</Text>
         </Box>
       )}
 
