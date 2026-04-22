@@ -144,7 +144,7 @@ async function copilot(copilotArgs: string[]): Promise<void> {
 // ── workflow runner ─────────────────────────────────────────────────
 
 async function run(runArgs: string[]): Promise<void> {
-  const { runToolRequest } = await import("@basaba/lobster/core");
+  const { runWorkflowFile, createDefaultRegistry } = await import("@basaba/lobster/core");
 
   let filePath: string | undefined;
   let pipeline: string | undefined;
@@ -189,11 +189,9 @@ async function run(runArgs: string[]): Promise<void> {
     cliUrl: process.env.COPILOT_CLI_URL,
     mcpServers,
   });
-  const adapters = { copilot: adapter as any };
   const dispose = () => adapter.dispose();
 
   // Build extended registry with copilot + mcp commands
-  const { createDefaultRegistry } = await import("@basaba/lobster/core");
   const defaultRegistry = createDefaultRegistry();
   const copilotCmd = createCopilotCommand(
     () => adapter.client,
@@ -212,18 +210,27 @@ async function run(runArgs: string[]): Promise<void> {
     },
   };
 
-  try {
-    const result = await runToolRequest({
-      ...(filePath ? { filePath } : { pipeline }),
-      ...(argsJson ? { args: argsJson } : {}),
-      ctx: {
-        llmAdapters: adapters,
-        registry,
-        env: { ...process.env, LOBSTER_LLM_PROVIDER: "copilot" },
-      },
-    });
+  // Use runWorkflowFile in human mode so approvals prompt interactively
+  const ctx = {
+    cwd: process.cwd(),
+    env: { ...process.env, LOBSTER_LLM_PROVIDER: "copilot" },
+    mode: "human" as const,
+    stdin: process.stdin,
+    stdout: process.stdout,
+    stderr: process.stderr,
+    llmAdapters: { copilot: adapter as any },
+    registry,
+  };
 
-    if (result.ok) {
+  try {
+    if (filePath) {
+      const result: any = await runWorkflowFile({ filePath, args: argsJson, ctx });
+
+      if (result.status === "cancelled") {
+        process.stderr.write("🚫 Cancelled\n");
+        process.exit(0);
+      }
+
       for (const item of result.output ?? []) {
         if (typeof item === "string") {
           console.log(item);
@@ -236,8 +243,33 @@ async function run(runArgs: string[]): Promise<void> {
         }
       }
     } else {
-      console.error("❌ Error:", result.error?.message ?? "Unknown error");
-      process.exit(1);
+      // Pipeline mode — use runToolRequest (tool mode, no approval prompts)
+      const { runToolRequest } = await import("@basaba/lobster/core");
+      const result = await runToolRequest({
+        pipeline,
+        ctx: {
+          llmAdapters: { copilot: adapter as any },
+          registry,
+          env: { ...process.env, LOBSTER_LLM_PROVIDER: "copilot" },
+        },
+      });
+
+      if (result.ok) {
+        for (const item of result.output ?? []) {
+          if (typeof item === "string") {
+            console.log(item);
+          } else if (item?.output?.data) {
+            console.log(JSON.stringify(item.output.data, null, 2));
+          } else if (item?.output?.text) {
+            console.log(item.output.text);
+          } else {
+            console.log(JSON.stringify(item, null, 2));
+          }
+        }
+      } else {
+        console.error("❌ Error:", result.error?.message ?? "Unknown error");
+        process.exit(1);
+      }
     }
   } finally {
     await dispose();
