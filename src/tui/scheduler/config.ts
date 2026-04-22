@@ -80,3 +80,15 @@ export function getRunsForWorkflow(workflowId: string): RunRecord[] {
     .filter((r) => r.workflowId === workflowId)
     .sort((a, b) => b.triggeredAt.localeCompare(a.triggeredAt));
 }
+
+export function deleteRun(runId: string): void {
+  const history = loadHistory();
+  history.runs = history.runs.filter((r) => r.id !== runId);
+  saveHistory(history);
+}
+
+export function clearWorkflowHistory(workflowId: string): void {
+  const history = loadHistory();
+  history.runs = history.runs.filter((r) => r.workflowId !== workflowId);
+  saveHistory(history);
+}

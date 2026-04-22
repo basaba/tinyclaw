@@ -151,6 +151,16 @@ export class DaemonClient extends EventEmitter {
     if (resp.type === "error") throw new Error(resp.message);
   }
 
+  async deleteRun(runId: string): Promise<void> {
+    const resp = await this.send({ cmd: "delete-run", runId });
+    if (resp.type === "error") throw new Error(resp.message);
+  }
+
+  async clearHistory(workflowId: string): Promise<void> {
+    const resp = await this.send({ cmd: "clear-history", workflowId });
+    if (resp.type === "error") throw new Error(resp.message);
+  }
+
   async stopDaemon(): Promise<void> {
     try {
       await this.send({ cmd: "stop-daemon" });

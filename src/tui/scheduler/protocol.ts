@@ -21,6 +21,8 @@ export type DaemonRequest =
   | { cmd: "get-history"; workflowId: string }
   | { cmd: "list-approvals" }
   | { cmd: "resolve-approval"; runId: string; approved: boolean }
+  | { cmd: "delete-run"; runId: string }
+  | { cmd: "clear-history"; workflowId: string }
   | { cmd: "stop-daemon" };
 
 // ── Response messages (Daemon → TUI) ────────────────────────────────

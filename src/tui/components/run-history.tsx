@@ -13,19 +13,30 @@ interface Props {
 export function RunHistory({ client, workflowId, onBack, onSelectRun }: Props) {
   const [runs, setRuns] = useState<RunRecord[]>([]);
   const [cursor, setCursor] = useState(0);
+  const [confirmClear, setConfirmClear] = useState(false);
+
+  const refresh = () => client.getHistory(workflowId).then(setRuns).catch(() => {});
 
   useEffect(() => {
-    client.getHistory(workflowId).then(setRuns).catch(() => {});
+    refresh();
     const onEvent = (evt: any) => {
       if (evt.kind === "run-complete" || evt.kind === "run-start" || evt.kind === "approval-pending") {
-        client.getHistory(workflowId).then(setRuns).catch(() => {});
+        refresh();
       }
     };
     client.on("event", onEvent);
     return () => { client.off("event", onEvent); };
   }, [client, workflowId]);
 
-  useInput((_input, key) => {
+  useInput((input, key) => {
+    if (confirmClear) {
+      if (input === "y") {
+        client.clearHistory(workflowId).then(() => { setRuns([]); setCursor(0); }).catch(() => {});
+      }
+      setConfirmClear(false);
+      return;
+    }
+
     if (key.escape) {
       onBack();
       return;
@@ -34,6 +45,18 @@ export function RunHistory({ client, workflowId, onBack, onSelectRun }: Props) {
     if (key.downArrow) setCursor((c) => Math.min(runs.length - 1, c + 1));
     if (key.return && runs[cursor]) {
       onSelectRun(runs[cursor], workflowId);
+    }
+    if (key.delete || input === "d") {
+      const run = runs[cursor];
+      if (run && run.status !== "running") {
+        client.deleteRun(run.id).then(() => {
+          refresh();
+          setCursor((c) => Math.min(c, runs.length - 2));
+        }).catch(() => {});
+      }
+    }
+    if (input === "c") {
+      setConfirmClear(true);
     }
   });
 
@@ -86,9 +109,13 @@ export function RunHistory({ client, workflowId, onBack, onSelectRun }: Props) {
           </Box>
         );
       })}
-      <Text color="gray" dimColor>
-        Press Enter to view input/output details
-      </Text>
+      {confirmClear ? (
+        <Text color="red" bold>Clear all history? Press y to confirm, any other key to cancel</Text>
+      ) : (
+        <Text color="gray" dimColor>
+          Enter: view details  d: delete entry  c: clear all
+        </Text>
+      )}
     </Box>
   );
 }
