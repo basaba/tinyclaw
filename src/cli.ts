@@ -20,6 +20,9 @@ if (args[0] === "copilot") {
 } else if (args[0] === "tui") {
   const { startTui } = await import("./tui/index.js");
   await startTui();
+} else if (args[0] === "sched") {
+  const { handleScheduler } = await import("./commands/scheduler.js");
+  await handleScheduler(args.slice(1));
 } else if (args[0] === "daemon") {
   await handleDaemon(args[1]);
 } else {
@@ -33,11 +36,14 @@ Usage:
   lobster-copilot <file> [options]
   lobster-copilot -p '<pipeline>' [options]
   lobster-copilot copilot '<prompt>' [options]
+  lobster-copilot sched <command> [options]
   lobster-copilot help
 
 Commands:
   copilot                  Send a prompt directly to Copilot (shortcut)
   tui                      Launch the workflow scheduler TUI (connects to daemon)
+  sched                    Scheduler management CLI (non-interactive)
+  sched help               Show all scheduler subcommands
   daemon start             Start the scheduler daemon in the background
   daemon stop              Stop the running scheduler daemon
   daemon status            Check if the daemon is running
@@ -63,6 +69,8 @@ Examples:
   lobster-copilot examples/piped-steps.yaml
   lobster-copilot -p "llm.invoke --provider copilot --prompt 'Hello'"
   lobster-copilot workflow.yaml --mcp-config ./mcp.json
+  lobster-copilot sched list
+  lobster-copilot sched run wf-abc123
 `);
 }
 

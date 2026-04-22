@@ -11,7 +11,7 @@
 import net from "node:net";
 import fs from "node:fs";
 import { SchedulerEngine } from "./engine.js";
-import { getRunsForWorkflow, deleteRun, clearWorkflowHistory } from "./config.js";
+import { getRunsForWorkflow, loadHistory, deleteRun, clearWorkflowHistory } from "./config.js";
 import {
   SOCKET_PATH,
   PID_FILE,
@@ -78,13 +78,25 @@ function handleRequest(req: DaemonRequest): DaemonResponse | Promise<DaemonRespo
       engine.resolveApproval(req.runId, req.approved).catch(() => {});
       return { type: "ok", message: req.approved ? "approving" : "rejecting" };
 
-    case "delete-run":
-      deleteRun(req.runId);
+    case "delete-run": {
+      const hist = loadHistory();
+      const match = hist.runs.find((r) => r.id === req.runId)
+        ?? hist.runs.find((r) => r.id.startsWith(req.runId));
+      if (match) deleteRun(match.id);
       return { type: "ok", message: "deleted" };
+    }
 
     case "clear-history":
       clearWorkflowHistory(req.workflowId);
       return { type: "ok", message: "cleared" };
+
+    case "get-run": {
+      const history = loadHistory();
+      const run = history.runs.find((r) => r.id === req.runId)
+        ?? history.runs.find((r) => r.id.startsWith(req.runId))
+        ?? null;
+      return { type: "run", run };
+    }
 
     case "stop-daemon":
       cleanup();

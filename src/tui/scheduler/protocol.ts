@@ -23,6 +23,7 @@ export type DaemonRequest =
   | { cmd: "resolve-approval"; runId: string; approved: boolean }
   | { cmd: "delete-run"; runId: string }
   | { cmd: "clear-history"; workflowId: string }
+  | { cmd: "get-run"; runId: string }
   | { cmd: "stop-daemon" };
 
 // ── Response messages (Daemon → TUI) ────────────────────────────────
@@ -31,6 +32,7 @@ export type DaemonResponse =
   | { type: "status"; running: boolean; pid: number; workflows: WorkflowEntry[] }
   | { type: "workflows"; workflows: WorkflowEntry[] }
   | { type: "history"; runs: RunRecord[] }
+  | { type: "run"; run: RunRecord | null }
   | { type: "approvals"; runs: RunRecord[] }
   | { type: "ok"; message?: string }
   | { type: "error"; message: string }
