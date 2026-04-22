@@ -207,12 +207,13 @@ export class SchedulerEngine extends EventEmitter {
             .join("\n")
         : undefined;
       const error = result.ok ? undefined : result.error?.message ?? "Unknown error";
-      const output = [capturedOutput, resultOutput].filter(Boolean).join("\n") || undefined;
+      const output = resultOutput || undefined;
 
       const patch: Partial<RunRecord> = {
         completedAt: new Date().toISOString(),
         status: approved ? (result.ok ? "success" : "error") : "rejected",
         output: output || (approved ? undefined : "Approval rejected"),
+        logs: capturedOutput || undefined,
         error: approved ? error : "Rejected by user",
         approvalInfo: undefined,
       };
@@ -349,7 +350,7 @@ export class SchedulerEngine extends EventEmitter {
         const patch: Partial<RunRecord> = {
           durationMs,
           status: "pending-approval",
-          output: capturedOutput || undefined,
+          logs: capturedOutput || undefined,
           approvalInfo: {
             prompt: result.requiresApproval.prompt ?? "Approval required",
             items: result.requiresApproval.items ?? [],
@@ -371,7 +372,7 @@ export class SchedulerEngine extends EventEmitter {
             )
             .join("\n")
         : undefined;
-      const output = [capturedOutput, resultOutput].filter(Boolean).join("\n") || undefined;
+      const output = resultOutput || undefined;
       const error = result.ok ? undefined : result.error?.message ?? "Unknown error";
 
       const patch: Partial<RunRecord> = {
@@ -379,6 +380,7 @@ export class SchedulerEngine extends EventEmitter {
         durationMs,
         status: result.ok ? "success" : "error",
         output,
+        logs: capturedOutput || undefined,
         error,
       };
 

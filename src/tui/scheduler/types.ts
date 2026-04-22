@@ -35,6 +35,7 @@ export interface RunRecord {
     schedule: string;
   };
   output?: string;
+  logs?: string;
   error?: string;
   approvalInfo?: ApprovalInfo;
 }

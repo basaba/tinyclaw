@@ -36,12 +36,8 @@ export function App({ client }: AppProps) {
           return next;
         });
       } else if (evt.kind === "run-complete") {
-        // Clean up live output once the run is done (final output is on the RunRecord)
-        setLiveOutput((prev) => {
-          const next = new Map(prev);
-          next.delete(evt.run.id);
-          return next;
-        });
+        // Keep liveOutput for the run — run-detail uses it for the Logs section
+        // even after completion. Old entries are cleaned up on navigation.
       }
     };
     client.on("event", handler);

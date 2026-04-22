@@ -136,18 +136,31 @@ export function RunDetail({ run: initialRun, availableHeight, client, liveOutput
 
   const isRunning = run.status === "running";
   const streamingText = liveOutput.get(run.id);
-  const outputText = isRunning
-    ? (streamingText || "⏳ Workflow is running…")
-    : (run.output ?? run.error ?? "No output");
+
+  // Logs: stored logs from engine, or accumulated live output
+  const logsText = run.logs || (liveOutput.get(run.id) || null);
+  const logsLines = logsText ? logsText.split("\n") : [];
+
+  // Output: workflow result (only after completion)
+  const outputText = !isRunning
+    ? (run.output ?? run.error ?? "No output")
+    : "⏳ Workflow is running…";
   const outputLines = outputText.split("\n");
 
-  // Auto-scroll to bottom when new live output arrives
+  // Split available height: give logs up to 1/3, rest to output
+  const hasLogs = logsLines.length > 0;
+  const LOG_LINES = hasLogs ? Math.min(Math.max(3, Math.floor(VISIBLE_LINES / 3)), logsLines.length) : 0;
+  const OUTPUT_LINES = Math.max(3, VISIBLE_LINES - LOG_LINES - (hasLogs ? 1 : 0));
+
+  const [logsScrollOffset, setLogsScrollOffset] = useState(0);
+
+  // Auto-scroll logs to bottom when new live output arrives
   const [autoScroll, setAutoScroll] = useState(true);
   useEffect(() => {
-    if (isRunning && autoScroll && outputLines.length > VISIBLE_LINES) {
-      setScrollOffset(Math.max(0, outputLines.length - VISIBLE_LINES));
+    if (isRunning && autoScroll && logsLines.length > LOG_LINES) {
+      setLogsScrollOffset(Math.max(0, logsLines.length - LOG_LINES));
     }
-  }, [outputLines.length, isRunning, autoScroll, VISIBLE_LINES]);
+  }, [logsLines.length, isRunning, autoScroll, LOG_LINES]);
 
   useInput((input, key) => {
     if (key.escape) {
@@ -160,18 +173,26 @@ export function RunDetail({ run: initialRun, availableHeight, client, liveOutput
       if (key.upArrow) setItemScrollOffset((o) => Math.max(0, o - 1));
       if (key.downArrow)
         setItemScrollOffset((o) => Math.min(o + 1, Math.max(0, approvalItemLines.length - MAX_APPROVAL_ITEM_LINES)));
-    } else {
-      // Otherwise scroll the output
+    } else if (isRunning && hasLogs) {
+      // While running, scroll the logs section
       if (key.upArrow) {
         setAutoScroll(false);
+        setLogsScrollOffset((o) => Math.max(0, o - 1));
+      }
+      if (key.downArrow) {
+        setLogsScrollOffset((o) => {
+          const next = Math.min(o + 1, Math.max(0, logsLines.length - LOG_LINES));
+          if (next >= logsLines.length - LOG_LINES) setAutoScroll(true);
+          return next;
+        });
+      }
+    } else {
+      // Scroll the output section
+      if (key.upArrow) {
         setScrollOffset((o) => Math.max(0, o - 1));
       }
       if (key.downArrow) {
-        setScrollOffset((o) => {
-          const next = Math.min(o + 1, Math.max(0, outputLines.length - VISIBLE_LINES));
-          if (next >= outputLines.length - VISIBLE_LINES) setAutoScroll(true);
-          return next;
-        });
+        setScrollOffset((o) => Math.min(o + 1, Math.max(0, outputLines.length - OUTPUT_LINES)));
       }
     }
 
@@ -194,11 +215,6 @@ export function RunDetail({ run: initialRun, availableHeight, client, liveOutput
       : run.status === "rejected" ? "magenta"
       : run.status === "pending-approval" ? "yellow"
       : "yellow";
-
-  const visibleLines = outputLines.slice(
-    scrollOffset,
-    scrollOffset + VISIBLE_LINES,
-  );
 
   return (
     <Box flexDirection="column">
@@ -284,19 +300,37 @@ export function RunDetail({ run: initialRun, availableHeight, client, liveOutput
         </Box>
       )}
 
-      <Box marginTop={1} flexDirection="column">
-        <Text bold color="gray">
-          ── Output ({outputLines.length} lines){isRunning && streamingText ? " 🔴 Live" : ""} ──
-        </Text>
-        {visibleLines.map((line, i) => (
-          <Text key={i} wrap="wrap">
-            {line}
+      {hasLogs && (
+        <Box marginTop={1} flexDirection="column">
+          <Text bold color="gray">
+            ── Logs{isRunning && streamingText ? " 🔴 Live" : ""} ──
           </Text>
-        ))}
-        {outputLines.length > VISIBLE_LINES && (
+          {logsLines
+            .slice(logsScrollOffset, logsScrollOffset + LOG_LINES)
+            .map((line, i) => (
+              <Text key={i} wrap="wrap">{line}</Text>
+            ))}
+          {logsLines.length > LOG_LINES && (
+            <Text color="gray" dimColor>
+              ↑/↓ to scroll ({logsScrollOffset + 1}-
+              {Math.min(logsScrollOffset + LOG_LINES, logsLines.length)}/
+              {logsLines.length})
+            </Text>
+          )}
+        </Box>
+      )}
+
+      <Box marginTop={1} flexDirection="column">
+        <Text bold color="gray">── Output ──</Text>
+        {outputLines
+          .slice(scrollOffset, scrollOffset + OUTPUT_LINES)
+          .map((line, i) => (
+            <Text key={i} wrap="wrap">{line}</Text>
+          ))}
+        {outputLines.length > OUTPUT_LINES && (
           <Text color="gray" dimColor>
             ↑/↓ to scroll ({scrollOffset + 1}-
-            {Math.min(scrollOffset + VISIBLE_LINES, outputLines.length)}/
+            {Math.min(scrollOffset + OUTPUT_LINES, outputLines.length)}/
             {outputLines.length})
           </Text>
         )}
