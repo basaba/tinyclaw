@@ -7,6 +7,7 @@ import { createCopilotAdapters } from "./adapters/index.js";
 import { loadMcpConfig, parseMcpFilter } from "./mcp-config/loader.js";
 import { createCopilotCommand } from "./commands/copilot.js";
 import { createMcpCallCommand } from "./commands/mcp.js";
+import { createAdoPrMonitorCommand } from "./commands/ado-pr-monitor.js";
 
 const args = process.argv.slice(2);
 
@@ -198,8 +199,9 @@ async function run(runArgs: string[]): Promise<void> {
     () => adapter.ensureStarted(),
   );
   const mcpCallCmd = createMcpCallCommand(() => mcpServers);
+  const adoPrCmd = createAdoPrMonitorCommand();
   const extraCommands = new Map(
-    [copilotCmd, mcpCallCmd].map((c) => [c.name, c]),
+    [copilotCmd, mcpCallCmd, adoPrCmd].map((c) => [c.name, c]),
   );
   const registry = {
     get(name: string) {

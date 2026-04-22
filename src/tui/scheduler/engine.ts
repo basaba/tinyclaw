@@ -13,6 +13,7 @@ import { EventEmitter } from "node:events";
 import { CopilotAdapter } from "../../adapters/copilot-adapter.js";
 import { createCopilotCommand } from "../../commands/copilot.js";
 import { createMcpCallCommand } from "../../commands/mcp.js";
+import { createAdoPrMonitorCommand } from "../../commands/ado-pr-monitor.js";
 import { loadMcpConfig } from "../../mcp-config/loader.js";
 
 const INTERVAL_RE = /^every\s+(\d+)\s*(s|sec|seconds?|m|min|minutes?|h|hr|hours?)$/i;
@@ -141,8 +142,9 @@ export class SchedulerEngine extends EventEmitter {
         () => adapter.ensureStarted(),
       );
       const mcpCallCmd = createMcpCallCommand(() => mcpServers);
+      const adoPrCmd = createAdoPrMonitorCommand();
       const extraCommands = new Map(
-        [copilotCmd, mcpCallCmd].map((c: any) => [c.name, c]),
+        [copilotCmd, mcpCallCmd, adoPrCmd].map((c: any) => [c.name, c]),
       );
       const registry = {
         get(name: string) {
@@ -304,8 +306,9 @@ export class SchedulerEngine extends EventEmitter {
         () => adapter.ensureStarted(),
       );
       const mcpCallCmd = createMcpCallCommand(() => mcpServers);
+      const adoPrCmd = createAdoPrMonitorCommand();
       const extraCommands = new Map(
-        [copilotCmd, mcpCallCmd].map((c) => [c.name, c]),
+        [copilotCmd, mcpCallCmd, adoPrCmd].map((c) => [c.name, c]),
       );
       const registry = {
         get(name: string) {
