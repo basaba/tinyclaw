@@ -3,18 +3,10 @@ import { Box, Text, useInput } from "ink";
 import type { RunRecord } from "../scheduler/types.js";
 import type { DaemonClient } from "../scheduler/daemon-client.js";
 
-interface StepProgressInfo {
-  stepId: string;
-  stepIndex: number;
-  totalSteps: number;
-  status: "running" | "complete" | "skipped" | "failed";
-}
-
 interface Props {
   run: RunRecord;
   availableHeight: number;
   client?: DaemonClient;
-  stepHistory: Map<string, StepProgressInfo[]>;
   onBack: () => void;
 }
 
@@ -103,14 +95,11 @@ function formatApprovalItem(item: unknown, index: number): string[] {
   return lines;
 }
 
-export function RunDetail({ run: initialRun, availableHeight, client, stepHistory, onBack }: Props) {
+export function RunDetail({ run: initialRun, availableHeight, client, onBack }: Props) {
   const [scrollOffset, setScrollOffset] = useState(0);
   const [itemScrollOffset, setItemScrollOffset] = useState(0);
   const [resolved, setResolved] = useState<"approved" | "rejected" | null>(null);
   const [liveRun, setLiveRun] = useState<RunRecord>(initialRun);
-
-  // Steps come from App-level stepHistory (survives view transitions)
-  const steps = stepHistory.get(initialRun.id) ?? [];
 
   // Listen for daemon events to update run data
   useEffect(() => {
@@ -126,8 +115,6 @@ export function RunDetail({ run: initialRun, availableHeight, client, stepHistor
 
   const run = liveRun;
   const isPendingApproval = !resolved && run.status === "pending-approval" && !!run.approvalInfo;
-  const isRunning = run.status === "running";
-  const showSteps = steps.length > 0 || isRunning;
 
   // Format approval items into displayable lines
   const approvalItemLines: string[] = isPendingApproval && run.approvalInfo!.items.length > 0
@@ -144,8 +131,7 @@ export function RunDetail({ run: initialRun, availableHeight, client, stepHistor
   const approvalChrome = isPendingApproval
     ? 2 + 1 + (run.approvalInfo!.preview && approvalItemLines.length === 0 ? 1 : 0) + (approvalItemLines.length > 0 ? 1 + visibleApprovalItemCount + (approvalItemLines.length > MAX_APPROVAL_ITEM_LINES ? 1 : 0) : 0) + 1
     : 0;
-  const stepsChrome = showSteps ? 2 + Math.min(steps.length || 1, 8) : 0;
-  const VISIBLE_LINES = Math.max(3, availableHeight - 14 - approvalChrome - stepsChrome);
+  const VISIBLE_LINES = Math.max(3, availableHeight - 14 - approvalChrome);
 
   const outputLines = (run.output ?? run.error ?? "No output").split("\n");
 
@@ -230,37 +216,7 @@ export function RunDetail({ run: initialRun, availableHeight, client, stepHistor
           <Text color="gray">Duration:  </Text>
           <Text>{dur}</Text>
         </Box>
-        {run.status === "error" && run.failedStepId && (
-          <Box>
-            <Text color="gray">Failed at: </Text>
-            <Text color="red">{run.failedStepId}</Text>
-          </Box>
-        )}
       </Box>
-
-      {showSteps && (
-        <Box marginTop={1} flexDirection="column">
-          <Text bold color="gray">── Steps {steps.length > 0 ? `(${steps.filter(s => s.status === "complete").length}/${steps[0]?.totalSteps ?? "?"})` : ""} ──</Text>
-          {steps.length === 0 && isRunning && (
-            <Text color="yellow">🔄 Starting…</Text>
-          )}
-          {steps.map((s) => {
-            const icon = s.status === "complete" ? "✅"
-              : s.status === "skipped" ? "⏭️"
-              : s.status === "failed" ? "❌"
-              : "🔄";
-            const color = s.status === "complete" ? "green"
-              : s.status === "skipped" ? "gray"
-              : s.status === "failed" ? "red"
-              : "yellow";
-            return (
-              <Text key={s.stepIndex} color={color}>
-                {icon} {s.stepIndex + 1}. {s.stepId}
-              </Text>
-            );
-          })}
-        </Box>
-      )}
 
       {isPendingApproval && (
         <Box marginTop={1} flexDirection="column" borderStyle="single" borderColor="yellow" paddingX={1}>

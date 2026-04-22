@@ -12,20 +12,6 @@ import { RunHistory } from "./components/run-history.js";
 import { RunDetail } from "./components/run-detail.js";
 import { StatusBar } from "./components/status-bar.js";
 
-export interface StepProgressEntry {
-  stepId: string;
-  stepIndex: number;
-  totalSteps: number;
-}
-
-// Accumulated step-by-step history per run
-interface StepHistoryEntry {
-  stepId: string;
-  stepIndex: number;
-  totalSteps: number;
-  status: "running" | "complete" | "skipped" | "failed";
-}
-
 interface AppProps {
   client: DaemonClient;
 }
@@ -38,79 +24,6 @@ export function App({ client }: AppProps) {
   const [daemonRunning, setDaemonRunning] = useState(true);
   const [tick, setTick] = useState(0);
   const [termSize, setTermSize] = useState({ columns: stdout.columns || 80, rows: stdout.rows || 24 });
-  // Step progress lives here so it survives view transitions
-  const [stepProgress, setStepProgress] = useState<Map<string, StepProgressEntry>>(new Map());
-  // Full step history per runId — accumulated across view transitions
-  const [stepHistory, setStepHistory] = useState<Map<string, StepHistoryEntry[]>>(new Map());
-
-  useEffect(() => {
-    const handler = (evt: DaemonEvent) => {
-      if (evt.kind === "step-progress") {
-        setStepProgress((prev) => {
-          const next = new Map(prev);
-          next.set(evt.workflowId, {
-            stepId: evt.stepId,
-            stepIndex: evt.stepIndex,
-            totalSteps: evt.totalSteps,
-          });
-          return next;
-        });
-        setStepHistory((prev) => {
-          const next = new Map(prev);
-          const list = [...(prev.get(evt.runId) ?? [])];
-          // Mark any previous running steps as complete
-          for (let i = 0; i < list.length; i++) {
-            if (list[i].status === "running") {
-              list[i] = { ...list[i], status: "complete" };
-            }
-          }
-          const existing = list.findIndex((s) => s.stepIndex === evt.stepIndex);
-          const entry: StepHistoryEntry = {
-            stepId: evt.stepId,
-            stepIndex: evt.stepIndex,
-            totalSteps: evt.totalSteps,
-            status: evt.status,
-          };
-          if (existing >= 0) {
-            list[existing] = entry;
-          } else {
-            list.push(entry);
-          }
-          next.set(evt.runId, list);
-          return next;
-        });
-      } else if (evt.kind === "run-complete") {
-        setStepProgress((prev) => {
-          const next = new Map(prev);
-          next.delete(evt.run.workflowId);
-          return next;
-        });
-        // Mark any still-running steps as failed if the run errored
-        if (evt.run.status === "error") {
-          setStepHistory((prev) => {
-            const next = new Map(prev);
-            const list = [...(prev.get(evt.run.id) ?? [])];
-            for (let i = 0; i < list.length; i++) {
-              if (list[i].status === "running") {
-                list[i] = { ...list[i], status: "failed" };
-              }
-            }
-            next.set(evt.run.id, list);
-            return next;
-          });
-        } else {
-          // Clean up step history for successful runs
-          setStepHistory((prev) => {
-            const next = new Map(prev);
-            next.delete(evt.run.id);
-            return next;
-          });
-        }
-      }
-    };
-    client.on("event", handler);
-    return () => { client.off("event", handler); };
-  }, [client]);
 
   useEffect(() => {
     const onResize = () => setTermSize({ columns: stdout.columns || 80, rows: stdout.rows || 24 });
@@ -187,7 +100,6 @@ export function App({ client }: AppProps) {
           <WorkflowList
             client={client}
             workflows={workflows}
-            stepProgress={stepProgress}
             onAdd={goAdd}
             onEdit={goEdit}
             onHistory={goHistory}
@@ -232,7 +144,6 @@ export function App({ client }: AppProps) {
             run={view.run}
             availableHeight={contentHeight}
             client={client}
-            stepHistory={stepHistory}
             onBack={
               view.fromWorkflowId
                 ? () => goHistory(view.fromWorkflowId!)

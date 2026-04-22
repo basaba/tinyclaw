@@ -40,5 +40,4 @@ export type DaemonEvent =
   | { kind: "run-start"; run: RunRecord }
   | { kind: "run-complete"; run: RunRecord }
   | { kind: "approval-pending"; run: RunRecord }
-  | { kind: "step-progress"; runId: string; workflowId: string; stepId: string; stepIndex: number; totalSteps: number; status: "running" | "complete" | "skipped" | "failed" }
   | { kind: "config-changed" };

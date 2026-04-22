@@ -36,7 +36,6 @@ export interface RunRecord {
   };
   output?: string;
   error?: string;
-  failedStepId?: string;
   approvalInfo?: ApprovalInfo;
 }
 

@@ -55,8 +55,7 @@ export function RunHistory({ client, workflowId, onBack, onSelectRun }: Props) {
           {"Status".padEnd(10)}
           {"Trigger".padEnd(12)}
           {"Started".padEnd(26)}
-          {"Duration".padEnd(12)}
-          {"Failed Step"}
+          {"Duration"}
         </Text>
       </Box>
       {runs.map((run, i) => {
@@ -82,8 +81,7 @@ export function RunHistory({ client, workflowId, onBack, onSelectRun }: Props) {
               {statusIcon.padEnd(10)}
               {run.triggeredBy.padEnd(12)}
               {time.padEnd(26)}
-              {dur.padEnd(12)}
-              {run.failedStepId ?? ""}
+              {dur}
             </Text>
           </Box>
         );

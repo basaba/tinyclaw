@@ -129,7 +129,7 @@ const server = net.createServer((socket) => {
 });
 
 // Forward engine events to all connected TUI clients
-engine.on("change", (evt: { type: string; run?: any; runId?: string; workflowId?: string; stepId?: string; stepIndex?: number; totalSteps?: number; status?: string }) => {
+engine.on("change", (evt: { type: string; run?: any }) => {
   const event: DaemonEvent =
     evt.type === "run-start"
       ? { kind: "run-start", run: evt.run }
@@ -137,9 +137,7 @@ engine.on("change", (evt: { type: string; run?: any; runId?: string; workflowId?
         ? { kind: "run-complete", run: evt.run }
         : evt.type === "approval-pending"
           ? { kind: "approval-pending", run: evt.run }
-          : evt.type === "step-progress"
-            ? { kind: "step-progress", runId: evt.runId!, workflowId: evt.workflowId!, stepId: evt.stepId!, stepIndex: evt.stepIndex!, totalSteps: evt.totalSteps!, status: evt.status as "running" | "complete" | "skipped" | "failed" }
-            : { kind: "config-changed" };
+          : { kind: "config-changed" };
 
   broadcast({ type: "event", event });
 });
