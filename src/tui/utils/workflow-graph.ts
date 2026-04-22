@@ -3,7 +3,7 @@
  * an ASCII step-dependency graph.
  *
  * Self-contained reimplementation of the graph logic from
- * @clawdbot/lobster (whose exports map blocks deep imports).
+ * @basaba/lobster (whose exports map blocks deep imports).
  */
 import { readFileSync } from "node:fs";
 import { resolve, extname } from "node:path";

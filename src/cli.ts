@@ -136,7 +136,7 @@ async function copilot(copilotArgs: string[]): Promise<void> {
 // ── workflow runner ─────────────────────────────────────────────────
 
 async function run(runArgs: string[]): Promise<void> {
-  const { runToolRequest } = await import("@clawdbot/lobster/core");
+  const { runToolRequest } = await import("@basaba/lobster/core");
 
   let filePath: string | undefined;
   let pipeline: string | undefined;
@@ -185,7 +185,7 @@ async function run(runArgs: string[]): Promise<void> {
   const dispose = () => adapter.dispose();
 
   // Build extended registry with copilot + mcp commands
-  const { createDefaultRegistry } = await import("@clawdbot/lobster/core");
+  const { createDefaultRegistry } = await import("@basaba/lobster/core");
   const defaultRegistry = createDefaultRegistry();
   const copilotCmd = createCopilotCommand(
     () => adapter.client,

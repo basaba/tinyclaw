@@ -24,7 +24,7 @@ async function main() {
   const { adapters, dispose } = createCopilotAdapters({ mcpServers });
 
   try {
-    const { runToolRequest } = await import("@clawdbot/lobster/core");
+    const { runToolRequest } = await import("@basaba/lobster/core");
 
     const result = await runToolRequest({
       pipeline: `llm.invoke --provider copilot --prompt "What tools do you have available?"`,
