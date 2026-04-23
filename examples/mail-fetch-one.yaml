@@ -1,0 +1,5 @@
+name: mail-fetch-one
+steps:
+  - id: fetch
+    pipeline: >
+      mail.search --unread --folder inbox --top 1

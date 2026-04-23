@@ -20,6 +20,93 @@ function asStream(items: unknown[]): AsyncIterable<unknown> {
   };
 }
 
+// ── Mail result normalisation ──────────────────────────────────────
+
+/** Normalised mail message — the fields downstream steps actually need. */
+interface MailSummary {
+  id: string;
+  from: string;
+  to: string[];
+  subject: string;
+  date: string;
+  isRead: boolean;
+  hasAttachments: boolean;
+  preview: string;
+}
+
+/** Extract a display-friendly email string from a Graph API recipient. */
+export function formatRecipient(r: any): string {
+  if (!r) return "";
+  if (typeof r === "string") return r;
+  const addr = r.emailAddress ?? r;
+  const name = addr.name ?? "";
+  const email = addr.address ?? "";
+  return name ? `${name} <${email}>` : email;
+}
+
+/**
+ * Try to parse raw MCP content items into normalised MailSummary objects.
+ * Falls through to raw content if the shape doesn't match.
+ *
+ * The agency mail MCP often returns:
+ *   { type: "text", text: '{"rawResponse":"{\\"value\\":[...]}"}' }
+ * i.e. a rawResponse wrapper with double-escaped Graph API JSON inside.
+ */
+export function normaliseMailResults(content: unknown[]): unknown[] {
+  const messages: MailSummary[] = [];
+
+  for (const item of content) {
+    // MCP content items are typically { type: "text", text: "..." }
+    const raw = typeof item === "string"
+      ? item
+      : (item as any)?.text ?? (item as any)?.content;
+
+    if (typeof raw !== "string") continue;
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+
+    // Unwrap { rawResponse: "<JSON string>" } wrapper from agency mail MCP
+    if (parsed && typeof parsed === "object" && typeof parsed.rawResponse === "string") {
+      try {
+        parsed = JSON.parse(parsed.rawResponse);
+      } catch {
+        continue;
+      }
+    }
+
+    const list = Array.isArray(parsed) ? parsed : [parsed];
+    for (const msg of list) {
+      if (!msg || typeof msg !== "object") continue;
+      // Handle Graph API response wrapper (value: [...])
+      const items = Array.isArray(msg.value) ? msg.value : [msg];
+      for (const m of items) {
+        if (!m.id && !m.subject) continue; // not a mail message
+        messages.push({
+          id: m.id ?? "",
+          from: formatRecipient(m.from ?? m.sender),
+          to: Array.isArray(m.toRecipients)
+            ? m.toRecipients.map(formatRecipient)
+            : [],
+          subject: m.subject ?? "(no subject)",
+          date: m.receivedDateTime ?? m.sentDateTime ?? m.createdDateTime ?? "",
+          isRead: m.isRead ?? false,
+          hasAttachments: m.hasAttachments ?? false,
+          preview: m.bodyPreview ?? "",
+        });
+      }
+    }
+  }
+
+  // If we managed to normalise at least one message, return the clean list;
+  // otherwise fall through to the original content so nothing is lost.
+  return messages.length > 0 ? messages : content;
+}
+
 /** Collect piped input into a single message string. */
 async function collectInput(input: AsyncIterable<unknown>): Promise<string> {
   const parts: string[] = [];
@@ -179,6 +266,7 @@ export function createMailSearchCommand(
           folder: { type: "string", description: "Folder: inbox, drafts, sent, deleted, junk, archive" },
           top: { type: "number", description: "Max results to return (default 25)" },
           unread: { type: "boolean", description: "Shorthand for --filter 'isRead eq false'" },
+          "order-by": { type: "string", description: "Order by date: newest (default) or oldest" },
         },
       },
       sideEffects: ["network"],
@@ -207,6 +295,7 @@ export function createMailSearchCommand(
         "  --folder   Restrict to folder: inbox, drafts, sent, deleted, junk, archive",
         "  --top      Max results (default 25)",
         "  --unread   Shorthand for --filter 'isRead eq false'",
+        "  --order-by Order by date: newest (default) or oldest",
         "",
         "Notes:",
         "  --search cannot be combined with --filter (Graph API limitation).",
@@ -228,13 +317,14 @@ export function createMailSearchCommand(
       const folder = args.folder as string | undefined;
       const top = args.top !== undefined ? Number(args.top) : undefined;
       const unread = args.unread === true || args.unread === "true";
+      const orderBy = (args["order-by"] as string | undefined)?.toLowerCase();
 
       if (unread && !filter) {
         filter = "isRead eq false";
       }
 
-      if (!query && !search && !filter) {
-        throw new Error("mail.search: provide --query, --search, or --filter");
+      if (!query && !search && !filter && !folder && top === undefined) {
+        throw new Error("mail.search: provide --query, --search, --filter, --folder, or --top");
       }
 
       if (query && (search || filter)) {
@@ -247,7 +337,7 @@ export function createMailSearchCommand(
       if (query) {
         const result = await callTool(config, "SearchMessages", { message: query }, timeout);
         if (result.isError) handleError("mail.search", result);
-        return { output: asStream(result.content as unknown[]) };
+        return { output: asStream(normaliseMailResults(result.content as unknown[])) };
       }
 
       // Deterministic mode → SearchMessagesQueryParameters
@@ -273,6 +363,12 @@ export function createMailSearchCommand(
 
       params.push(`$top=${top ?? 25}`);
 
+      // $orderby — Note: $orderby cannot be combined with $search (Graph API limitation)
+      if (!search) {
+        const dir = orderBy === "oldest" ? "asc" : "desc";
+        params.push(`$orderby=receivedDateTime ${dir}`);
+      }
+
       const queryParameters = `?${params.join("&")}`;
       const result = await callTool(
         config,
@@ -282,7 +378,7 @@ export function createMailSearchCommand(
       );
       if (result.isError) handleError("mail.search", result);
 
-      return { output: asStream(result.content as unknown[]) };
+      return { output: asStream(normaliseMailResults(result.content as unknown[])) };
     },
   };
 }
