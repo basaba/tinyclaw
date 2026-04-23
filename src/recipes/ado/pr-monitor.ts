@@ -42,6 +42,9 @@ function pickPrSubset(pr: any) {
     })),
     creationDate: pr.creationDate,
     closedDate: pr.closedDate,
+    lastMergeSourceCommit: pr.lastMergeSourceCommit?.commitId ?? null,
+    lastMergeTargetCommit: pr.lastMergeTargetCommit?.commitId ?? null,
+    lastMergeCommit: pr.lastMergeCommit?.commitId ?? null,
   };
 }
 
