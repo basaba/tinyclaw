@@ -8,11 +8,10 @@ import fs from "node:fs";
 import { EventEmitter } from "node:events";
 import type { WorkflowEntry, RunRecord } from "./types.js";
 import {
-  SOCKET_PATH,
-  PID_FILE,
   type DaemonRequest,
   type DaemonResponse,
 } from "./protocol.js";
+import { SOCKET_PATH, PID_FILE, isProcessRunning } from "./platform.js";
 
 export class DaemonClient extends EventEmitter {
   private socket: net.Socket | null = null;
@@ -180,8 +179,7 @@ export class DaemonClient extends EventEmitter {
   static isDaemonRunning(): boolean {
     try {
       const pid = parseInt(fs.readFileSync(PID_FILE, "utf-8").trim(), 10);
-      process.kill(pid, 0); // Check if process exists (signal 0)
-      return true;
+      return isProcessRunning(pid);
     } catch {
       return false;
     }

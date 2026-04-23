@@ -15,7 +15,7 @@ steps:
   # 1. Fetch unread emails from inbox
   - id: unread
     pipeline: >
-      mail.search --unread --folder inbox --top 10
+      mail.search --unread --folder inbox --top 1
     retry:
       max: 3
       backoff: exponential

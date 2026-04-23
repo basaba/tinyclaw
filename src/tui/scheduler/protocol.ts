@@ -1,12 +1,7 @@
-import { join } from "node:path";
-import { homedir } from "node:os";
 import type { WorkflowEntry, RunRecord } from "./types.js";
 
-// ── Paths ───────────────────────────────────────────────────────────
-
-const CONFIG_DIR = join(homedir(), ".config", "lobster-copilot");
-export const SOCKET_PATH = join(CONFIG_DIR, "daemon.sock");
-export const PID_FILE = join(CONFIG_DIR, "daemon.pid");
+// ── Paths (re-exported from platform abstraction) ───────────────────
+export { SOCKET_PATH, PID_FILE } from "./platform.js";
 
 // ── Request messages (TUI → Daemon) ─────────────────────────────────
 

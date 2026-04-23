@@ -13,12 +13,16 @@ import fs from "node:fs";
 import { SchedulerEngine } from "./engine.js";
 import { getRunsForWorkflow, loadHistory, deleteRun, clearWorkflowHistory } from "./config.js";
 import {
-  SOCKET_PATH,
-  PID_FILE,
   type DaemonRequest,
   type DaemonResponse,
   type DaemonEvent,
 } from "./protocol.js";
+import {
+  SOCKET_PATH,
+  PID_FILE,
+  ensureConfigDir,
+  cleanupSocket,
+} from "./platform.js";
 
 const engine = new SchedulerEngine();
 const clients = new Set<net.Socket>();
@@ -169,18 +173,16 @@ engine.on("change", (evt: { type: string; run?: any; runId?: string; text?: stri
 function cleanup(): void {
   engine.stop();
   server.close();
-  try { fs.unlinkSync(SOCKET_PATH); } catch {}
+  cleanupSocket();
   try { fs.unlinkSync(PID_FILE); } catch {}
 }
 
 export function startDaemon(): void {
-  // Remove stale socket
-  try { fs.unlinkSync(SOCKET_PATH); } catch {}
+  // Remove stale socket (no-op on Windows named pipes)
+  cleanupSocket();
 
   server.listen(SOCKET_PATH, () => {
-    // Write PID file
-    const dir = SOCKET_PATH.replace(/\/[^/]+$/, "");
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    ensureConfigDir();
     fs.writeFileSync(PID_FILE, String(process.pid), "utf-8");
 
     engine.start();

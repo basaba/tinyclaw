@@ -1,18 +1,11 @@
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { homedir } from "node:os";
 import type { ScheduleConfig, RunHistory, RunRecord } from "./types.js";
+import { CONFIG_DIR, ensureConfigDir } from "./platform.js";
 
-const CONFIG_DIR = join(homedir(), ".config", "lobster-copilot");
 const SCHEDULES_FILE = join(CONFIG_DIR, "schedules.json");
 const HISTORY_FILE = join(CONFIG_DIR, "history.json");
 const MAX_RUNS_PER_WORKFLOW = 100;
-
-function ensureDir(): void {
-  if (!existsSync(CONFIG_DIR)) {
-    mkdirSync(CONFIG_DIR, { recursive: true });
-  }
-}
 
 // ── Schedules ───────────────────────────────────────────────────────
 
@@ -26,7 +19,7 @@ export function loadSchedules(): ScheduleConfig {
 }
 
 export function saveSchedules(config: ScheduleConfig): void {
-  ensureDir();
+  ensureConfigDir();
   writeFileSync(SCHEDULES_FILE, JSON.stringify(config, null, 2), "utf-8");
 }
 
@@ -42,7 +35,7 @@ export function loadHistory(): RunHistory {
 }
 
 export function saveHistory(history: RunHistory): void {
-  ensureDir();
+  ensureConfigDir();
   writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2), "utf-8");
 }
 
