@@ -8,6 +8,7 @@ import { loadMcpConfig, parseMcpFilter } from "./mcp-config/loader.js";
 import { createCopilotCommand } from "./commands/copilot.js";
 import { createMcpCallCommand } from "./commands/mcp.js";
 import { createAdoPrMonitorCommand } from "./commands/ado-pr-monitor.js";
+import { createTeamsSendCommand } from "./commands/teams.js";
 
 const args = process.argv.slice(2);
 
@@ -200,8 +201,9 @@ async function run(runArgs: string[]): Promise<void> {
   );
   const mcpCallCmd = createMcpCallCommand(() => mcpServers);
   const adoPrCmd = createAdoPrMonitorCommand();
+  const teamsSendCmd = createTeamsSendCommand(() => mcpServers);
   const extraCommands = new Map(
-    [copilotCmd, mcpCallCmd, adoPrCmd].map((c) => [c.name, c]),
+    [copilotCmd, mcpCallCmd, adoPrCmd, teamsSendCmd].map((c) => [c.name, c]),
   );
   const registry = {
     get(name: string) {

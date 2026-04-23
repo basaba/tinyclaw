@@ -14,6 +14,7 @@ import { CopilotAdapter } from "../../adapters/copilot-adapter.js";
 import { createCopilotCommand } from "../../commands/copilot.js";
 import { createMcpCallCommand } from "../../commands/mcp.js";
 import { createAdoPrMonitorCommand } from "../../commands/ado-pr-monitor.js";
+import { createTeamsSendCommand } from "../../commands/teams.js";
 import { loadMcpConfig } from "../../mcp-config/loader.js";
 
 const INTERVAL_RE = /^every\s+(\d+)\s*(s|sec|seconds?|m|min|minutes?|h|hr|hours?)$/i;
@@ -143,8 +144,9 @@ export class SchedulerEngine extends EventEmitter {
       );
       const mcpCallCmd = createMcpCallCommand(() => mcpServers);
       const adoPrCmd = createAdoPrMonitorCommand();
+      const teamsSendCmd = createTeamsSendCommand(() => mcpServers);
       const extraCommands = new Map(
-        [copilotCmd, mcpCallCmd, adoPrCmd].map((c: any) => [c.name, c]),
+        [copilotCmd, mcpCallCmd, adoPrCmd, teamsSendCmd].map((c: any) => [c.name, c]),
       );
       const registry = {
         get(name: string) {
@@ -307,8 +309,9 @@ export class SchedulerEngine extends EventEmitter {
       );
       const mcpCallCmd = createMcpCallCommand(() => mcpServers);
       const adoPrCmd = createAdoPrMonitorCommand();
+      const teamsSendCmd = createTeamsSendCommand(() => mcpServers);
       const extraCommands = new Map(
-        [copilotCmd, mcpCallCmd, adoPrCmd].map((c) => [c.name, c]),
+        [copilotCmd, mcpCallCmd, adoPrCmd, teamsSendCmd].map((c) => [c.name, c]),
       );
       const registry = {
         get(name: string) {
