@@ -1,4 +1,4 @@
-import React, { useReducer, useCallback, useRef, useState } from "react";
+import React, { useReducer, useCallback, useRef } from "react";
 import { Box, Text, useInput } from "ink";
 import type { DaemonClient } from "../scheduler/daemon-client.js";
 import type { WorkflowEntry } from "../scheduler/types.js";
@@ -9,7 +9,7 @@ interface Props {
   onDone: () => void;
 }
 
-type Field = "name" | "filePath" | "schedule" | "scheduleNum" | "scheduleUnit" | "submit";
+type Field = "name" | "filePath" | "schedule" | "scheduleNum" | "scheduleUnit" | "argsJson" | "submit";
 
 const UNITS = ["min", "hour", "day"] as const;
 type ScheduleUnit = (typeof UNITS)[number];
@@ -30,6 +30,8 @@ interface FormState {
   // Raw schedule (for cron or unparseable formats)
   rawSchedule: string;
   useRawSchedule: boolean;
+  argsJson: string;
+  error: string;
 }
 
 type Action =
@@ -37,7 +39,8 @@ type Action =
   | { type: "prev_field" }
   | { type: "append"; char: string }
   | { type: "delete_char" }
-  | { type: "cycle_unit"; dir: 1 | -1 };
+  | { type: "cycle_unit"; dir: 1 | -1 }
+  | { type: "set_error"; error: string };
 
 const INTERVAL_RE = /^every\s+(\d+)\s*(s|sec|seconds?|m|min|minutes?|h|hr|hours?|d|day|days?)$/i;
 
@@ -55,8 +58,8 @@ function parseSchedule(schedule: string): { num: string; unit: ScheduleUnit } | 
 
 function getFields(useRaw: boolean): Field[] {
   return useRaw
-    ? ["name", "filePath", "schedule", "submit"]
-    : ["name", "filePath", "scheduleNum", "scheduleUnit", "submit"];
+    ? ["name", "filePath", "schedule", "argsJson", "submit"]
+    : ["name", "filePath", "scheduleNum", "scheduleUnit", "argsJson", "submit"];
 }
 
 function reducer(state: FormState, action: Action): FormState {
@@ -87,6 +90,9 @@ function reducer(state: FormState, action: Action): FormState {
       if (f === "schedule") {
         return { ...state, rawSchedule: state.rawSchedule + action.char };
       }
+      if (f === "argsJson") {
+        return { ...state, argsJson: state.argsJson + action.char, error: "" };
+      }
       return { ...state, [f]: (state[f] as string) + action.char };
     }
     case "delete_char": {
@@ -98,6 +104,9 @@ function reducer(state: FormState, action: Action): FormState {
       if (f === "schedule") {
         return { ...state, rawSchedule: state.rawSchedule.slice(0, -1) };
       }
+      if (f === "argsJson") {
+        return { ...state, argsJson: state.argsJson.slice(0, -1), error: "" };
+      }
       return { ...state, [f]: (state[f] as string).slice(0, -1) };
     }
     case "cycle_unit": {
@@ -105,12 +114,15 @@ function reducer(state: FormState, action: Action): FormState {
       const next = (idx + action.dir + UNITS.length) % UNITS.length;
       return { ...state, scheduleUnit: UNITS[next] };
     }
+    case "set_error":
+      return { ...state, error: action.error };
     default:
       return state;
   }
 }
 
 function buildInitialState(wf: WorkflowEntry): FormState {
+  const argsJson = wf.args ? JSON.stringify(wf.args) : "";
   const parsed = parseSchedule(wf.schedule);
   if (parsed) {
     return {
@@ -121,6 +133,8 @@ function buildInitialState(wf: WorkflowEntry): FormState {
       scheduleUnit: parsed.unit,
       rawSchedule: wf.schedule,
       useRawSchedule: false,
+      argsJson,
+      error: "",
     };
   }
   return {
@@ -131,6 +145,8 @@ function buildInitialState(wf: WorkflowEntry): FormState {
     scheduleUnit: "min",
     rawSchedule: wf.schedule,
     useRawSchedule: true,
+    argsJson,
+    error: "",
   };
 }
 
@@ -138,7 +154,6 @@ export function EditWorkflow({ client, workflow, onDone }: Props) {
   const [state, dispatch] = useReducer(reducer, buildInitialState(workflow));
   const stateRef = useRef(state);
   stateRef.current = state;
-  const [error, setError] = useState<string | null>(null);
 
   const handleInput = useCallback(
     (
@@ -184,18 +199,34 @@ export function EditWorkflow({ client, workflow, onDone }: Props) {
           }
           if (newSchedule && newSchedule !== workflow.schedule) patch.schedule = newSchedule;
 
+          // Parse args JSON
+          const trimmedArgs = s.argsJson.trim();
+          const oldArgsJson = workflow.args ? JSON.stringify(workflow.args) : "";
+          if (trimmedArgs !== oldArgsJson) {
+            if (trimmedArgs) {
+              try {
+                patch.args = JSON.parse(trimmedArgs);
+              } catch {
+                dispatch({ type: "set_error", error: "Invalid JSON in Args" });
+                return;
+              }
+            } else {
+              patch.args = undefined;
+            }
+          }
+
           if (Object.keys(patch).length === 0) {
             // Nothing changed
             onDone();
             return;
           }
 
-          setError(null);
+          dispatch({ type: "set_error", error: "" });
           client
             .updateWorkflow(workflow.id, patch)
             .then(onDone)
             .catch((err: unknown) => {
-              setError(err instanceof Error ? err.message : "Failed to update workflow");
+              dispatch({ type: "set_error", error: err instanceof Error ? err.message : "Failed to update workflow" });
             });
         }
         if (key.tab && key.shift) {
@@ -299,6 +330,19 @@ export function EditWorkflow({ client, workflow, onDone }: Props) {
           </Box>
         )}
 
+        <Box>
+          <Text color={fieldColor("argsJson")}>Args (JSON): </Text>
+          <Text>
+            {state.argsJson}
+            {state.field === "argsJson" ? "▋" : ""}
+          </Text>
+        </Box>
+        {state.error ? (
+          <Box>
+            <Text color="red">⚠ {state.error}</Text>
+          </Box>
+        ) : null}
+
         <Box marginTop={1}>
           {state.field === "submit" ? (
             <Text bold inverse color="green">
@@ -313,12 +357,6 @@ export function EditWorkflow({ client, workflow, onDone }: Props) {
             <Text color="gray"> press Enter to save</Text>
           )}
         </Box>
-
-        {error && (
-          <Box marginTop={1}>
-            <Text color="red">Error: {error}</Text>
-          </Box>
-        )}
       </Box>
     </Box>
   );

@@ -8,8 +8,8 @@ interface Props {
   onDone: () => void;
 }
 
-type Field = "name" | "filePath" | "scheduleNum" | "scheduleUnit" | "submit";
-const FIELDS: Field[] = ["name", "filePath", "scheduleNum", "scheduleUnit", "submit"];
+type Field = "name" | "filePath" | "scheduleNum" | "scheduleUnit" | "argsJson" | "submit";
+const FIELDS: Field[] = ["name", "filePath", "scheduleNum", "scheduleUnit", "argsJson", "submit"];
 
 const UNITS = ["min", "hour", "day"] as const;
 type ScheduleUnit = (typeof UNITS)[number];
@@ -26,6 +26,8 @@ interface FormState {
   filePath: string;
   scheduleNum: string;
   scheduleUnit: ScheduleUnit;
+  argsJson: string;
+  error: string;
 }
 
 type Action =
@@ -33,7 +35,8 @@ type Action =
   | { type: "prev_field" }
   | { type: "append"; char: string }
   | { type: "delete_char" }
-  | { type: "cycle_unit"; dir: 1 | -1 };
+  | { type: "cycle_unit"; dir: 1 | -1 }
+  | { type: "set_error"; error: string };
 
 function reducer(state: FormState, action: Action): FormState {
   switch (action.type) {
@@ -58,6 +61,9 @@ function reducer(state: FormState, action: Action): FormState {
         if (!/^\d$/.test(action.char)) return state;
         return { ...state, scheduleNum: state.scheduleNum + action.char };
       }
+      if (f === "argsJson") {
+        return { ...state, argsJson: state.argsJson + action.char, error: "" };
+      }
       return { ...state, [f]: (state[f] as string) + action.char };
     }
     case "delete_char": {
@@ -66,6 +72,9 @@ function reducer(state: FormState, action: Action): FormState {
       if (f === "scheduleNum") {
         return { ...state, scheduleNum: state.scheduleNum.slice(0, -1) };
       }
+      if (f === "argsJson") {
+        return { ...state, argsJson: state.argsJson.slice(0, -1), error: "" };
+      }
       return { ...state, [f]: (state[f] as string).slice(0, -1) };
     }
     case "cycle_unit": {
@@ -73,6 +82,8 @@ function reducer(state: FormState, action: Action): FormState {
       const next = (idx + action.dir + UNITS.length) % UNITS.length;
       return { ...state, scheduleUnit: UNITS[next] };
     }
+    case "set_error":
+      return { ...state, error: action.error };
     default:
       return state;
   }
@@ -84,6 +95,8 @@ const INITIAL_STATE: FormState = {
   filePath: "",
   scheduleNum: "",
   scheduleUnit: "min",
+  argsJson: "",
+  error: "",
 };
 
 function formatSchedule(num: string, unit: ScheduleUnit): string {
@@ -106,6 +119,15 @@ export function AddWorkflow({ client, onDone }: Props) {
 
       if (s.field === "submit") {
         if (key.return) {
+          let wfArgs: Record<string, unknown> | undefined;
+          if (s.argsJson.trim()) {
+            try {
+              wfArgs = JSON.parse(s.argsJson.trim());
+            } catch {
+              dispatch({ type: "set_error", error: "Invalid JSON in Args" });
+              return;
+            }
+          }
           client
             .addWorkflow({
               id: randomUUID().slice(0, 8),
@@ -113,6 +135,7 @@ export function AddWorkflow({ client, onDone }: Props) {
               filePath: s.filePath.trim(),
               schedule: formatSchedule(s.scheduleNum.trim(), s.scheduleUnit),
               enabled: true,
+              ...(wfArgs ? { args: wfArgs } : {}),
             })
             .then(onDone)
             .catch(() => onDone());
@@ -206,6 +229,18 @@ export function AddWorkflow({ client, onDone }: Props) {
             <Text color="gray"> ◂/▸ to change</Text>
           )}
         </Box>
+        <Box>
+          <Text color={fieldColor("argsJson")}>Args (JSON): </Text>
+          <Text>
+            {state.argsJson}
+            {state.field === "argsJson" ? "▋" : ""}
+          </Text>
+        </Box>
+        {state.error ? (
+          <Box>
+            <Text color="red">⚠ {state.error}</Text>
+          </Box>
+        ) : null}
         <Box marginTop={1}>
           {state.field === "submit" ? (
             <Text bold inverse color="green">
