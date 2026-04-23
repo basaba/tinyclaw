@@ -15,6 +15,7 @@ import { createCopilotCommand } from "../../commands/copilot.js";
 import { createMcpCallCommand } from "../../commands/mcp.js";
 import { createAdoPrMonitorCommand } from "../../commands/ado-pr-monitor.js";
 import { createTeamsSendCommand } from "../../commands/teams.js";
+import { createMailSendCommand, createMailSearchCommand, createMailReadCommand } from "../../commands/mail.js";
 import { loadMcpConfig } from "../../mcp-config/loader.js";
 
 const INTERVAL_RE = /^every\s+(\d+)\s*(s|sec|seconds?|m|min|minutes?|h|hr|hours?)$/i;
@@ -145,8 +146,11 @@ export class SchedulerEngine extends EventEmitter {
       const mcpCallCmd = createMcpCallCommand(() => mcpServers);
       const adoPrCmd = createAdoPrMonitorCommand();
       const teamsSendCmd = createTeamsSendCommand(() => mcpServers);
+      const mailSendCmd = createMailSendCommand(() => mcpServers);
+      const mailSearchCmd = createMailSearchCommand(() => mcpServers);
+      const mailReadCmd = createMailReadCommand(() => mcpServers);
       const extraCommands = new Map(
-        [copilotCmd, mcpCallCmd, adoPrCmd, teamsSendCmd].map((c: any) => [c.name, c]),
+        [copilotCmd, mcpCallCmd, adoPrCmd, teamsSendCmd, mailSendCmd, mailSearchCmd, mailReadCmd].map((c: any) => [c.name, c]),
       );
       const registry = {
         get(name: string) {
@@ -310,8 +314,11 @@ export class SchedulerEngine extends EventEmitter {
       const mcpCallCmd = createMcpCallCommand(() => mcpServers);
       const adoPrCmd = createAdoPrMonitorCommand();
       const teamsSendCmd = createTeamsSendCommand(() => mcpServers);
+      const mailSendCmd = createMailSendCommand(() => mcpServers);
+      const mailSearchCmd = createMailSearchCommand(() => mcpServers);
+      const mailReadCmd = createMailReadCommand(() => mcpServers);
       const extraCommands = new Map(
-        [copilotCmd, mcpCallCmd, adoPrCmd, teamsSendCmd].map((c) => [c.name, c]),
+        [copilotCmd, mcpCallCmd, adoPrCmd, teamsSendCmd, mailSendCmd, mailSearchCmd, mailReadCmd].map((c) => [c.name, c]),
       );
       const registry = {
         get(name: string) {

@@ -56,12 +56,8 @@ steps:
           --output json
 
     
-  # # 5. Pipe failure data through pick to trim, then into Copilot for analysis
-  # - id: investigate
-  #   pipeline: >
-  #     copilot --prompt 'You are a build failure investigator. Analyze these
-  #     Azure DevOps test failures and provide:
-  #     1. A summary of what failed
-  #     2. Common patterns or root causes across failures
-  #     3. Suggested next steps to fix them'
-  #   stdin: $failures.json
+  # 5. Pipe failure data through pick to trim, then into Copilot for analysis
+  - id: investigate
+    pipeline: >
+      pick failed-tests
+    stdin: $failures.json

@@ -9,6 +9,7 @@ import { createCopilotCommand } from "./commands/copilot.js";
 import { createMcpCallCommand } from "./commands/mcp.js";
 import { createAdoPrMonitorCommand } from "./commands/ado-pr-monitor.js";
 import { createTeamsSendCommand } from "./commands/teams.js";
+import { createMailSendCommand, createMailSearchCommand, createMailReadCommand } from "./commands/mail.js";
 
 const args = process.argv.slice(2);
 
@@ -52,6 +53,7 @@ Commands:
 
 Options:
   -p, --pipeline <text>    Run a pipeline string instead of a file
+  --dry-run                Validate and print the execution plan without running
   --model <model>          Model to use (e.g. gpt-4o, claude-sonnet-4)
   --system <prompt>        System prompt override
   --mcp-config <path>      Path to mcp.json config file
@@ -69,7 +71,9 @@ Examples:
   lobster-copilot copilot 'Explain async/await in TypeScript'
   lobster-copilot copilot 'Review this code' --model gpt-4o < file.ts
   lobster-copilot examples/piped-steps.yaml
+  lobster-copilot examples/piped-steps.yaml --dry-run
   lobster-copilot -p "llm.invoke --provider copilot --prompt 'Hello'"
+  lobster-copilot -p "ado.pr.monitor --org myorg --project proj" --dry-run
   lobster-copilot workflow.yaml --mcp-config ./mcp.json
   lobster-copilot sched list
   lobster-copilot sched run wf-abc123
@@ -146,18 +150,22 @@ async function copilot(copilotArgs: string[]): Promise<void> {
 // ── workflow runner ─────────────────────────────────────────────────
 
 async function run(runArgs: string[]): Promise<void> {
-  const { runWorkflowFile, createDefaultRegistry } = await import("@basaba/lobster/core");
+  const lobsterCore: any = await import("@basaba/lobster/core");
+  const { runWorkflowFile, createDefaultRegistry, runPipeline, parsePipeline } = lobsterCore;
 
   let filePath: string | undefined;
   let pipeline: string | undefined;
   let argsJson: Record<string, unknown> | undefined;
   let mcpConfigPath: string | undefined;
   let mcpsFilter: string | undefined;
+  let dryRun = false;
 
   for (let i = 0; i < runArgs.length; i++) {
     const arg = runArgs[i];
     if (arg === "-p" || arg === "--pipeline") {
       pipeline = runArgs[++i];
+    } else if (arg === "--dry-run") {
+      dryRun = true;
     } else if (arg === "--args-json") {
       try {
         argsJson = JSON.parse(runArgs[++i]);
@@ -202,8 +210,11 @@ async function run(runArgs: string[]): Promise<void> {
   const mcpCallCmd = createMcpCallCommand(() => mcpServers);
   const adoPrCmd = createAdoPrMonitorCommand();
   const teamsSendCmd = createTeamsSendCommand(() => mcpServers);
+  const mailSendCmd = createMailSendCommand(() => mcpServers);
+  const mailSearchCmd = createMailSearchCommand(() => mcpServers);
+  const mailReadCmd = createMailReadCommand(() => mcpServers);
   const extraCommands = new Map(
-    [copilotCmd, mcpCallCmd, adoPrCmd, teamsSendCmd].map((c) => [c.name, c]),
+    [copilotCmd, mcpCallCmd, adoPrCmd, teamsSendCmd, mailSendCmd, mailSearchCmd, mailReadCmd].map((c) => [c.name, c]),
   );
   const registry = {
     get(name: string) {
@@ -224,6 +235,7 @@ async function run(runArgs: string[]): Promise<void> {
     stderr: process.stderr,
     llmAdapters: { copilot: adapter as any },
     registry,
+    dryRun,
   };
 
   try {
@@ -247,32 +259,31 @@ async function run(runArgs: string[]): Promise<void> {
         }
       }
     } else {
-      // Pipeline mode — use runToolRequest (tool mode, no approval prompts)
-      const { runToolRequest } = await import("@basaba/lobster/core");
-      const result = await runToolRequest({
-        pipeline,
-        ctx: {
-          llmAdapters: { copilot: adapter as any },
-          registry,
-          env: { ...process.env, LOBSTER_LLM_PROVIDER: "copilot" },
-        },
+      // Pipeline mode
+      const parsed = parsePipeline(pipeline!);
+      const result = await runPipeline({
+        pipeline: parsed,
+        registry,
+        stdin: process.stdin,
+        stdout: process.stdout,
+        stderr: process.stderr,
+        env: { ...process.env, LOBSTER_LLM_PROVIDER: "copilot" },
+        mode: "human",
+        cwd: process.cwd(),
+        llmAdapters: { copilot: adapter as any },
+        dryRun,
       });
 
-      if (result.ok) {
-        for (const item of result.output ?? []) {
-          if (typeof item === "string") {
-            console.log(item);
-          } else if (item?.output?.data) {
-            console.log(JSON.stringify(item.output.data, null, 2));
-          } else if (item?.output?.text) {
-            console.log(item.output.text);
-          } else {
-            console.log(JSON.stringify(item, null, 2));
-          }
+      for (const item of result.items ?? []) {
+        if (typeof item === "string") {
+          console.log(item);
+        } else if (item?.output?.data) {
+          console.log(JSON.stringify(item.output.data, null, 2));
+        } else if (item?.output?.text) {
+          console.log(item.output.text);
+        } else {
+          console.log(JSON.stringify(item, null, 2));
         }
-      } else {
-        console.error("❌ Error:", result.error?.message ?? "Unknown error");
-        process.exit(1);
       }
     }
   } finally {

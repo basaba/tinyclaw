@@ -1,0 +1,34 @@
+# Mail workflow examples
+#
+# Prerequisites:
+#   - Agency CLI with mail MCP (`agency mcp mail`)
+#   - Authenticated via agency/Entra ID
+#
+# Usage:
+#   lobster-copilot examples/mail-digest.yaml
+#   lobster-copilot examples/mail-digest.yaml --dry-run
+
+name: mail-digest
+
+# Summarise unread inbox emails and send the digest to yourself
+steps:
+  # 1. Fetch unread emails from inbox
+  - id: unread
+    pipeline: >
+      mail.search --unread --folder inbox --top 10
+    retry:
+      max: 3
+      backoff: exponential
+      delay_ms: 1000
+
+  # # 2. Ask Copilot to summarise them
+  # - id: summary
+  #   pipeline: >
+  #     copilot --prompt 'Summarise these emails as a concise bullet-point digest. Group by sender.'
+  #   stdin: $unread
+
+  # # 3. Send the digest to yourself on Teams
+  # - id: notify
+  #   pipeline: >
+  #     teams.send --self
+  #   stdin: $summary
