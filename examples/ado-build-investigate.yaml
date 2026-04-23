@@ -48,13 +48,14 @@ steps:
     for_each: $test-runs.json.value
     steps:
       - id: failed-tests
-        when: $item.json.totalTests > $item.json.passedTests
+        condition: $item.json.totalTests>$item.json.passedTests
         run: >
           az rest --method get
           --url "https://dev.azure.com/msazure/One/_apis/test/runs/$item.json.id/results?outcomes=Failed&api-version=7.1"
           --resource "499b84ac-1321-427f-aa17-267ca6975798"
           --output json
 
+    
   # # 5. Pipe failure data through pick to trim, then into Copilot for analysis
   # - id: investigate
   #   pipeline: >
