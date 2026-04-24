@@ -11,11 +11,7 @@ import {
 } from "./config.js";
 import { EventEmitter } from "node:events";
 import { CopilotAdapter } from "../../adapters/copilot-adapter.js";
-import { createCopilotCommand } from "../../commands/copilot.js";
-import { createMcpCallCommand } from "../../commands/mcp.js";
-import { createAdoPrMonitorCommand } from "../../commands/ado-pr-monitor.js";
-import { createTeamsSendCommand } from "../../commands/teams.js";
-import { createMailSendCommand, createMailSearchCommand, createMailReadCommand } from "../../commands/mail.js";
+import { buildRegistry } from "../../registry.js";
 import { loadMcpConfig } from "../../mcp-config/loader.js";
 
 const INTERVAL_RE = /^every\s+(\d+)\s*(s|sec|seconds?|m|min|minutes?|h|hr|hours?)$/i;
@@ -129,7 +125,7 @@ export class SchedulerEngine extends EventEmitter {
     if (!run.approvalInfo?.resumeToken) throw new Error(`Run ${runId} has no resume token`);
 
     const lobsterCore = await import("@basaba/lobster/core") as any;
-    const { resumeToolRequest, createDefaultRegistry } = lobsterCore;
+    const { resumeToolRequest } = lobsterCore;
 
     const mcpServers = loadMcpConfig({});
     const adapter = new CopilotAdapter({
@@ -138,28 +134,11 @@ export class SchedulerEngine extends EventEmitter {
     });
 
     try {
-      const defaultRegistry = createDefaultRegistry();
-      const copilotCmd = createCopilotCommand(
-        () => adapter.client,
-        () => adapter.ensureStarted(),
-      );
-      const mcpCallCmd = createMcpCallCommand(() => mcpServers);
-      const adoPrCmd = createAdoPrMonitorCommand();
-      const teamsSendCmd = createTeamsSendCommand(() => mcpServers);
-      const mailSendCmd = createMailSendCommand(() => mcpServers);
-      const mailSearchCmd = createMailSearchCommand(() => mcpServers);
-      const mailReadCmd = createMailReadCommand(() => mcpServers);
-      const extraCommands = new Map(
-        [copilotCmd, mcpCallCmd, adoPrCmd, teamsSendCmd, mailSendCmd, mailSearchCmd, mailReadCmd].map((c: any) => [c.name, c]),
-      );
-      const registry = {
-        get(name: string) {
-          return extraCommands.get(name) ?? defaultRegistry.get(name);
-        },
-        list() {
-          return [...defaultRegistry.list(), ...extraCommands.keys()].sort();
-        },
-      };
+      const registry = await buildRegistry({
+        getClient: () => adapter.client,
+        ensureStarted: () => adapter.ensureStarted(),
+        getMcpServers: () => mcpServers,
+      });
 
       const stdout = new PassThrough();
       const stderr = new PassThrough();
@@ -301,33 +280,16 @@ export class SchedulerEngine extends EventEmitter {
     });
 
     try {
-      const { runToolRequest, createDefaultRegistry } = await import(
+      const { runToolRequest } = await import(
         "@basaba/lobster/core"
       );
 
       // Build extended registry with copilot + mcp commands
-      const defaultRegistry = createDefaultRegistry();
-      const copilotCmd = createCopilotCommand(
-        () => adapter.client,
-        () => adapter.ensureStarted(),
-      );
-      const mcpCallCmd = createMcpCallCommand(() => mcpServers);
-      const adoPrCmd = createAdoPrMonitorCommand();
-      const teamsSendCmd = createTeamsSendCommand(() => mcpServers);
-      const mailSendCmd = createMailSendCommand(() => mcpServers);
-      const mailSearchCmd = createMailSearchCommand(() => mcpServers);
-      const mailReadCmd = createMailReadCommand(() => mcpServers);
-      const extraCommands = new Map(
-        [copilotCmd, mcpCallCmd, adoPrCmd, teamsSendCmd, mailSendCmd, mailSearchCmd, mailReadCmd].map((c) => [c.name, c]),
-      );
-      const registry = {
-        get(name: string) {
-          return extraCommands.get(name) ?? defaultRegistry.get(name);
-        },
-        list() {
-          return [...defaultRegistry.list(), ...extraCommands.keys()].sort();
-        },
-      };
+      const registry = await buildRegistry({
+        getClient: () => adapter.client,
+        ensureStarted: () => adapter.ensureStarted(),
+        getMcpServers: () => mcpServers,
+      });
 
       const stdout = new PassThrough();
       const stderr = new PassThrough();

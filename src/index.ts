@@ -26,6 +26,8 @@ export {
   LLM_INVOKE_SYSTEM_PROMPT,
 } from "./copilot/prompts.js";
 export { createCopilotCommand, createMcpCallCommand, type LobsterCommand } from "./commands/index.js";
+export { loadPlugins, resolvePluginDir, type PluginContext } from "./plugins/loader.js";
+export { buildRegistry, type Registry, type BuildRegistryOptions } from "./registry.js";
 export {
   resolveServer,
   withMcpClient,

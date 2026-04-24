@@ -5,11 +5,7 @@ process.env.NODE_NO_WARNINGS = "1";
 import { CopilotAdapter } from "./adapters/copilot-adapter.js";
 import { createCopilotAdapters } from "./adapters/index.js";
 import { loadMcpConfig, parseMcpFilter } from "./mcp-config/loader.js";
-import { createCopilotCommand } from "./commands/copilot.js";
-import { createMcpCallCommand } from "./commands/mcp.js";
-import { createAdoPrMonitorCommand } from "./commands/ado-pr-monitor.js";
-import { createTeamsSendCommand } from "./commands/teams.js";
-import { createMailSendCommand, createMailSearchCommand, createMailReadCommand } from "./commands/mail.js";
+import { buildRegistry } from "./registry.js";
 
 const args = process.argv.slice(2);
 
@@ -59,6 +55,7 @@ Options:
   --mcp-config <path>      Path to mcp.json config file
   --mcps <list>            Filter MCP servers from config (comma-separated)
   --args-json <json>       JSON object of workflow arguments
+  --plugins <dir>          Plugin directory (or set LOBSTER_PLUGINS env var)
 
 MCP Config Resolution (first found wins):
   1. --mcp-config <path>
@@ -151,7 +148,7 @@ async function copilot(copilotArgs: string[]): Promise<void> {
 
 async function run(runArgs: string[]): Promise<void> {
   const lobsterCore: any = await import("@basaba/lobster/core");
-  const { runWorkflowFile, createDefaultRegistry, runPipeline, parsePipeline } = lobsterCore;
+  const { runWorkflowFile, runPipeline, parsePipeline } = lobsterCore;
 
   let filePath: string | undefined;
   let pipeline: string | undefined;
@@ -159,6 +156,7 @@ async function run(runArgs: string[]): Promise<void> {
   let mcpConfigPath: string | undefined;
   let mcpsFilter: string | undefined;
   let dryRun = false;
+  let pluginsDir: string | undefined;
 
   for (let i = 0; i < runArgs.length; i++) {
     const arg = runArgs[i];
@@ -177,6 +175,8 @@ async function run(runArgs: string[]): Promise<void> {
       mcpConfigPath = runArgs[++i];
     } else if (arg === "--mcps") {
       mcpsFilter = runArgs[++i];
+    } else if (arg === "--plugins") {
+      pluginsDir = runArgs[++i];
     } else if (!arg.startsWith("-")) {
       filePath = arg;
     }
@@ -201,29 +201,14 @@ async function run(runArgs: string[]): Promise<void> {
   });
   const dispose = () => adapter.dispose();
 
-  // Build extended registry with copilot + mcp commands
-  const defaultRegistry = createDefaultRegistry();
-  const copilotCmd = createCopilotCommand(
-    () => adapter.client,
-    () => adapter.ensureStarted(),
-  );
-  const mcpCallCmd = createMcpCallCommand(() => mcpServers);
-  const adoPrCmd = createAdoPrMonitorCommand();
-  const teamsSendCmd = createTeamsSendCommand(() => mcpServers);
-  const mailSendCmd = createMailSendCommand(() => mcpServers);
-  const mailSearchCmd = createMailSearchCommand(() => mcpServers);
-  const mailReadCmd = createMailReadCommand(() => mcpServers);
-  const extraCommands = new Map(
-    [copilotCmd, mcpCallCmd, adoPrCmd, teamsSendCmd, mailSendCmd, mailSearchCmd, mailReadCmd].map((c) => [c.name, c]),
-  );
-  const registry = {
-    get(name: string) {
-      return extraCommands.get(name) ?? defaultRegistry.get(name);
-    },
-    list() {
-      return [...defaultRegistry.list(), ...extraCommands.keys()].sort();
-    },
-  };
+  // Build extended registry with copilot + mcp commands + plugins
+  const registry = await buildRegistry({
+    getClient: () => adapter.client,
+    ensureStarted: () => adapter.ensureStarted(),
+    getMcpServers: () => mcpServers,
+    getAdapter: () => adapter,
+    pluginDir: pluginsDir,
+  });
 
   // Use runWorkflowFile in human mode so approvals prompt interactively
   const ctx = {
