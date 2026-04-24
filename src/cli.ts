@@ -165,9 +165,19 @@ async function run(runArgs: string[]): Promise<void> {
     } else if (arg === "--dry-run") {
       dryRun = true;
     } else if (arg === "--args-json") {
-      try {
-        argsJson = JSON.parse(runArgs[++i]);
-      } catch {
+      // On Windows, shells may split JSON across multiple argv entries.
+      // Collect and rejoin until we get valid JSON.
+      const parts: string[] = [];
+      while (i + 1 < runArgs.length) {
+        parts.push(runArgs[++i]);
+        try {
+          argsJson = JSON.parse(parts.join(" "));
+          break;
+        } catch {
+          // keep collecting
+        }
+      }
+      if (!argsJson) {
         console.error("❌ --args-json must be valid JSON");
         process.exit(1);
       }

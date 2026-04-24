@@ -1,0 +1,5 @@
+name: mail-send-self
+steps:
+  - id: send
+    pipeline: >
+      mail.send --to 'basaba@microsoft.com' --subject 'Test from lobster-copilot' --body 'Hello from lobster-copilot! This is a test email.'

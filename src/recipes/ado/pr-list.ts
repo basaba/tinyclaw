@@ -15,6 +15,7 @@ function runAz(
     const child = spawn("az", argv, {
       env: opts.env as NodeJS.ProcessEnv,
       stdio: ["ignore", "pipe", "pipe"],
+      shell: true,
     });
 
     let stdout = "";

@@ -34,8 +34,8 @@ steps:
         Include reviewer vote status. Keep it brief.'
     stdin: $prs
 
-  # 3. Email the report
-  - id: send
-    pipeline: >
-      mail.send --to '$args.to' --subject 'PR Status Report — $args.project' --content-type HTML
-    stdin: $report
+#  # 3. Email the report
+#  - id: send
+#    pipeline: >
+#      mail.send --to '$args.to' --subject 'PR Status Report — $args.project' --content-type HTML
+#    stdin: $report
