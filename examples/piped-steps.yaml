@@ -1,8 +1,0 @@
-# Multi-step pipeline — output of step 1 feeds into step 2
-name: piped-steps
-steps:
-  - id: generate-and-translate
-    pipeline: >
-      copilot --prompt 'Generate a short fictional product description for a smart water bottle.'
-      | copilot --prompt 'Translate the following product description to French.'
-    

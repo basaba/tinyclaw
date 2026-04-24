@@ -1,5 +1,0 @@
-# Simple prompt — ask Copilot a question
-name: hello
-steps:
-  - id: ask
-    pipeline: "copilot --prompt 'What are the three laws of robotics? Answer in one sentence each.'"

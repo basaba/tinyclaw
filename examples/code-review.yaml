@@ -1,5 +1,0 @@
-# Code review using artifacts
-name: code-review
-steps:
-  - id: review
-    pipeline: "copilot --prompt 'Review this code for bugs, security issues, and improvements.'"
