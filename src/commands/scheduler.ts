@@ -15,6 +15,18 @@ function die(msg: string): never {
   process.exit(1);
 }
 
+/** Parse JSON with fallback for unquoted keys/values (PowerShell quote-stripping). */
+function parseJsonRelaxed(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    const relaxed = text
+      .replace(/([{,])\s*([A-Za-z_]\w*)\s*:/g, '$1"$2":')
+      .replace(/:\s*([^",{}\[\]\s][^,}]*?)\s*(?=[,}])/g, (_, v) => `:"${v.trim()}"`);
+    return JSON.parse(relaxed);
+  }
+}
+
 function needArg(args: string[], idx: number, flag: string): string {
   const val = args[idx];
   if (!val || val.startsWith("-")) die(`${flag} requires a value`);
@@ -190,8 +202,9 @@ async function cmdAdd(args: string[], json: boolean): Promise<void> {
     else if (a === "--file") filePath = needArg(args, ++i, "--file");
     else if (a === "--schedule") schedule = needArg(args, ++i, "--schedule");
     else if (a === "--args-json") {
-      try { wfArgs = JSON.parse(needArg(args, ++i, "--args-json")); }
-      catch { die("--args-json must be valid JSON"); }
+      const raw = needArg(args, ++i, "--args-json");
+      try { wfArgs = parseJsonRelaxed(raw) as Record<string, unknown>; }
+      catch { die(`--args-json must be valid JSON, got: ${raw}`); }
     }
   }
 
@@ -218,8 +231,9 @@ async function cmdEdit(args: string[], json: boolean): Promise<void> {
     else if (a === "--file") patch.filePath = needArg(args, ++i, "--file");
     else if (a === "--schedule") patch.schedule = needArg(args, ++i, "--schedule");
     else if (a === "--args-json") {
-      try { patch.args = JSON.parse(needArg(args, ++i, "--args-json")); }
-      catch { die("--args-json must be valid JSON"); }
+      const raw = needArg(args, ++i, "--args-json");
+      try { patch.args = parseJsonRelaxed(raw) as Record<string, unknown>; }
+      catch { die(`--args-json must be valid JSON, got: ${raw}`); }
     }
   }
 

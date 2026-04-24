@@ -71,7 +71,7 @@ export function createMcpCallCommand(
         try {
           toolArgs = JSON.parse(args.args);
         } catch {
-          throw new Error("--args must be valid JSON");
+          throw new Error(`--args must be valid JSON, got: ${args.args}`);
         }
       }
 

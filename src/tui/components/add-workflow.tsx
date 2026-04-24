@@ -172,7 +172,7 @@ export function AddWorkflow({ client, onDone }: Props) {
             try {
               wfArgs = JSON.parse(s.argsJson.trim());
             } catch {
-              dispatch({ type: "set_error", error: "Invalid JSON in Args" });
+              dispatch({ type: "set_error", error: `Invalid JSON in Args: ${s.argsJson.trim()}` });
               return;
             }
           }

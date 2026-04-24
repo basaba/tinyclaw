@@ -7,6 +7,27 @@ import { createCopilotAdapters } from "./adapters/index.js";
 import { loadMcpConfig, parseMcpFilter } from "./mcp-config/loader.js";
 import { buildRegistry } from "./registry.js";
 
+/**
+ * Attempt to parse a string as JSON, falling back to a relaxed parser
+ * that handles unquoted keys/values (common when PowerShell strips inner
+ * double-quotes, e.g. {org:value, project:One}).
+ */
+function parseJsonRelaxed(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    // Try fixing unquoted keys and string values in a flat object:
+    //   {org:https://dev.azure.com/msazure, project:One}
+    // → {"org":"https://dev.azure.com/msazure","project":"One"}
+    const relaxed = text
+      .replace(/^\{/, "{")
+      .replace(/\}$/, "}")
+      .replace(/([{,])\s*([A-Za-z_]\w*)\s*:/g, '$1"$2":')
+      .replace(/:\s*([^",{}\[\]\s][^,}]*?)\s*(?=[,}])/g, (_, v) => `:"${v.trim()}"`);
+    return JSON.parse(relaxed); // let this throw if it still fails
+  }
+}
+
 const args = process.argv.slice(2);
 
 if (args[0] === "help" || args[0] === "--help" || args[0] === "-h" || !args.length) {
@@ -171,14 +192,14 @@ async function run(runArgs: string[]): Promise<void> {
       while (i + 1 < runArgs.length) {
         parts.push(runArgs[++i]);
         try {
-          argsJson = JSON.parse(parts.join(" "));
+          argsJson = parseJsonRelaxed(parts.join(" ")) as Record<string, unknown>;
           break;
         } catch {
           // keep collecting
         }
       }
       if (!argsJson) {
-        console.error("❌ --args-json must be valid JSON");
+        console.error(`❌ --args-json must be valid JSON, got: ${parts.join(" ")}`);
         process.exit(1);
       }
     } else if (arg === "--mcp-config") {

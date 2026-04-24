@@ -250,7 +250,7 @@ export function EditWorkflow({ client, workflow, onDone }: Props) {
               try {
                 patch.args = JSON.parse(trimmedArgs);
               } catch {
-                dispatch({ type: "set_error", error: "Invalid JSON in Args" });
+                dispatch({ type: "set_error", error: `Invalid JSON in Args: ${trimmedArgs}` });
                 return;
               }
             } else {

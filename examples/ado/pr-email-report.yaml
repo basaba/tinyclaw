@@ -24,7 +24,7 @@ steps:
   # 1. Fetch open PRs
   - id: prs
     pipeline: >
-      ado.pr.monitor --org $args.org --project $args.project
+      ado.pr.monitor --org "${org}" --project "${project}"
 
   # 2. Generate an HTML summary
   - id: report
@@ -37,5 +37,5 @@ steps:
 #  # 3. Email the report
 #  - id: send
 #    pipeline: >
-#      mail.send --to '$args.to' --subject 'PR Status Report — $args.project' --content-type HTML
+#      mail.send --to '${to}' --subject 'PR Status Report — ${project}' --content-type HTML
 #    stdin: $report

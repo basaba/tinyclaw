@@ -7,16 +7,30 @@
 
 import { spawn } from "node:child_process";
 
+const IS_WINDOWS = process.platform === "win32";
+
 function runAz(
   argv: string[],
   opts: { env?: Record<string, string | undefined> },
 ): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
-    const child = spawn("az", argv, {
-      env: opts.env as NodeJS.ProcessEnv,
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: true,
-    });
+    // On Windows, `az` is a `.cmd` shim that requires shell execution.
+    // Using shell with args array triggers DEP0190, so we build a single
+    // command string with properly quoted arguments instead.
+    let child;
+    if (IS_WINDOWS) {
+      const quoted = argv.map((a) => `"${a}"`).join(" ");
+      child = spawn(`az ${quoted}`, {
+        env: opts.env as NodeJS.ProcessEnv,
+        stdio: ["ignore", "pipe", "pipe"],
+        shell: true,
+      });
+    } else {
+      child = spawn("az", argv, {
+        env: opts.env as NodeJS.ProcessEnv,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+    }
 
     let stdout = "";
     let stderr = "";
@@ -83,7 +97,7 @@ export async function fetchAdoPrs(
   try {
     parsed = JSON.parse(stdout.trim());
   } catch {
-    throw new Error("az returned non-JSON output");
+    throw new Error(`az returned non-JSON output: ${stdout.trim().slice(0, 200)}`);
   }
 
   return Array.isArray(parsed) ? parsed : [];
