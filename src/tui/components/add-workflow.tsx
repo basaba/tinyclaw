@@ -27,6 +27,7 @@ interface FormState {
   scheduleNum: string;
   scheduleUnit: ScheduleUnit;
   argsJson: string;
+  cursor: number;
   error: string;
 }
 
@@ -35,47 +36,78 @@ type Action =
   | { type: "prev_field" }
   | { type: "append"; char: string }
   | { type: "delete_char" }
+  | { type: "move_cursor"; dir: "left" | "right" | "home" | "end" }
   | { type: "cycle_unit"; dir: 1 | -1 }
   | { type: "set_error"; error: string };
 
+/** Get the text value of the currently focused text field. */
+function getFieldValue(state: FormState): string {
+  const f = state.field;
+  if (f === "scheduleNum") return state.scheduleNum;
+  if (f === "argsJson") return state.argsJson;
+  if (f === "submit" || f === "scheduleUnit") return "";
+  return state[f] as string;
+}
+
+/** Insert text at cursor, delete at cursor, and move cursor. */
 function reducer(state: FormState, action: Action): FormState {
   switch (action.type) {
     case "next_field": {
       const idx = FIELDS.indexOf(state.field);
       if (idx < FIELDS.length - 1) {
-        return { ...state, field: FIELDS[idx + 1] };
+        const next = FIELDS[idx + 1];
+        const val = next === "scheduleNum" ? state.scheduleNum
+          : next === "argsJson" ? state.argsJson
+          : next === "submit" || next === "scheduleUnit" ? ""
+          : (state[next] as string);
+        return { ...state, field: next, cursor: val.length };
       }
       return state;
     }
     case "prev_field": {
       const idx = FIELDS.indexOf(state.field);
       if (idx > 0) {
-        return { ...state, field: FIELDS[idx - 1] };
+        const prev = FIELDS[idx - 1];
+        const val = prev === "scheduleNum" ? state.scheduleNum
+          : prev === "argsJson" ? state.argsJson
+          : prev === "submit" || prev === "scheduleUnit" ? ""
+          : (state[prev] as string);
+        return { ...state, field: prev, cursor: val.length };
       }
       return state;
     }
     case "append": {
       const f = state.field;
       if (f === "submit" || f === "scheduleUnit") return state;
-      if (f === "scheduleNum") {
-        if (!/^\d$/.test(action.char)) return state;
-        return { ...state, scheduleNum: state.scheduleNum + action.char };
-      }
-      if (f === "argsJson") {
-        return { ...state, argsJson: state.argsJson + action.char, error: "" };
-      }
-      return { ...state, [f]: (state[f] as string) + action.char };
+      const cur = getFieldValue(state);
+      const pos = state.cursor;
+      if (f === "scheduleNum" && !/^\d$/.test(action.char)) return state;
+      const updated = cur.slice(0, pos) + action.char + cur.slice(pos);
+      const extra = f === "argsJson" ? { error: "" } : {};
+      if (f === "scheduleNum") return { ...state, scheduleNum: updated, cursor: pos + 1, ...extra };
+      if (f === "argsJson") return { ...state, argsJson: updated, cursor: pos + 1, ...extra };
+      return { ...state, [f]: updated, cursor: pos + 1, ...extra };
     }
     case "delete_char": {
       const f = state.field;
       if (f === "submit" || f === "scheduleUnit") return state;
-      if (f === "scheduleNum") {
-        return { ...state, scheduleNum: state.scheduleNum.slice(0, -1) };
-      }
-      if (f === "argsJson") {
-        return { ...state, argsJson: state.argsJson.slice(0, -1), error: "" };
-      }
-      return { ...state, [f]: (state[f] as string).slice(0, -1) };
+      const cur = getFieldValue(state);
+      const pos = state.cursor;
+      if (pos === 0) return state;
+      const updated = cur.slice(0, pos - 1) + cur.slice(pos);
+      const extra = f === "argsJson" ? { error: "" } : {};
+      if (f === "scheduleNum") return { ...state, scheduleNum: updated, cursor: pos - 1, ...extra };
+      if (f === "argsJson") return { ...state, argsJson: updated, cursor: pos - 1, ...extra };
+      return { ...state, [f]: updated, cursor: pos - 1, ...extra };
+    }
+    case "move_cursor": {
+      const cur = getFieldValue(state);
+      let pos = state.cursor;
+      if (action.dir === "left") pos = Math.max(0, pos - 1);
+      else if (action.dir === "right") pos = Math.min(cur.length, pos + 1);
+      else if (action.dir === "home") pos = 0;
+      else if (action.dir === "end") pos = cur.length;
+      return { ...state, cursor: pos };
     }
     case "cycle_unit": {
       const idx = UNITS.indexOf(state.scheduleUnit);
@@ -89,6 +121,21 @@ function reducer(state: FormState, action: Action): FormState {
   }
 }
 
+/** Render text with a visible cursor block at the given position. */
+function TextWithCursor({ value, cursor, active }: { value: string; cursor: number; active: boolean }) {
+  if (!active) return <Text>{value}</Text>;
+  const before = value.slice(0, cursor);
+  const at = value[cursor] ?? " ";
+  const after = value.slice(cursor + 1);
+  return (
+    <Text>
+      {before}
+      <Text inverse>{at}</Text>
+      {after}
+    </Text>
+  );
+}
+
 const INITIAL_STATE: FormState = {
   field: "name",
   name: "",
@@ -96,6 +143,7 @@ const INITIAL_STATE: FormState = {
   scheduleNum: "",
   scheduleUnit: "min",
   argsJson: "",
+  cursor: 0,
   error: "",
 };
 
@@ -158,6 +206,16 @@ export function AddWorkflow({ client, onDone }: Props) {
         }
       }
 
+      // Cursor movement within text fields
+      if (key.leftArrow) {
+        dispatch({ type: "move_cursor", dir: key.ctrl ? "home" : "left" });
+        return;
+      }
+      if (key.rightArrow) {
+        dispatch({ type: "move_cursor", dir: key.ctrl ? "end" : "right" });
+        return;
+      }
+
       if (key.tab && key.shift) {
         dispatch({ type: "prev_field" });
         return;
@@ -194,25 +252,20 @@ export function AddWorkflow({ client, onDone }: Props) {
       <Box marginTop={1} flexDirection="column">
         <Box>
           <Text color={fieldColor("name")}>Name: </Text>
-          <Text>
-            {state.name}
-            {state.field === "name" ? "▋" : ""}
-          </Text>
+          <TextWithCursor value={state.name} cursor={state.cursor} active={state.field === "name"} />
         </Box>
         <Box>
           <Text color={fieldColor("filePath")}>File: </Text>
-          <Text>
-            {state.filePath}
-            {state.field === "filePath" ? "▋" : ""}
-          </Text>
+          <TextWithCursor value={state.filePath} cursor={state.cursor} active={state.field === "filePath"} />
         </Box>
         <Box>
           <Text color={isScheduleActive ? "cyan" : "gray"}>Schedule: </Text>
           <Text color={fieldColor("scheduleNum")}>every </Text>
-          <Text>
-            {state.scheduleNum || (state.field === "scheduleNum" ? "" : "…")}
-            {state.field === "scheduleNum" ? "▋" : ""}
-          </Text>
+          <TextWithCursor
+            value={state.scheduleNum || (state.field === "scheduleNum" ? "" : "…")}
+            cursor={state.cursor}
+            active={state.field === "scheduleNum"}
+          />
           <Text> </Text>
           {UNITS.map((u) => (
             <Text key={u}>
@@ -231,10 +284,7 @@ export function AddWorkflow({ client, onDone }: Props) {
         </Box>
         <Box>
           <Text color={fieldColor("argsJson")}>Args (JSON): </Text>
-          <Text>
-            {state.argsJson}
-            {state.field === "argsJson" ? "▋" : ""}
-          </Text>
+          <TextWithCursor value={state.argsJson} cursor={state.cursor} active={state.field === "argsJson"} />
         </Box>
         {state.error ? (
           <Box>
