@@ -1,7 +1,8 @@
-import React, { useReducer, useCallback, useRef } from "react";
+import React, { useReducer, useCallback, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import type { DaemonClient } from "../scheduler/daemon-client.js";
 import type { WorkflowEntry } from "../scheduler/types.js";
+import { ArgsTable, argsToRows, rowsToArgs, type ArgRow } from "./args-table.js";
 
 interface Props {
   client: DaemonClient;
@@ -9,7 +10,7 @@ interface Props {
   onDone: () => void;
 }
 
-type Field = "name" | "filePath" | "schedule" | "scheduleNum" | "scheduleUnit" | "argsJson" | "submit";
+type Field = "name" | "filePath" | "schedule" | "scheduleNum" | "scheduleUnit" | "args" | "submit";
 
 const UNITS = ["min", "hour", "day"] as const;
 type ScheduleUnit = (typeof UNITS)[number];
@@ -28,7 +29,6 @@ interface FormState {
   scheduleUnit: ScheduleUnit;
   rawSchedule: string;
   useRawSchedule: boolean;
-  argsJson: string;
   cursor: number;
   error: string;
 }
@@ -58,16 +58,15 @@ function parseSchedule(schedule: string): { num: string; unit: ScheduleUnit } | 
 
 function getFields(useRaw: boolean): Field[] {
   return useRaw
-    ? ["name", "filePath", "schedule", "argsJson", "submit"]
-    : ["name", "filePath", "scheduleNum", "scheduleUnit", "argsJson", "submit"];
+    ? ["name", "filePath", "schedule", "args", "submit"]
+    : ["name", "filePath", "scheduleNum", "scheduleUnit", "args", "submit"];
 }
 
 function getFieldValue(state: FormState): string {
   const f = state.field;
   if (f === "scheduleNum") return state.scheduleNum;
-  if (f === "argsJson") return state.argsJson;
   if (f === "schedule") return state.rawSchedule;
-  if (f === "submit" || f === "scheduleUnit") return "";
+  if (f === "submit" || f === "scheduleUnit" || f === "args") return "";
   return state[f] as string;
 }
 
@@ -77,55 +76,43 @@ function reducer(state: FormState, action: Action): FormState {
   switch (action.type) {
     case "next_field": {
       const idx = fields.indexOf(state.field);
-      if (idx < fields.length - 1) {
-        const next = fields[idx + 1];
-        const val = next === "scheduleNum" ? state.scheduleNum
-          : next === "argsJson" ? state.argsJson
-          : next === "schedule" ? state.rawSchedule
-          : next === "submit" || next === "scheduleUnit" ? ""
-          : (state[next] as string);
-        return { ...state, field: next, cursor: val.length };
-      }
-      return state;
+      const next = fields[(idx + 1) % fields.length];
+      const val = next === "scheduleNum" ? state.scheduleNum
+        : next === "schedule" ? state.rawSchedule
+        : next === "submit" || next === "scheduleUnit" || next === "args" ? ""
+        : (state[next] as string);
+      return { ...state, field: next, cursor: val.length };
     }
     case "prev_field": {
       const idx = fields.indexOf(state.field);
-      if (idx > 0) {
-        const prev = fields[idx - 1];
-        const val = prev === "scheduleNum" ? state.scheduleNum
-          : prev === "argsJson" ? state.argsJson
-          : prev === "schedule" ? state.rawSchedule
-          : prev === "submit" || prev === "scheduleUnit" ? ""
-          : (state[prev] as string);
-        return { ...state, field: prev, cursor: val.length };
-      }
-      return state;
+      const prev = fields[(idx - 1 + fields.length) % fields.length];
+      const val = prev === "scheduleNum" ? state.scheduleNum
+        : prev === "schedule" ? state.rawSchedule
+        : prev === "submit" || prev === "scheduleUnit" || prev === "args" ? ""
+        : (state[prev] as string);
+      return { ...state, field: prev, cursor: val.length };
     }
     case "append": {
       const f = state.field;
-      if (f === "submit" || f === "scheduleUnit") return state;
+      if (f === "submit" || f === "scheduleUnit" || f === "args") return state;
       const cur = getFieldValue(state);
       const pos = state.cursor;
       if (f === "scheduleNum" && !/^\d$/.test(action.char)) return state;
       const updated = cur.slice(0, pos) + action.char + cur.slice(pos);
-      const extra = f === "argsJson" ? { error: "" } : {};
-      if (f === "scheduleNum") return { ...state, scheduleNum: updated, cursor: pos + 1, ...extra };
-      if (f === "argsJson") return { ...state, argsJson: updated, cursor: pos + 1, ...extra };
+      if (f === "scheduleNum") return { ...state, scheduleNum: updated, cursor: pos + 1 };
       if (f === "schedule") return { ...state, rawSchedule: updated, cursor: pos + 1 };
-      return { ...state, [f]: updated, cursor: pos + 1, ...extra };
+      return { ...state, [f]: updated, cursor: pos + 1 };
     }
     case "delete_char": {
       const f = state.field;
-      if (f === "submit" || f === "scheduleUnit") return state;
+      if (f === "submit" || f === "scheduleUnit" || f === "args") return state;
       const cur = getFieldValue(state);
       const pos = state.cursor;
       if (pos === 0) return state;
       const updated = cur.slice(0, pos - 1) + cur.slice(pos);
-      const extra = f === "argsJson" ? { error: "" } : {};
-      if (f === "scheduleNum") return { ...state, scheduleNum: updated, cursor: pos - 1, ...extra };
-      if (f === "argsJson") return { ...state, argsJson: updated, cursor: pos - 1, ...extra };
+      if (f === "scheduleNum") return { ...state, scheduleNum: updated, cursor: pos - 1 };
       if (f === "schedule") return { ...state, rawSchedule: updated, cursor: pos - 1 };
-      return { ...state, [f]: updated, cursor: pos - 1, ...extra };
+      return { ...state, [f]: updated, cursor: pos - 1 };
     }
     case "move_cursor": {
       const cur = getFieldValue(state);
@@ -163,7 +150,6 @@ function TextWithCursor({ value, cursor, active }: { value: string; cursor: numb
 }
 
 function buildInitialState(wf: WorkflowEntry): FormState {
-  const argsJson = wf.args ? JSON.stringify(wf.args) : "";
   const parsed = parseSchedule(wf.schedule);
   if (parsed) {
     return {
@@ -174,7 +160,6 @@ function buildInitialState(wf: WorkflowEntry): FormState {
       scheduleUnit: parsed.unit,
       rawSchedule: wf.schedule,
       useRawSchedule: false,
-      argsJson,
       cursor: 0,
       error: "",
     };
@@ -187,7 +172,6 @@ function buildInitialState(wf: WorkflowEntry): FormState {
     scheduleUnit: "min",
     rawSchedule: wf.schedule,
     useRawSchedule: true,
-    argsJson,
     cursor: 0,
     error: "",
   };
@@ -197,6 +181,7 @@ export function EditWorkflow({ client, workflow, onDone }: Props) {
   const [state, dispatch] = useReducer(reducer, buildInitialState(workflow));
   const stateRef = useRef(state);
   stateRef.current = state;
+  const [argRows, setArgRows] = useState<ArgRow[]>(() => argsToRows(workflow.args));
 
   const handleInput = useCallback(
     (
@@ -242,20 +227,12 @@ export function EditWorkflow({ client, workflow, onDone }: Props) {
           }
           if (newSchedule && newSchedule !== workflow.schedule) patch.schedule = newSchedule;
 
-          // Parse args JSON
-          const trimmedArgs = s.argsJson.trim();
+          // Build args from table rows
+          const newArgs = rowsToArgs(argRows);
           const oldArgsJson = workflow.args ? JSON.stringify(workflow.args) : "";
-          if (trimmedArgs !== oldArgsJson) {
-            if (trimmedArgs) {
-              try {
-                patch.args = JSON.parse(trimmedArgs);
-              } catch {
-                dispatch({ type: "set_error", error: `Invalid JSON in Args: ${trimmedArgs}` });
-                return;
-              }
-            } else {
-              patch.args = undefined;
-            }
+          const newArgsJson = newArgs ? JSON.stringify(newArgs) : "";
+          if (newArgsJson !== oldArgsJson) {
+            patch.args = newArgs;
           }
 
           if (Object.keys(patch).length === 0) {
@@ -274,6 +251,8 @@ export function EditWorkflow({ client, workflow, onDone }: Props) {
         }
         if (key.tab && key.shift) {
           dispatch({ type: "prev_field" });
+        } else if (key.tab) {
+          dispatch({ type: "next_field" });
         }
         return;
       }
@@ -321,7 +300,11 @@ export function EditWorkflow({ client, workflow, onDone }: Props) {
     [client, workflow, onDone],
   );
 
-  useInput(handleInput);
+  useInput(handleInput, { isActive: state.field !== "args" });
+
+  const handleArgsExit = useCallback((dir: "next" | "prev") => {
+    dispatch({ type: dir === "next" ? "next_field" : "prev_field" });
+  }, []);
 
   const fields = getFields(state.useRawSchedule);
   const fieldColor = (f: Field) => (fields.includes(f) && f === state.field ? "cyan" : "gray");
@@ -375,10 +358,7 @@ export function EditWorkflow({ client, workflow, onDone }: Props) {
           </Box>
         )}
 
-        <Box>
-          <Text color={fieldColor("argsJson")}>Args (JSON): </Text>
-          <TextWithCursor value={state.argsJson} cursor={state.cursor} active={state.field === "argsJson"} />
-        </Box>
+        <ArgsTable rows={argRows} onChange={setArgRows} active={state.field === "args"} onExit={handleArgsExit} />
         {state.error ? (
           <Box>
             <Text color="red">⚠ {state.error}</Text>

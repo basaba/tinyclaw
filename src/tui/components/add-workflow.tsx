@@ -1,15 +1,16 @@
-import React, { useReducer, useCallback, useRef } from "react";
+import React, { useReducer, useCallback, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { randomUUID } from "node:crypto";
 import type { DaemonClient } from "../scheduler/daemon-client.js";
+import { ArgsTable, rowsToArgs, type ArgRow } from "./args-table.js";
 
 interface Props {
   client: DaemonClient;
   onDone: () => void;
 }
 
-type Field = "name" | "filePath" | "scheduleNum" | "scheduleUnit" | "argsJson" | "submit";
-const FIELDS: Field[] = ["name", "filePath", "scheduleNum", "scheduleUnit", "argsJson", "submit"];
+type Field = "name" | "filePath" | "scheduleNum" | "scheduleUnit" | "args" | "submit";
+const FIELDS: Field[] = ["name", "filePath", "scheduleNum", "scheduleUnit", "args", "submit"];
 
 const UNITS = ["min", "hour", "day"] as const;
 type ScheduleUnit = (typeof UNITS)[number];
@@ -26,7 +27,6 @@ interface FormState {
   filePath: string;
   scheduleNum: string;
   scheduleUnit: ScheduleUnit;
-  argsJson: string;
   cursor: number;
   error: string;
 }
@@ -44,8 +44,7 @@ type Action =
 function getFieldValue(state: FormState): string {
   const f = state.field;
   if (f === "scheduleNum") return state.scheduleNum;
-  if (f === "argsJson") return state.argsJson;
-  if (f === "submit" || f === "scheduleUnit") return "";
+  if (f === "submit" || f === "scheduleUnit" || f === "args") return "";
   return state[f] as string;
 }
 
@@ -54,51 +53,39 @@ function reducer(state: FormState, action: Action): FormState {
   switch (action.type) {
     case "next_field": {
       const idx = FIELDS.indexOf(state.field);
-      if (idx < FIELDS.length - 1) {
-        const next = FIELDS[idx + 1];
-        const val = next === "scheduleNum" ? state.scheduleNum
-          : next === "argsJson" ? state.argsJson
-          : next === "submit" || next === "scheduleUnit" ? ""
-          : (state[next] as string);
-        return { ...state, field: next, cursor: val.length };
-      }
-      return state;
+      const next = FIELDS[(idx + 1) % FIELDS.length];
+      const val = next === "scheduleNum" ? state.scheduleNum
+        : next === "submit" || next === "scheduleUnit" || next === "args" ? ""
+        : (state[next] as string);
+      return { ...state, field: next, cursor: val.length };
     }
     case "prev_field": {
       const idx = FIELDS.indexOf(state.field);
-      if (idx > 0) {
-        const prev = FIELDS[idx - 1];
-        const val = prev === "scheduleNum" ? state.scheduleNum
-          : prev === "argsJson" ? state.argsJson
-          : prev === "submit" || prev === "scheduleUnit" ? ""
-          : (state[prev] as string);
-        return { ...state, field: prev, cursor: val.length };
-      }
-      return state;
+      const prev = FIELDS[(idx - 1 + FIELDS.length) % FIELDS.length];
+      const val = prev === "scheduleNum" ? state.scheduleNum
+        : prev === "submit" || prev === "scheduleUnit" || prev === "args" ? ""
+        : (state[prev] as string);
+      return { ...state, field: prev, cursor: val.length };
     }
     case "append": {
       const f = state.field;
-      if (f === "submit" || f === "scheduleUnit") return state;
+      if (f === "submit" || f === "scheduleUnit" || f === "args") return state;
       const cur = getFieldValue(state);
       const pos = state.cursor;
       if (f === "scheduleNum" && !/^\d$/.test(action.char)) return state;
       const updated = cur.slice(0, pos) + action.char + cur.slice(pos);
-      const extra = f === "argsJson" ? { error: "" } : {};
-      if (f === "scheduleNum") return { ...state, scheduleNum: updated, cursor: pos + 1, ...extra };
-      if (f === "argsJson") return { ...state, argsJson: updated, cursor: pos + 1, ...extra };
-      return { ...state, [f]: updated, cursor: pos + 1, ...extra };
+      if (f === "scheduleNum") return { ...state, scheduleNum: updated, cursor: pos + 1 };
+      return { ...state, [f]: updated, cursor: pos + 1 };
     }
     case "delete_char": {
       const f = state.field;
-      if (f === "submit" || f === "scheduleUnit") return state;
+      if (f === "submit" || f === "scheduleUnit" || f === "args") return state;
       const cur = getFieldValue(state);
       const pos = state.cursor;
       if (pos === 0) return state;
       const updated = cur.slice(0, pos - 1) + cur.slice(pos);
-      const extra = f === "argsJson" ? { error: "" } : {};
-      if (f === "scheduleNum") return { ...state, scheduleNum: updated, cursor: pos - 1, ...extra };
-      if (f === "argsJson") return { ...state, argsJson: updated, cursor: pos - 1, ...extra };
-      return { ...state, [f]: updated, cursor: pos - 1, ...extra };
+      if (f === "scheduleNum") return { ...state, scheduleNum: updated, cursor: pos - 1 };
+      return { ...state, [f]: updated, cursor: pos - 1 };
     }
     case "move_cursor": {
       const cur = getFieldValue(state);
@@ -142,7 +129,6 @@ const INITIAL_STATE: FormState = {
   filePath: "",
   scheduleNum: "",
   scheduleUnit: "min",
-  argsJson: "",
   cursor: 0,
   error: "",
 };
@@ -155,6 +141,7 @@ export function AddWorkflow({ client, onDone }: Props) {
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
   const stateRef = useRef(state);
   stateRef.current = state;
+  const [argRows, setArgRows] = useState<ArgRow[]>([]);
 
   const handleInput = useCallback(
     (input: string, key: { return: boolean; escape: boolean; backspace: boolean; delete: boolean; ctrl: boolean; meta: boolean; upArrow: boolean; downArrow: boolean; leftArrow: boolean; rightArrow: boolean; shift: boolean; tab: boolean }) => {
@@ -167,15 +154,7 @@ export function AddWorkflow({ client, onDone }: Props) {
 
       if (s.field === "submit") {
         if (key.return) {
-          let wfArgs: Record<string, unknown> | undefined;
-          if (s.argsJson.trim()) {
-            try {
-              wfArgs = JSON.parse(s.argsJson.trim());
-            } catch {
-              dispatch({ type: "set_error", error: `Invalid JSON in Args: ${s.argsJson.trim()}` });
-              return;
-            }
-          }
+          const wfArgs = rowsToArgs(argRows);
           client
             .addWorkflow({
               id: randomUUID().slice(0, 8),
@@ -188,9 +167,11 @@ export function AddWorkflow({ client, onDone }: Props) {
             .then(onDone)
             .catch(() => onDone());
         }
-        // Allow Shift+Tab to go back from submit
+        // Allow Shift+Tab to go back, Tab to cycle forward
         if (key.tab && key.shift) {
           dispatch({ type: "prev_field" });
+        } else if (key.tab) {
+          dispatch({ type: "next_field" });
         }
         return;
       }
@@ -238,7 +219,11 @@ export function AddWorkflow({ client, onDone }: Props) {
     [client, onDone],
   );
 
-  useInput(handleInput);
+  useInput(handleInput, { isActive: state.field !== "args" });
+
+  const handleArgsExit = useCallback((dir: "next" | "prev") => {
+    dispatch({ type: dir === "next" ? "next_field" : "prev_field" });
+  }, []);
 
   const fieldColor = (f: Field) => (f === state.field ? "cyan" : "gray");
   const isScheduleActive = state.field === "scheduleNum" || state.field === "scheduleUnit";
@@ -282,10 +267,7 @@ export function AddWorkflow({ client, onDone }: Props) {
             <Text color="gray"> ◂/▸ to change</Text>
           )}
         </Box>
-        <Box>
-          <Text color={fieldColor("argsJson")}>Args (JSON): </Text>
-          <TextWithCursor value={state.argsJson} cursor={state.cursor} active={state.field === "argsJson"} />
-        </Box>
+        <ArgsTable rows={argRows} onChange={setArgRows} active={state.field === "args"} onExit={handleArgsExit} />
         {state.error ? (
           <Box>
             <Text color="red">⚠ {state.error}</Text>
