@@ -302,6 +302,9 @@ async function run(runArgs: string[]): Promise<void> {
         }
       }
     }
+  } catch (err) {
+    console.error("❌", err instanceof Error ? err.message : String(err));
+    process.exit(1);
   } finally {
     await dispose();
     process.exit(0);
