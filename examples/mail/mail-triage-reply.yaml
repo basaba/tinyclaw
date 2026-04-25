@@ -5,7 +5,7 @@
 #
 # Flow:
 #   1. Search unread inbox emails
-#   2. diff.key — tag each email as new/seen; filter to new only
+#   2. diff.key (from @basaba/lobster) — tag each email as new/seen; filter to new only
 #   3. For each NEW email: read full body → Copilot triage (structured JSON)
 #   4. Show summary of emails needing replies → approval gate
 #   5. For each approved: mail.send --draft (creates Outlook draft directly)

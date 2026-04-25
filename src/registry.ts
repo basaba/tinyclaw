@@ -7,7 +7,6 @@ import {
   createMailSearchCommand,
   createMailReadCommand,
 } from "./commands/mail.js";
-import { createDiffKeyCommand } from "./commands/diff-key.js";
 import type { CopilotBridgeClient } from "./copilot/client.js";
 
 import type { McpServerConfig } from "./mcp-config/loader.js";
@@ -59,7 +58,6 @@ export async function buildRegistry(
     createMailSendCommand(opts.getMcpServers),
     createMailSearchCommand(opts.getMcpServers),
     createMailReadCommand(opts.getMcpServers),
-    createDiffKeyCommand(),
     ...(opts.extraCommands ?? []),
     ...pluginCommands,
   ];
