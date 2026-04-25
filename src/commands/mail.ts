@@ -44,16 +44,24 @@ export function formatRecipient(r: any): string {
   return name ? `${name} <${email}>` : email;
 }
 
+/** Result of normalising mail content — messages plus optional pagination link. */
+interface NormalisedMailResult {
+  messages: unknown[];
+  nextLink?: string;
+}
+
 /**
  * Try to parse raw MCP content items into normalised MailSummary objects.
  * Falls through to raw content if the shape doesn't match.
+ * Also extracts nextLink for pagination if present.
  *
  * The agency mail MCP often returns:
  *   { type: "text", text: '{"rawResponse":"{\\"value\\":[...]}"}' }
  * i.e. a rawResponse wrapper with double-escaped Graph API JSON inside.
  */
-export function normaliseMailResults(content: unknown[]): unknown[] {
+export function normaliseMailResults(content: unknown[]): NormalisedMailResult {
   const messages: MailSummary[] = [];
+  let nextLink: string | undefined;
 
   for (const item of content) {
     // MCP content items are typically { type: "text", text: "..." }
@@ -82,6 +90,15 @@ export function normaliseMailResults(content: unknown[]): unknown[] {
     const list = Array.isArray(parsed) ? parsed : [parsed];
     for (const msg of list) {
       if (!msg || typeof msg !== "object") continue;
+
+      // Extract pagination link from Graph API response wrapper
+      if (msg["@odata.nextLink"]) {
+        nextLink = msg["@odata.nextLink"];
+      }
+      if (msg.hasMoreResults === true && msg.nextLink) {
+        nextLink = msg.nextLink;
+      }
+
       // Handle Graph API response wrapper (value: [...])
       const items = Array.isArray(msg.value) ? msg.value : [msg];
       for (const m of items) {
@@ -104,7 +121,10 @@ export function normaliseMailResults(content: unknown[]): unknown[] {
 
   // If we managed to normalise at least one message, return the clean list;
   // otherwise fall through to the original content so nothing is lost.
-  return messages.length > 0 ? messages : content;
+  return {
+    messages: messages.length > 0 ? messages : content,
+    nextLink,
+  };
 }
 
 /** Collect piped input into a single message string. */
@@ -267,6 +287,9 @@ export function createMailSearchCommand(
           top: { type: "number", description: "Max results to return (default 25)" },
           unread: { type: "boolean", description: "Shorthand for --filter 'isRead eq false'" },
           "order-by": { type: "string", description: "Order by date: newest (default) or oldest" },
+          select: { type: "string", description: "Comma-separated fields to return (e.g. 'id,subject,from,receivedDateTime')" },
+          all: { type: "boolean", description: "Auto-paginate to fetch all results (up to --top limit)" },
+          "page-size": { type: "number", description: "Items per page when using --all (default 25)" },
         },
       },
       sideEffects: ["network"],
@@ -296,6 +319,10 @@ export function createMailSearchCommand(
         "  --top      Max results (default 25)",
         "  --unread   Shorthand for --filter 'isRead eq false'",
         "  --order-by Order by date: newest (default) or oldest",
+        "  --select   Comma-separated fields to return (reduces payload)",
+        "             e.g. --select id,subject,from,receivedDateTime",
+        "  --all      Auto-paginate to fetch all matching results (up to --top)",
+        "  --page-size Items per page when using --all (default 25)",
         "",
         "Notes:",
         "  --search cannot be combined with --filter (Graph API limitation).",
@@ -318,6 +345,9 @@ export function createMailSearchCommand(
       const top = args.top !== undefined ? Number(args.top) : undefined;
       const unread = args.unread === true || args.unread === "true";
       const orderBy = (args["order-by"] as string | undefined)?.toLowerCase();
+      const select = args.select as string | undefined;
+      const fetchAll = args.all === true || args.all === "true";
+      const pageSize = args["page-size"] !== undefined ? Number(args["page-size"]) : undefined;
 
       if (unread && !filter) {
         filter = "isRead eq false";
@@ -337,7 +367,7 @@ export function createMailSearchCommand(
       if (query) {
         const result = await callTool(config, "SearchMessages", { message: query }, timeout);
         if (result.isError) handleError("mail.search", result);
-        return { output: asStream(normaliseMailResults(result.content as unknown[])) };
+        return { output: asStream(normaliseMailResults(result.content as unknown[]).messages) };
       }
 
       // Deterministic mode → SearchMessagesQueryParameters
@@ -361,7 +391,13 @@ export function createMailSearchCommand(
         params.push(`$filter=parentFolderId eq '${folderId}'`);
       }
 
-      params.push(`$top=${top ?? 25}`);
+      // When paginating, $top is the per-page size; --top is the overall max.
+      const perPage = pageSize ?? (fetchAll ? 25 : (top ?? 25));
+      params.push(`$top=${perPage}`);
+
+      if (select) {
+        params.push(`$select=${select}`);
+      }
 
       // $orderby — Note: $orderby cannot be combined with $search (Graph API limitation)
       if (!search) {
@@ -370,15 +406,37 @@ export function createMailSearchCommand(
       }
 
       const queryParameters = `?${params.join("&")}`;
-      const result = await callTool(
-        config,
-        "SearchMessagesQueryParameters",
-        { queryParameters },
-        timeout,
-      );
-      if (result.isError) handleError("mail.search", result);
+      const maxResults = top ?? (fetchAll ? Infinity : 25);
+      const allMessages: unknown[] = [];
+      let nextPageLink: string | undefined;
+      let currentQuery: string | undefined = queryParameters;
 
-      return { output: asStream(normaliseMailResults(result.content as unknown[])) };
+      // Fetch first page (and auto-paginate if --all)
+      do {
+        const toolArgs: Record<string, unknown> = nextPageLink
+          ? { nextLink: nextPageLink }
+          : { queryParameters: currentQuery };
+
+        const result = await callTool(
+          config,
+          "SearchMessagesQueryParameters",
+          toolArgs,
+          timeout,
+        );
+        if (result.isError) handleError("mail.search", result);
+
+        const page = normaliseMailResults(result.content as unknown[]);
+        allMessages.push(...page.messages);
+        nextPageLink = page.nextLink;
+        currentQuery = undefined;
+      } while (fetchAll && nextPageLink && allMessages.length < maxResults);
+
+      // Trim to --top limit
+      const trimmed = Number.isFinite(maxResults) && allMessages.length > maxResults
+        ? allMessages.slice(0, maxResults)
+        : allMessages;
+
+      return { output: asStream(trimmed) };
     },
   };
 }

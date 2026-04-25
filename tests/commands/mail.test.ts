@@ -47,7 +47,7 @@ describe("normaliseMailResults", () => {
 
   it("normalises a single MCP text content item containing a Graph message", () => {
     const content = [{ type: "text", text: JSON.stringify(graphMessage) }];
-    const result = normaliseMailResults(content);
+    const { messages: result } = normaliseMailResults(content);
 
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual({
@@ -65,7 +65,7 @@ describe("normaliseMailResults", () => {
   it("normalises a Graph API response wrapper with value array", () => {
     const wrapper = { value: [graphMessage, { ...graphMessage, id: "msg-2", subject: "Follow-up" }] };
     const content = [{ type: "text", text: JSON.stringify(wrapper) }];
-    const result = normaliseMailResults(content);
+    const { messages: result } = normaliseMailResults(content);
 
     expect(result).toHaveLength(2);
     expect((result[0] as any).id).toBe("msg-1");
@@ -75,7 +75,7 @@ describe("normaliseMailResults", () => {
 
   it("normalises an array of messages in a single text item", () => {
     const content = [{ type: "text", text: JSON.stringify([graphMessage]) }];
-    const result = normaliseMailResults(content);
+    const { messages: result } = normaliseMailResults(content);
 
     expect(result).toHaveLength(1);
     expect((result[0] as any).subject).toBe("Hello");
@@ -83,7 +83,7 @@ describe("normaliseMailResults", () => {
 
   it("normalises raw JSON strings (not wrapped in MCP content)", () => {
     const content = [JSON.stringify(graphMessage)];
-    const result = normaliseMailResults(content);
+    const { messages: result } = normaliseMailResults(content);
 
     expect(result).toHaveLength(1);
     expect((result[0] as any).id).toBe("msg-1");
@@ -94,33 +94,33 @@ describe("normaliseMailResults", () => {
       { type: "text", text: JSON.stringify(graphMessage) },
       { type: "text", text: JSON.stringify({ ...graphMessage, id: "msg-3" }) },
     ];
-    const result = normaliseMailResults(content);
+    const { messages: result } = normaliseMailResults(content);
 
     expect(result).toHaveLength(2);
   });
 
   it("falls through to raw content if nothing looks like a mail message", () => {
     const raw = [{ type: "text", text: "Just a plain text response" }];
-    const result = normaliseMailResults(raw);
+    const { messages: result } = normaliseMailResults(raw);
     expect(result).toBe(raw); // same reference — unchanged
   });
 
   it("falls through for non-JSON text", () => {
     const raw = [{ type: "text", text: "not json {{{" }];
-    const result = normaliseMailResults(raw);
+    const { messages: result } = normaliseMailResults(raw);
     expect(result).toBe(raw);
   });
 
   it("falls through for objects without id or subject", () => {
     const raw = [{ type: "text", text: JSON.stringify({ foo: "bar" }) }];
-    const result = normaliseMailResults(raw);
+    const { messages: result } = normaliseMailResults(raw);
     expect(result).toBe(raw);
   });
 
   it("defaults missing fields gracefully", () => {
     const minimal = { id: "msg-minimal" };
     const content = [{ type: "text", text: JSON.stringify(minimal) }];
-    const result = normaliseMailResults(content);
+    const { messages: result } = normaliseMailResults(content);
 
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual({
@@ -142,7 +142,7 @@ describe("normaliseMailResults", () => {
       sender: { emailAddress: { name: "Dan", address: "dan@test.com" } },
     };
     const content = [{ type: "text", text: JSON.stringify(msg) }];
-    const result = normaliseMailResults(content);
+    const { messages: result } = normaliseMailResults(content);
 
     expect((result[0] as any).from).toBe("Dan <dan@test.com>");
   });
@@ -156,7 +156,7 @@ describe("normaliseMailResults", () => {
       createdDateTime: "2025-12-31T23:58:00Z",
     };
     const content = [{ type: "text", text: JSON.stringify(msg) }];
-    const result = normaliseMailResults(content);
+    const { messages: result } = normaliseMailResults(content);
 
     expect((result[0] as any).date).toBe("2026-01-01T00:00:00Z");
   });
@@ -165,7 +165,7 @@ describe("normaliseMailResults", () => {
     const graphResponse = { value: [graphMessage] };
     const wrapped = { rawResponse: JSON.stringify(graphResponse) };
     const content = [{ type: "text", text: JSON.stringify(wrapped) }];
-    const result = normaliseMailResults(content);
+    const { messages: result } = normaliseMailResults(content);
 
     expect(result).toHaveLength(1);
     expect((result[0] as any).id).toBe("msg-1");
@@ -180,7 +180,7 @@ describe("normaliseMailResults", () => {
       sentDateTime: "2026-02-01T12:00:00Z",
     };
     const content = [{ type: "text", text: JSON.stringify(msg) }];
-    const result = normaliseMailResults(content);
+    const { messages: result } = normaliseMailResults(content);
 
     expect((result[0] as any).date).toBe("2026-02-01T12:00:00Z");
   });

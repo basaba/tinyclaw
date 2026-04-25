@@ -1,0 +1,118 @@
+# Email triage & reply workflow
+#
+# Fetches recent unread emails, asks Copilot to decide which need a reply,
+# drafts responses, and creates Outlook drafts after your approval.
+#
+# Flow:
+#   1. Search unread inbox emails
+#   2. diff.key — tag each email as new/seen; filter to new only
+#   3. For each NEW email: read full body → Copilot triage (structured JSON)
+#   4. Show summary of emails needing replies → approval gate
+#   5. For each approved: mail.send --draft (creates Outlook draft directly)
+#
+# State:
+#   Stores processed email IDs in ~/.lobster/state/mail-triage-inbox.json
+#   On re-runs, only new (unseen) emails are triaged.
+#
+# The for_each output structure per iteration is:
+#   { item: <email metadata>, body: <full email>, decision: <triage JSON> }
+# where decision has: { needs_reply, reason, priority, sender_email, original_subject, draft }
+#
+# Prerequisites:
+#   - Agency CLI with mail MCP (`agency mcp mail`)
+#   - Authenticated via agency / Entra ID
+#
+# Usage:
+#   lobster-copilot examples/mail/mail-triage-reply.yaml
+#   lobster-copilot examples/mail/mail-triage-reply.yaml --dry-run
+
+name: mail-triage-reply
+description: Triage unread emails — decide if reply needed, draft responses, get approval
+
+steps:
+  # 1. Fetch recent unread emails (metadata only)
+  - id: unread
+    pipeline: >
+      mail.search --unread --folder inbox --top 20 --order-by newest --all
+      --select id,subject,from,receivedDateTime,isRead,hasAttachments,bodyPreview
+
+  # 2. Tag each email as new (_changed=true) or seen (_changed=false).
+  #    Only new emails (not processed in previous runs) pass through.
+  #    Stores seen IDs in ~/.lobster/state/mail-triage-inbox.json
+  - id: new-mail
+    pipeline: >
+      diff.key --key mail-triage-inbox --field id | where changed==true
+    stdin: $unread
+
+  # 3. For each NEW email: read body, then triage with Copilot.
+  #    Copilot outputs structured JSON with all fields needed for sending.
+  - id: triage
+    for_each: $new-mail.json
+    steps:
+      - id: body
+        pipeline: >
+          mail.read --id $item.json.id
+
+      - id: decision
+        pipeline: >
+          copilot --prompt "You are an email triage assistant. Analyse the email below and decide whether it requires a reply from me.
+
+          Rules — NEEDS reply:
+            • Direct questions addressed to me
+            • Action items assigned to me
+            • Requests for feedback or review
+
+          Rules — does NOT need reply:
+            • Newsletters, notifications, automated alerts
+            • FYI / broadcast emails with no action for me
+            • Emails where I am only CC'd and not directly addressed
+
+          Respond with EXACTLY this JSON (no markdown fences, no extra text):
+          {
+            \"needs_reply\": true or false,
+            \"reason\": \"one-line explanation\",
+            \"priority\": \"high\" | \"medium\" | \"low\",
+            \"sender_email\": \"the sender's email address from the headers\",
+            \"original_subject\": \"the original subject line\",
+            \"draft\": \"your suggested reply text (empty string if needs_reply is false)\"
+          }
+
+          Email metadata — subject: $item.json.subject | from: $item.json.from"
+        stdin: $body
+
+  # 4. Copilot formats a readable summary, then approval gate blocks until you confirm.
+  #    Skipped if no emails need a reply.
+  - id: review
+    when: "some($triage.json, @.decision.needs_reply == true)"
+    pipeline: >
+      copilot --prompt "Format a triage summary from the data below.
+
+      For each email where decision.needs_reply is true, show:
+      ───────────────────────────────
+      📧 From: [sender_email]
+      📋 Subject: [original_subject]
+      🔴 Priority: [priority]
+      💬 Reason: [reason]
+      ✏️ Draft reply:
+      [draft text]
+      ───────────────────────────────
+
+      Only show emails where needs_reply is true."
+    stdin: $triage
+    approval: "Review the drafts above. Approve to create them as Outlook drafts."
+
+  # 5. Create an Outlook draft for each email that needs a reply.
+  #    Uses mail.send --draft directly — no Copilot generation.
+  #    Skipped if review was not approved or no emails need reply.
+  - id: send-replies
+    when: $review.approved == true
+    for_each: $triage.json
+    steps:
+      - id: create-draft
+        condition: $item.json.decision.needs_reply == true
+        pipeline: >
+          mail.send
+          --to '$item.json.decision.sender_email'
+          --subject 'Re: $item.json.decision.original_subject'
+          --body '$item.json.decision.draft'
+          --draft

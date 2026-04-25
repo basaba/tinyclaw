@@ -35,10 +35,12 @@ description: Monitor Azure DevOps PRs and report changes
 args:
   org:
     description: "Azure DevOps org URL (e.g. https://dev.azure.com/myorg)"
+    default: "https://dev.azure.com/msazure"
   project:
     description: "Project name"
+    default: null
   repository:
-    description: "Repository name filter"
+    description: "Azure-Kusto-Service"
     default: null
   targetBranch:
     description: "Target branch filter"
@@ -76,3 +78,6 @@ steps:
       --creator "${creator}"
       --reviewer "${reviewer}"
       --days "${days}"
+      | where changed==true
+      | copilot --prompt "Summarize these PRs"
+      | teams.send --self
