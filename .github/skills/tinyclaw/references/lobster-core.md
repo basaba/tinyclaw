@@ -1,26 +1,6 @@
-# TinyClaw Skill
+# Lobster Core Language Reference
 
-You are an expert on **Lobster** (OpenClaw's workflow shell) and **tinyclaw** (its GitHub Copilot integration). You help users write workflows, debug pipelines, use the CLI, and understand the system's semantics. You generate correct, idiomatic Lobster YAML and pipeline syntax.
-
----
-
-## Fast Operational Rules
-
-- **JSON-first, stream-oriented.** All pipeline values are JSON-serializable. Stages receive and yield async streams of items.
-- **Deterministic & resumable.** Lobster is not an autonomous LLM agent — workflows are fixed DAGs with explicit approval gates. Never auto-approve on behalf of a user.
-- **Two integration modes:**
-  - **Native adapter:** `llm.invoke --provider copilot --prompt '...'` — plugs Copilot directly into Lobster pipelines.
-  - **MCP server:** Exposes reasoning tools via Model Context Protocol.
-- Use `copilot --prompt '...'` for direct Copilot calls in tinyclaw pipelines.
-- Use `agency.mcp.call --server <name> --tool <tool>` for direct MCP tool calls (no LLM).
-- Prefer simple pipelines over unnecessary nesting. A single pipeline step often suffices.
-- When generating workflows, always include unique `id` fields on every step.
-
----
-
-## Part I — Lobster Core
-
-### Data Model & Execution
+## Data Model & Execution
 
 | Concept | Detail |
 |---------|--------|
@@ -40,7 +20,7 @@ Pipeline flow: `Stage 1 → Stage 2 → Stage 3 → output`. Each stage receives
 
 ---
 
-### Pipeline Syntax
+## Pipeline Syntax
 
 ```
 command1 --flag value positional | command2 arg | command3
@@ -54,7 +34,7 @@ command1 --flag value positional | command2 arg | command3
 
 ---
 
-### Expression Language
+## Expression Language
 
 Used by `compute`, `where` (extended), workflow `when`/`condition`.
 
@@ -97,7 +77,7 @@ coalesce(nickname, fullName, "Unknown")
 
 ---
 
-### Template & Interpolation Syntax
+## Template & Interpolation Syntax
 
 **Template expressions** (in `template`, `map`):
 
@@ -127,7 +107,7 @@ Missing paths → empty string. Objects/arrays → JSON-stringified.
 
 ---
 
-### Filters
+## Filters
 
 Filters transform values inside `{{ }}`. Applied left-to-right. Args space-separated.
 
@@ -151,9 +131,9 @@ Date tokens: `YYYY`, `MM`, `DD`, `HH`, `mm`, `ss` — all UTC, zero-padded.
 
 ---
 
-### Built-in Commands (stdlib)
+## Built-in Commands (stdlib)
 
-#### Data Flow
+### Data Flow
 
 | Command | Usage | Description |
 |---------|-------|-------------|
@@ -162,7 +142,7 @@ Date tokens: `YYYY`, `MM`, `DD`, `HH`, `mm`, `ss` — all UTC, zero-padded.
 | `table` | `... \| table` | Render as table |
 | `template` | `... \| template --text 'PR #{{number}}: {{title}}'` | Render template per item. Flags: `--text`, `--file` |
 
-#### Filtering & Selection
+### Filtering & Selection
 
 | Command | Usage | Description |
 |---------|-------|-------------|
@@ -171,7 +151,7 @@ Date tokens: `YYYY`, `MM`, `DD`, `HH`, `mm`, `ss` — all UTC, zero-padded.
 | `head` | `... \| head --n 5` | Take first N items (default 10) |
 | `dedupe` | `... \| dedupe --key id` | Remove duplicates (stable, first kept) |
 
-#### Transformation
+### Transformation
 
 | Command | Usage | Description |
 |---------|-------|-------------|
@@ -180,7 +160,7 @@ Date tokens: `YYYY`, `MM`, `DD`, `HH`, `mm`, `ss` — all UTC, zero-padded.
 | `sort` | `... \| sort --key updatedAt --desc` | Sort items. Stable sort, nulls sort last |
 | `groupBy` | `... \| groupBy --key status` | Group → `{ key, items, count }` |
 
-#### State Management
+### State Management
 
 | Command | Usage | Description |
 |---------|-------|-------------|
@@ -190,14 +170,14 @@ Date tokens: `YYYY`, `MM`, `DD`, `HH`, `mm`, `ss` — all UTC, zero-padded.
 | `diff.gate` | `<items> \| diff.gate --key myKey` | Like `diff.last` but **halts** if unchanged |
 | `diff.key` | `<items> \| diff.key --key myKey [--field id]` | Tag each item `changed: true/false` by comparing a key field against stored state. Persists seen keys to `~/.lobster/state/<key>.json`. Use with `where changed==true` to act only on new items. |
 
-#### Human-in-the-Loop
+### Human-in-the-Loop
 
 | Command | Usage | Description |
 |---------|-------|-------------|
 | `approve` | `... \| approve --prompt "Send?"` | Approval gate. Flags: `--emit`, `--preview-from-stdin`, `--limit` |
 | `ask` | `... \| ask --prompt "Review:" --schema '{...}'` | Request structured input |
 
-#### LLM Integration
+### LLM Integration
 
 | Command | Usage | Description |
 |---------|-------|-------------|
@@ -205,7 +185,7 @@ Date tokens: `YYYY`, `MM`, `DD`, `HH`, `mm`, `ss` — all UTC, zero-padded.
 
 Provider resolution: `--provider` flag → `LOBSTER_LLM_PROVIDER` env → auto-detect.
 
-#### External Integrations
+### External Integrations
 
 | Command | Description |
 |---------|-------------|
@@ -216,9 +196,9 @@ Provider resolution: `--provider` flag → `LOBSTER_LLM_PROVIDER` env → auto-d
 
 ---
 
-### Workflow Files (.lobster / .yaml)
+## Workflow Files (.lobster / .yaml)
 
-#### Top-Level Schema
+### Top-Level Schema
 
 ```yaml
 name: "My Workflow"                    # optional
@@ -241,7 +221,7 @@ steps:                                 # required — non-empty array
     ...
 ```
 
-#### Step Types
+### Step Types
 
 Every step requires a unique `id` and exactly **one** execution mode:
 
@@ -255,7 +235,7 @@ Every step requires a unique `id` and exactly **one** execution mode:
 | Approval | `approval` | String prompt or `{ prompt, items, preview, ... }` |
 | Input | `input` | `{ prompt, responseSchema, defaults }` |
 
-#### Common Step Fields
+### Common Step Fields
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -268,7 +248,7 @@ Every step requires a unique `id` and exactly **one** execution mode:
 | `on_error` | string | `"stop"` | `"stop"`, `"continue"`, `"skip_rest"` |
 | `retry` | object | — | `{ max, backoff, delay_ms, max_delay_ms, jitter }` |
 
-#### Retry Configuration
+### Retry Configuration
 
 ```yaml
 retry:
@@ -281,7 +261,7 @@ retry:
 
 Abort/cancellation errors are **never** retried.
 
-#### Conditional Execution
+### Conditional Execution
 
 ```yaml
 when: $approval.approved == true
@@ -290,7 +270,7 @@ when: "($a.json.x == 1 || $b.json.y == 2) && $c.json.z > 0"
 
 Skipped steps produce `{ id, skipped: true }` — no `stdout`/`json`.
 
-#### stdin Resolution
+### stdin Resolution
 
 | Pattern | Behavior |
 |---------|----------|
@@ -302,7 +282,7 @@ Skipped steps produce `{ id, skipped: true }` — no `stdout`/`json`.
 
 ---
 
-### Constraints & Gotchas
+## Constraints & Gotchas
 
 **These are hard constraints — generating workflows that violate them will fail:**
 
@@ -317,7 +297,7 @@ Skipped steps produce `{ id, skipped: true }` — no `stdout`/`json`.
 
 ---
 
-### Approval, Input & Resume Flow
+## Approval, Input & Resume Flow
 
 Lobster's human-in-the-loop model is central to its design:
 
@@ -341,7 +321,7 @@ lobster resume --id <8hex> --cancel
 
 ---
 
-### Core Environment Variables
+## Core Environment Variables
 
 | Variable | Purpose |
 |----------|---------|
@@ -354,7 +334,7 @@ lobster resume --id <8hex> --cancel
 
 ---
 
-### SDK (Programmatic API)
+## SDK (Programmatic API)
 
 ```typescript
 import { Lobster, exec, approve, diffLast } from '@clawdbot/lobster';
@@ -380,309 +360,3 @@ if (result.status === 'needs_approval') {
 **Result shape:** `{ ok, status, output[], runId, requiresApproval?, requiresInput?, error? }`
 
 **Events:** `run:start`, `step:start`, `step:complete`, `run:complete` (SDK-only, not CLI).
-
----
-
-## Part II — Lobster-Copilot Extension
-
-### Extended CLI
-
-```bash
-tinyclaw <file.yaml> [options]           # Run workflow
-tinyclaw -p '<pipeline>' [options]        # Run pipeline string
-tinyclaw tui                              # Interactive TUI (default when no args)
-tinyclaw sched <command> [options]        # Scheduler CLI
-tinyclaw daemon start|stop|status         # Daemon management
-```
-
-| Flag | Description |
-|------|-------------|
-| `-p, --pipeline <text>` | Run pipeline string |
-| `--dry-run` | Validate without running |
-| `--model <id>` | Model override (e.g. `gpt-4o`, `claude-sonnet-4`) |
-| `--system <prompt>` | System prompt override |
-| `--args-json <json>` | Workflow arguments |
-| `--mcp-config <path>` | MCP config file path |
-| `--mcps <list>` | Filter MCP servers (comma-separated) |
-| `--plugins <dir>` | Plugin directory |
-
-### Extended Commands
-
-#### `copilot` — Direct Copilot Reasoning
-
-```
-copilot --prompt "Explain this code"
-copilot --prompt "Summarize" --model gpt-4o
-copilot "What is 2+2?"
-<input> | copilot --prompt "Review the above"
-```
-
-Flags: `--prompt`, `--model`, `--system`. Piped input prepended to prompt. Output: string.
-
-#### `agency.mcp.call` — Direct MCP Tool Call
-
-```
-agency.mcp.call --server icm --tool search_incidents --args '{"query":"sev1"}'
-<input> | agency.mcp.call --server mail --tool GetMessage --input-key messageId
-```
-
-Flags: `--server` (required), `--tool` (required), `--args` (JSON), `--input-key`. Piped JSON merged into args; `--input-key` assigns piped text to that arg key.
-
-#### `ado.pr.monitor` — Azure DevOps PR Monitor
-
-```
-ado.pr.monitor --org https://dev.azure.com/myorg --project MyProject
-ado.pr.monitor --org ... --project ... --status active --changes-only
-```
-
-Required: `--org`, `--project`. Optional: `--repository`, `--source-branch`, `--target-branch`, `--creator`, `--reviewer`, `--status` (active|completed|abandoned|all), `--top`, `--days`, `--changes-only`, `--key`.
-
-Output: array of PR objects. Requires Azure CLI with `azure-devops` extension.
-
-#### `teams.send` — Microsoft Teams Message
-
-Three target modes (mutually exclusive):
-
-```
-teams.send --team-id <guid> --channel-id <id> --message "Hello"    # Channel
-teams.send --chat-id <id> --message "Hi"                            # Chat
-teams.send --self --message "Reminder"                               # Self
-copilot --prompt '...' | teams.send --self                           # Piped
-```
-
-Optional: `--subject` (channel only), `--importance` (normal|high|urgent).
-
-#### `mail.send` — Email via Microsoft 365
-
-```
-mail.send --to alice@example.com --subject "Report" --body "Content"
-copilot --prompt '...' | mail.send --to team@example.com --subject "Summary" --content-type HTML
-mail.send --to alice@example.com --subject "Draft" --draft
-```
-
-Flags: `--to`, `--cc`, `--bcc`, `--subject`, `--body`, `--content-type` (Text|HTML), `--draft`.
-
-#### `mail.search` — Search Emails
-
-```
-mail.search --query "emails from John about budget"       # AI search
-mail.search --search "from:alice subject:urgent"          # KQL
-mail.search --filter "isRead eq false"                    # OData
-mail.search --unread --folder inbox --top 10              # Shorthand
-```
-
-Flags: `--query`, `--search`, `--filter` (mutually exclusive modes), `--folder`, `--top`, `--unread`, `--order-by`.
-
-Output: `{ id, from, to[], subject, date, isRead, hasAttachments, preview }`.
-
-#### `mail.read` — Read Email by ID
-
-```
-mail.read --id <message-id> [--attachments]
-```
-
----
-
-### MCP Configuration
-
-Config file format:
-```json
-{
-  "mcpServers": {
-    "teams": { "type": "stdio", "command": "agency", "args": ["mcp", "teams"], "tools": ["*"], "timeout": 30 },
-    "mail": { "type": "http", "url": "http://localhost:3000", "tools": ["SendMessage"], "timeout": 30 }
-  }
-}
-```
-
-**Server types:** `stdio`/`local` (command + args) or `http`/`sse` (url + headers).
-
-**Resolution chain:** `--mcp-config` flag → `MCP_CONFIG` env → `mcp.json` in CWD → `.mcp.json` in CWD → `~/.config/tinyclaw/mcp.json` → empty.
-
-Copilot SDK also auto-discovers `.mcp.json` and `.vscode/mcp.json` in working directory.
-
----
-
-### Scheduler & TUI
-
-**Schedule formats:**
-
-| Format | Example |
-|--------|---------|
-| Cron | `0 9 * * MON` |
-| Interval | `every 5m`, `every 30s`, `every 2h` |
-
-**Scheduler CLI:**
-```bash
-tinyclaw sched list
-tinyclaw sched add --name <n> --file <f> --schedule '<expr>' [--args '<json>']
-tinyclaw sched remove|enable|disable|run|history <id>
-```
-
-**Daemon:** `tinyclaw daemon start|stop|status`. Uses Unix socket IPC. Data in `~/.config/tinyclaw/`.
-
-**TUI:** `tinyclaw tui` — React/Ink terminal UI. Screens: list, add, edit, history, run-detail, yaml-view, graph-view.
-
----
-
-### Plugin System
-
-Drop `.js` files in the plugin directory (default `~/.config/tinyclaw/plugins/`).
-
-**Resolution:** `--plugins` flag → `LOBSTER_PLUGINS` env → default.
-
-**Contract:**
-```javascript
-export function createCommand(ctx) {
-  // ctx: { mcpServers, getAdapter }
-  return {
-    name: "my.command",
-    help: () => "usage text",
-    meta: { description: "...", argsSchema: {}, sideEffects: ["network"] },
-    async run({ input, args }) {
-      const items = [];
-      for await (const chunk of input) items.push(chunk);
-      return { output: (async function* () { yield result; })() };
-    },
-  };
-}
-```
-
-Errors are non-fatal: missing dir → empty, bad plugin → warns to stderr and skips.
-
----
-
-### Extension Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `COPILOT_CLI_URL` | Override Copilot SDK CLI URL |
-| `LOBSTER_LLM_PROVIDER` | Set to `copilot` automatically |
-| `MCP_CONFIG` | Path to MCP config file |
-| `LOBSTER_PLUGINS` | Plugin directory path |
-
----
-
-## Workflow Generation Guidelines
-
-When generating workflows from natural language descriptions, follow these patterns:
-
-### Pattern: Fetch → Transform → Act
-
-```yaml
-steps:
-  - id: fetch
-    run: "curl -s https://api.example.com/data"
-  - id: transform
-    pipeline: "where status=active | pick id,title | sort --key title"
-    stdin: $fetch.json
-  - id: act
-    pipeline: "copilot --prompt 'Summarize these items'"
-    stdin: $transform
-```
-
-### Pattern: Diff-Based Monitor
-
-```yaml
-steps:
-  - id: fetch
-    pipeline: "ado.pr.monitor --org '${org}' --project '${project}'"
-  - id: diff
-    pipeline: "diff.gate --key pr-state"
-    stdin: $fetch
-  - id: notify
-    pipeline: "teams.send --self"
-    stdin: $diff
-```
-
-### Pattern: Search → Read → Summarize → Notify
-
-```yaml
-steps:
-  - id: search
-    pipeline: "mail.search --unread --folder inbox --top 10"
-  - id: summary
-    pipeline: "copilot --prompt 'Create a concise bullet-point digest'"
-    stdin: $search
-  - id: notify
-    pipeline: "teams.send --self"
-    stdin: $summary
-```
-
-### Pattern: Approval-Gated Action
-
-```yaml
-steps:
-  - id: data
-    run: "curl -s https://api.example.com/deploy-info"
-  - id: gate
-    approval: "Deploy to production?"
-  - id: deploy
-    run: "deploy.sh"
-    when: $gate.approved == true
-```
-
-### Pattern: Parallel Fetch
-
-```yaml
-steps:
-  - id: fetch_all
-    parallel:
-      wait: "all"
-      timeout_ms: 10000
-      branches:
-        - id: api_a
-          run: "curl -s https://api-a.com/data"
-        - id: api_b
-          run: "curl -s https://api-b.com/data"
-```
-
-### Pattern: Loop with Batching
-
-```yaml
-steps:
-  - id: items
-    run: "curl -s https://api.example.com/items"
-  - id: process
-    for_each: $items.json
-    batch_size: 5
-    pause_ms: 200
-    steps:
-      - id: enrich
-        run: "curl -s https://api.example.com/detail/$item.json.id"
-```
-
-### Best Practices
-
-1. **Use `pipeline:` for data transformation** — chain Lobster commands instead of shell pipes.
-2. **Use `run:` for OS commands** — `curl`, `gh`, shell scripts.
-3. **Always set `stdin:` when a step needs prior output** — use `$step_id` or `$step_id.json`.
-4. **Add `retry:` for network calls** — especially API calls and MCP tool invocations.
-5. **Use `--dry-run` first** to validate workflows before executing.
-6. **Prefer `diff.gate` for monitors** — avoids duplicate notifications.
-7. **Keep pipelines flat** — avoid unnecessary nesting of workflows/sub-workflows.
-8. **Use `on_error: continue`** for non-critical steps that shouldn't block the workflow.
-
----
-
-## Debugging Guidelines
-
-### Common Errors
-
-| Symptom | Likely Cause | Fix |
-|---------|-------------|-----|
-| `parse_error` | Invalid pipeline syntax | Check quoting, unmatched quotes, empty stages |
-| Step output is `undefined` | Referencing skipped step | Add `when:` check or use `$step.skipped` guard |
-| `approval/input inside for_each` | Constraint violation | Move gate outside the loop |
-| `MCP tool error` | Wrong tool name or args | Check tool name with `agency.mcp.call --server X --tool list_tools` |
-| `Copilot client not started` | Missing `ensureStarted()` | Ensure adapter is initialized before use |
-| Workflow hangs | Missing `stdin:` | Step waiting for piped input that was never provided |
-| JSON parse error in `--args-json` | Shell quote stripping | Use single quotes around JSON, or escape inner quotes |
-
-### Debugging Steps
-
-1. **`--dry-run`** — Validate workflow structure without executing.
-2. **Check step references** — Ensure `$step.json` references match actual step IDs.
-3. **Test pipeline stages individually** — Run each stage separately via `tinyclaw -p '...'`.
-4. **Check MCP config** — Verify servers are configured and accessible.
-5. **Review stderr** — Warnings about plugins, MCP servers, and retry attempts appear on stderr.
