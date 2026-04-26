@@ -57,20 +57,6 @@ steps:
     when: $gate.approved == true
 ```
 
-## Pattern: Early Exit with Break
-
-```yaml
-steps:
-  - id: data
-    run: "curl -s https://api.example.com/items"
-  - id: guard
-    pipeline: 'break --message "Nothing to process"'
-    when: length($data.json) == 0
-  - id: process
-    pipeline: "copilot --prompt 'Summarize these items'"
-    stdin: $data.json
-```
-
 ## Pattern: Parallel Fetch
 
 ```yaml
