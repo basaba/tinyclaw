@@ -1,7 +1,7 @@
 {
-  "name": "tinyclaw",
+  "name": "@basaba/tinyclaw",
   "version": "0.1.0",
-  "description": "Copilot adapter and MCP auto-loader for OpenClaw Lobster workflows",
+  "description": "A Lobster workflow runner powered by GitHub Copilot — run, schedule, and orchestrate LLM workflows from the terminal",
   "type": "module",
   "main": "dist/index.js",
   "exports": {
@@ -11,6 +11,11 @@
   "bin": {
     "tinyclaw": "dist/cli.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/cli.ts",
@@ -39,6 +44,10 @@
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
   },
   "engines": {
     "node": ">=20.0.0"
