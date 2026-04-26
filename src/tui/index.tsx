@@ -8,10 +8,13 @@ export async function startTui(): Promise<void> {
   const client = new DaemonClient();
 
   if (!DaemonClient.isDaemonRunning()) {
+    console.error("Daemon not running, starting…");
     const pid = spawnDaemon();
     if (!pid) {
+      console.error("Failed to start daemon.");
       process.exit(1);
     }
+    console.error(`Daemon started (pid ${pid}).`);
     // Give the daemon a moment to bind the socket
     await new Promise((r) => setTimeout(r, 500));
   }
@@ -29,6 +32,7 @@ export async function startTui(): Promise<void> {
   }
 
   if (!connected) {
+    console.error("Cannot connect to daemon after multiple attempts.");
     process.exit(1);
   }
 
