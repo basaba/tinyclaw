@@ -5,7 +5,7 @@
 
 Lobster is an OpenClaw-native workflow shell: typed (JSON-first) pipelines, jobs, and approval gates. It is designed for deterministic, resumable automation — not ad-hoc LLM re-planning loops.
 
-Lobster-Copilot extends Lobster — it does not replace it. All Lobster pipeline syntax, expressions, workflow files, and built-in commands remain available. The extension adds GitHub Copilot as an LLM provider, commands for Teams messaging, Microsoft 365 mail, Azure DevOps PR monitoring, a TUI-based scheduler daemon, and a plugin system.
+TinyClaw extends Lobster — it does not replace it. All Lobster pipeline syntax, expressions, workflow files, and built-in commands remain available. The extension adds GitHub Copilot as an LLM provider, commands for Teams messaging, Microsoft 365 mail, Azure DevOps PR monitoring, a TUI-based scheduler daemon, and a plugin system.
 
 ---
 
@@ -14,31 +14,30 @@ Lobster-Copilot extends Lobster — it does not replace it. All Lobster pipeline
 ### Part I — Lobster Core
 
 1. [Concepts & Execution Model](#1-concepts--execution-model)
-2. [CLI Interface](#2-cli-interface)
-3. [Pipeline Syntax](#3-pipeline-syntax)
-4. [Expression Language](#4-expression-language)
-5. [Template & Interpolation Syntax](#5-template--interpolation-syntax)
-6. [Filters](#6-filters)
-7. [Built-in Commands (stdlib)](#7-built-in-commands-stdlib)
-8. [Workflow Files (`.lobster`)](#8-workflow-files-lobster)
-9. [Approval & Input Gates](#9-approval--input-gates)
-10. [Resume Flow](#10-resume-flow)
-11. [Retry & Error Handling](#11-retry--error-handling)
-12. [Environment Variables](#12-environment-variables)
-13. [SDK (Programmatic API)](#13-sdk-programmatic-api)
-14. [Built-in Workflow Registry](#14-built-in-workflow-registry)
-15. [Using Lobster as an npm Package (Consumer Guide)](#15-using-lobster-as-an-npm-package-consumer-guide)
-16. [Contributing Commands & Workflows to Lobster](#16-contributing-commands--workflows-to-lobster)
+2. [Pipeline Syntax](#2-pipeline-syntax)
+3. [Expression Language](#3-expression-language)
+4. [Template & Interpolation Syntax](#4-template--interpolation-syntax)
+5. [Filters](#5-filters)
+6. [Built-in Commands (stdlib)](#6-built-in-commands-stdlib)
+7. [Workflow Files (`.lobster`)](#7-workflow-files-lobster)
+8. [Approval & Input Gates](#8-approval--input-gates)
+9. [Resume Flow](#9-resume-flow)
+10. [Retry & Error Handling](#10-retry--error-handling)
+11. [Environment Variables](#11-environment-variables)
+12. [SDK (Programmatic API)](#12-sdk-programmatic-api)
+13. [Built-in Workflow Registry](#13-built-in-workflow-registry)
+14. [Using Lobster as an npm Package (Consumer Guide)](#14-using-lobster-as-an-npm-package-consumer-guide)
+15. [Contributing Commands & Workflows to Lobster](#15-contributing-commands--workflows-to-lobster)
 
-### Part II — Lobster-Copilot Extension
+### Part II — TinyClaw Extension
 
-17. [Extension CLI Interface](#17-extension-cli-interface)
-18. [Extended Commands](#18-extended-commands)
-19. [MCP Configuration](#19-mcp-configuration)
-20. [Scheduler & TUI](#20-scheduler--tui)
-21. [Plugin System](#21-plugin-system)
-22. [Extension Environment Variables](#22-extension-environment-variables)
-23. [Example Workflows](#23-example-workflows)
+16. [Extension CLI Interface](#16-extension-cli-interface)
+17. [Extended Commands](#17-extended-commands)
+18. [MCP Configuration](#18-mcp-configuration)
+19. [Scheduler & TUI](#19-scheduler--tui)
+20. [Plugin System](#20-plugin-system)
+21. [Extension Environment Variables](#21-extension-environment-variables)
+22. [Example Workflows](#22-example-workflows)
 
 ---
 
@@ -75,77 +74,7 @@ A stage result may set:
 
 ---
 
-## 2. CLI Interface
-
-### Invocation
-
-If `lobster` is not on `PATH`, use `node bin/lobster.js` instead.
-
-```bash
-# Direct pipeline execution
-lobster '<pipeline>'
-
-# Explicit run subcommand
-lobster run [flags] '<pipeline>'
-lobster run [flags] --file <workflow.lobster>
-
-# Resume a halted workflow
-lobster resume --token <token> --approve yes|no
-lobster resume --id <8-hex-id> --approve yes|no
-lobster resume --token <token> --response-json '<json>'
-lobster resume --id <8-hex-id> --cancel
-
-# Visualize a workflow
-lobster graph --file <workflow.lobster> [--format mermaid|dot|ascii]
-
-# Utilities
-lobster doctor        # Diagnose installation
-lobster version       # Show version
-lobster help          # Show help
-```
-
-### Run Flags
-
-| Flag | Description |
-|------|-------------|
-| `--mode human\|tool` | Output mode (default: `human`) |
-| `--file <path>` | Load workflow from `.lobster` / `.yaml` / `.json` file |
-| `--args-json '<json>'` | Pass JSON object as workflow arguments |
-| `--dry-run` | Validate and print execution plan without running |
-
-### Tool-Mode Envelope
-
-All `--mode tool` responses are a single JSON object:
-
-```jsonc
-// Success
-{
-  "protocolVersion": 1,
-  "ok": true,
-  "status": "ok | needs_approval | needs_input | cancelled",
-  "output": [/* items */],
-  "requiresApproval": { /* or null */ },
-  "requiresInput": { /* or null */ }
-}
-
-// Error
-{
-  "protocolVersion": 1,
-  "ok": false,
-  "error": { "type": "parse_error | runtime_error", "message": "..." }
-}
-```
-
-| Status | Meaning | Next Action |
-|--------|---------|-------------|
-| `ok` | Completed successfully | Read `output` |
-| `needs_approval` | Halted at approval gate | `lobster resume --approve yes\|no` |
-| `needs_input` | Halted requesting user input | `lobster resume --response-json '...'` |
-| `cancelled` | Workflow was cancelled | Done |
-
----
-
-## 3. Pipeline Syntax
+## 2. Pipeline Syntax
 
 ### Structure
 
@@ -205,7 +134,7 @@ echo "{\"key\":\"val\"}"  # → {"key":"val"}
 
 ---
 
-## 4. Expression Language
+## 3. Expression Language
 
 Used by `compute`, `where` (extended mode), and workflow `when`/`condition` fields.
 
@@ -280,7 +209,7 @@ concat(first, " ", last)
 
 ---
 
-## 5. Template & Interpolation Syntax
+## 4. Template & Interpolation Syntax
 
 Used by `template`, `map`, and workflow field substitution.
 
@@ -334,7 +263,7 @@ when: $approval.approved == true   # in conditions
 
 ---
 
-## 6. Filters
+## 5. Filters
 
 Filters transform values inside `{{ }}` template expressions.
 
@@ -372,7 +301,7 @@ Filters are applied left-to-right. Arguments are space-separated; use quotes for
 
 ---
 
-## 7. Built-in Commands (stdlib)
+## 6. Built-in Commands (stdlib)
 
 ### Data Flow Commands
 
@@ -700,7 +629,7 @@ Categories: `needs_reply`, `needs_action`, `fyi`.
 
 ---
 
-## 8. Workflow Files (`.lobster`)
+## 7. Workflow Files (`.lobster`)
 
 Workflow files are YAML (or JSON) documents defining multi-step automation.
 
@@ -893,7 +822,7 @@ Every completed step produces a result accessible by later steps:
 
 ---
 
-## 9. Approval & Input Gates
+## 8. Approval & Input Gates
 
 ### Approval Configuration
 
@@ -939,7 +868,7 @@ input:
 
 ---
 
-## 10. Resume Flow
+## 9. Resume Flow
 
 When a workflow halts at an approval or input gate, it can be resumed.
 
@@ -984,7 +913,7 @@ Tokens are base64url-encoded JSON:
 
 ---
 
-## 11. Retry & Error Handling
+## 10. Retry & Error Handling
 
 ### Retry Configuration
 
@@ -1033,7 +962,7 @@ Range: 1 to 2,147,483,647 ms.
 
 ---
 
-## 12. Environment Variables
+## 11. Environment Variables
 
 ### Workflow Runtime
 
@@ -1079,7 +1008,7 @@ Range: 1 to 2,147,483,647 ms.
 
 ---
 
-## 13. SDK (Programmatic API)
+## 12. SDK (Programmatic API)
 
 ### Core Class: `Lobster`
 
@@ -1142,7 +1071,7 @@ type LobsterResult = {
 
 ---
 
-## 14. Built-in Workflow Registry
+## 13. Built-in Workflow Registry
 
 Pre-built workflows available via `workflows.run`:
 
@@ -1174,7 +1103,7 @@ Monitor a PR and emit a human-friendly message when it changes.
 
 ---
 
-## 15. Using Lobster as an npm Package (Consumer Guide)
+## 14. Using Lobster as an npm Package (Consumer Guide)
 
 This section is for **consumers** who install `@clawdbot/lobster` as an npm dependency and want to build workflows, custom stages, or recipes in their own project — without modifying the Lobster repository.
 
@@ -1696,7 +1625,7 @@ wf.on('run:complete', (evt) => {
 
 ---
 
-## 16. Contributing Commands & Workflows to Lobster
+## 15. Contributing Commands & Workflows to Lobster
 
 This section is for **contributors** who want to add new built-in commands or workflows to the Lobster repository itself.
 
@@ -1818,7 +1747,7 @@ Run all tests with `npm test` (Node.js built-in test runner).
 
 ---
 
-## 17. Extension CLI Interface
+## 16. Extension CLI Interface
 
 ### Invocation
 
@@ -1878,7 +1807,7 @@ The daemon communicates with the TUI over a Unix domain socket. PID file and con
 
 ---
 
-## 18. Extended Commands
+## 17. Extended Commands
 
 These commands are available in pipelines and workflow files, in addition to all Lobster stdlib commands.
 
@@ -2059,7 +1988,7 @@ mail.read --id <message-id> --attachments
 
 ---
 
-## 19. MCP Configuration
+## 18. MCP Configuration
 
 ### Config File Format
 
@@ -2137,7 +2066,7 @@ tinyclaw -p "..." --mcp-config ./custom-mcp.json
 
 ---
 
-## 20. Scheduler & TUI
+## 19. Scheduler & TUI
 
 ### Overview
 
@@ -2230,7 +2159,7 @@ All data is stored in `~/.config/tinyclaw/`:
 
 ---
 
-## 21. Plugin System
+## 20. Plugin System
 
 ### Overview
 
@@ -2338,7 +2267,7 @@ The scheduler engine loads plugins from the same directory, so custom commands w
 
 ---
 
-## 22. Extension Environment Variables
+## 21. Extension Environment Variables
 
 | Variable | Description |
 |----------|-------------|
@@ -2350,7 +2279,7 @@ The scheduler engine loads plugins from the same directory, so custom commands w
 
 ---
 
-## 23. Example Workflows
+## 22. Example Workflows
 
 ### ADO PR Monitor
 
