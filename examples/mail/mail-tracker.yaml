@@ -30,4 +30,4 @@ steps:
       | where changed==true
       | mail.read
       | copilot --prompt "Summarize these e-mails"
-      | teams.send --self --subject "Mail Tracker: Unread Emails Summary"
+      | teams.send --self
