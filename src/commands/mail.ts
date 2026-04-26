@@ -273,6 +273,20 @@ const WELL_KNOWN_FOLDERS: Record<string, string> = {
   archive: "archive",
 };
 
+/** Parse a human-friendly duration (e.g. "1d", "6h", "2w") into an ISO 8601 date string. */
+function parseSince(since: string): string {
+  const m = since.trim().match(/^(\d+)\s*(m|h|d|w)$/i);
+  if (!m) {
+    throw new Error(
+      `mail.search: invalid --since value '${since}'. Use a number + unit: 30m, 1h, 6h, 1d, 3d, 1w, 2w`,
+    );
+  }
+  const n = parseInt(m[1], 10);
+  const unit = m[2].toLowerCase();
+  const ms = { m: 60_000, h: 3_600_000, d: 86_400_000, w: 604_800_000 }[unit]!;
+  return new Date(Date.now() - n * ms).toISOString();
+}
+
 export function createMailSearchCommand(
   getServers: () => Record<string, McpServerConfig>,
 ): LobsterCommand {
@@ -289,6 +303,7 @@ export function createMailSearchCommand(
           folder: { type: "string", description: "Folder: inbox, drafts, sent, deleted, junk, archive" },
           top: { type: "number", description: "Max results to return (default 25)" },
           unread: { type: "boolean", description: "Shorthand for --filter 'isRead eq false'" },
+          since: { type: "string", description: "Relative time filter: 1h, 6h, 1d, 3d, 1w, 2w, 30d (shorthand for receivedDateTime OData filter)" },
           "order-by": { type: "string", description: "Order by date: newest (default) or oldest" },
           select: { type: "string", description: "Comma-separated fields to return (default: id,subject,from,receivedDateTime,isRead,hasAttachments,bodyPreview). Use --select '' to fetch all fields" },
           all: { type: "boolean", description: "Auto-paginate to fetch all results (default: true). Use --no-all for single page" },
@@ -313,6 +328,8 @@ export function createMailSearchCommand(
         "  mail.search --filter 'isRead eq false' --top 10",
         "  mail.search --filter 'hasAttachments eq true' --folder inbox",
         "  mail.search --unread --folder inbox --top 5",
+        "  mail.search --unread --since 1d --folder inbox",
+        "  mail.search --since 6h",
         "",
         "Options:",
         "  --query    Natural language search (AI-powered, cannot combine with --search/--filter)",
@@ -320,7 +337,8 @@ export function createMailSearchCommand(
         "  --filter   OData $filter (subject, isRead, isDraft, hasAttachments, importance, receivedDateTime)",
         "  --folder   Restrict to folder: inbox, drafts, sent, deleted, junk, archive",
         "  --top      Max results (default 25)",
-        "  --unread   Shorthand for --filter 'isRead eq false'",
+        "  --unread   Shorthand for isRead eq false (combinable with --filter and --since)",
+        "  --since    Relative time filter: 30m, 1h, 6h, 1d, 3d, 1w, 2w (combinable with --unread and --filter)",
         "  --order-by Order by date: newest (default) or oldest",
         "  --select   Comma-separated fields to return (reduces payload)",
         "             Default: id,subject,from,receivedDateTime,isRead,hasAttachments,bodyPreview",
@@ -349,14 +367,21 @@ export function createMailSearchCommand(
       const folder = args.folder as string | undefined;
       const top = args.top !== undefined ? Number(args.top) : undefined;
       const unread = args.unread === true || args.unread === "true";
+      const since = args.since as string | undefined;
       const orderBy = (args["order-by"] as string | undefined)?.toLowerCase();
       const select = args.select !== undefined ? (args.select as string) : DEFAULT_SELECT;
       const noAll = args["no-all"] === true || args["no-all"] === "true";
       const fetchAll = noAll ? false : (args.all !== false && args.all !== "false");
       const pageSize = args["page-size"] !== undefined ? Number(args["page-size"]) : undefined;
 
-      if (unread && !filter) {
-        filter = "isRead eq false";
+      // --unread and --since are shorthands that append to --filter
+      const shorthands: string[] = [];
+      if (unread) shorthands.push("isRead eq false");
+      if (since) shorthands.push(`receivedDateTime ge ${parseSince(since)}`);
+
+      if (shorthands.length > 0) {
+        const combined = shorthands.join(" and ");
+        filter = filter ? `(${filter}) and ${combined}` : combined;
       }
 
       if (!query && !search && !filter && !folder && top === undefined) {
@@ -468,17 +493,20 @@ export function createMailReadCommand(
     },
     help() {
       return [
-        "mail.read — Read a specific email by message ID",
+        "mail.read — Read full email body by message ID",
         "",
         "Usage:",
         "  mail.read --id <messageId>",
         "  mail.read --id <messageId> --html",
         "  mail.read --id <messageId> --preview-only",
+        "  mail.search --unread --since 1d | mail.read",
         "",
         "Options:",
-        "  --id             Message ID (required)",
+        "  --id             Message ID (optional if piped from mail.search)",
         "  --html           Return HTML body format",
         "  --preview-only   Return body preview only (~255 chars)",
+        "",
+        "When piped from mail.search, reads the full body of each message.",
       ].join("\n");
     },
     async run({
@@ -488,27 +516,49 @@ export function createMailReadCommand(
       input: AsyncIterable<unknown>;
       args: Record<string, unknown>;
     }) {
-      await drain(input);
-
       const id = args.id as string | undefined;
-      if (!id) {
-        throw new Error("mail.read: --id is required");
-      }
-
       const preferHtml = args.html === true || args.html === "true";
       const previewOnly = args["preview-only"] === true || args["preview-only"] === "true";
 
       const { config, timeout } = getMailConfig(getServers);
-      const toolArgs: Record<string, unknown> = {
-        id,
-        ...(preferHtml ? { preferHtml: true } : {}),
-        ...(previewOnly ? { bodyPreviewOnly: true } : {}),
-      };
 
-      const result = await callTool(config, "GetMessage", toolArgs, timeout);
-      if (result.isError) handleError("mail.read", result);
+      // Collect piped messages to check if we have upstream input
+      const piped: unknown[] = [];
+      for await (const item of input) piped.push(item);
 
-      return { output: asStream(result.content as unknown[]) };
+      // If --id is given, read that single message
+      if (id) {
+        const toolArgs: Record<string, unknown> = {
+          id,
+          ...(preferHtml ? { preferHtml: true } : {}),
+          ...(previewOnly ? { bodyPreviewOnly: true } : {}),
+        };
+        const result = await callTool(config, "GetMessage", toolArgs, timeout);
+        if (result.isError) handleError("mail.read", result);
+        return { output: asStream(result.content as unknown[]) };
+      }
+
+      // No --id: read each piped message by its .id field
+      if (piped.length === 0) {
+        throw new Error("mail.read: --id is required, or pipe messages from mail.search");
+      }
+
+      async function* readAll() {
+        for (const item of piped) {
+          const msgId = (item as Record<string, unknown>)?.id as string | undefined;
+          if (!msgId) { yield item; continue; }
+          const toolArgs: Record<string, unknown> = {
+            id: msgId,
+            ...(preferHtml ? { preferHtml: true } : {}),
+            ...(previewOnly ? { bodyPreviewOnly: true } : {}),
+          };
+          const result = await callTool(config, "GetMessage", toolArgs, timeout);
+          if (result.isError) handleError("mail.read", result);
+          for (const msg of result.content as unknown[]) yield msg;
+        }
+      }
+
+      return { output: readAll() };
     },
   };
 }
