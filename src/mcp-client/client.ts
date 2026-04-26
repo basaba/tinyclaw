@@ -59,7 +59,7 @@ export async function withMcpClient<T>(
   });
 
   const client = new Client(
-    { name: "lobster-copilot", version: "0.1.0" },
+    { name: "tinyclaw", version: "0.1.0" },
     { capabilities: {} },
   );
 

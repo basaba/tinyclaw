@@ -9,8 +9,8 @@
 #   - Authenticated via agency / Entra ID
 #
 # Usage:
-#   lobster-copilot examples/mail-search-digest.yaml
-#   lobster-copilot examples/mail-search-digest.yaml --dry-run
+#   tinyclaw examples/mail-search-digest.yaml
+#   tinyclaw examples/mail-search-digest.yaml --dry-run
 #
 # Tip: Tweak --top / --folder / --query to change what's fetched.
 

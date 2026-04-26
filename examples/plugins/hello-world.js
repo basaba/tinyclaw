@@ -1,12 +1,12 @@
 /**
- * Example lobster-copilot plugin — "hello.world"
+ * Example tinyclaw plugin — "hello.world"
  *
  * Drop this file in your plugins directory and it's auto-discovered on startup:
- *   ~/.config/lobster-copilot/plugins/hello-world.js
+ *   ~/.config/tinyclaw/plugins/hello-world.js
  *
  * Or specify a custom dir:
- *   lobster-copilot workflow.yaml --plugins ./my-plugins
- *   LOBSTER_PLUGINS=./my-plugins lobster-copilot workflow.yaml
+ *   tinyclaw workflow.yaml --plugins ./my-plugins
+ *   LOBSTER_PLUGINS=./my-plugins tinyclaw workflow.yaml
  *
  * Plugin contract:
  *   - Export a `createCommand(ctx)` function (or use `export default`)

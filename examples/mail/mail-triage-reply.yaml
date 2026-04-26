@@ -23,8 +23,8 @@
 #   - Authenticated via agency / Entra ID
 #
 # Usage:
-#   lobster-copilot examples/mail/mail-triage-reply.yaml
-#   lobster-copilot examples/mail/mail-triage-reply.yaml --dry-run
+#   tinyclaw examples/mail/mail-triage-reply.yaml
+#   tinyclaw examples/mail/mail-triage-reply.yaml --dry-run
 
 name: mail-triage-reply
 description: Triage unread emails — decide if reply needed, draft responses, get approval

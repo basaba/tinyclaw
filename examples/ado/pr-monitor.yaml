@@ -19,11 +19,11 @@
 #   top         (optional) Max PRs to return (default: 50)
 #
 # Run:
-#   lobster-copilot workflows/ado-pr-monitor.lobster \
+#   tinyclaw workflows/ado-pr-monitor.lobster \
 #     --args-json '{"org":"https://dev.azure.com/myorg","project":"MyProject","status":"active"}'
 #
 # Schedule via TUI / sched:
-#   lobster-copilot sched add \
+#   tinyclaw sched add \
 #     --name ado-prs \
 #     --file workflows/ado-pr-monitor.lobster \
 #     --schedule "every 5m" \

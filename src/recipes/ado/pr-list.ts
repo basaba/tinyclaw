@@ -2,7 +2,7 @@
  * Azure DevOps PR List — fetch PRs via `az repos pr list`
  *
  * Standalone helper (no Lobster SDK dependency) so it can be used
- * directly from the lobster-copilot CLI or scheduler.
+ * directly from the tinyclaw CLI or scheduler.
  */
 
 import { spawn } from "node:child_process";

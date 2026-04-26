@@ -3,7 +3,7 @@
  * rest of the scheduler/daemon code stays platform-agnostic.
  *
  * On Linux/macOS the daemon listens on a Unix socket file.
- * On Windows it uses a named pipe (\\.\pipe\lobster-copilot-daemon).
+ * On Windows it uses a named pipe (\\.\pipe\tinyclaw-daemon).
  */
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
@@ -13,20 +13,20 @@ export const IS_WINDOWS = process.platform === "win32";
 
 /**
  * Configuration directory.
- *  - Windows:  %APPDATA%\lobster-copilot
- *  - Others:   ~/.config/lobster-copilot
+ *  - Windows:  %APPDATA%\tinyclaw
+ *  - Others:   ~/.config/tinyclaw
  */
 export const CONFIG_DIR: string = IS_WINDOWS
-  ? join(process.env.APPDATA ?? join(homedir(), "AppData", "Roaming"), "lobster-copilot")
-  : join(homedir(), ".config", "lobster-copilot");
+  ? join(process.env.APPDATA ?? join(homedir(), "AppData", "Roaming"), "tinyclaw")
+  : join(homedir(), ".config", "tinyclaw");
 
 /**
  * IPC endpoint.
- *  - Windows:  \\.\pipe\lobster-copilot-daemon  (named pipe)
+ *  - Windows:  \\.\pipe\tinyclaw-daemon  (named pipe)
  *  - Others:   CONFIG_DIR/daemon.sock            (Unix socket)
  */
 export const SOCKET_PATH: string = IS_WINDOWS
-  ? "\\\\.\\pipe\\lobster-copilot-daemon"
+  ? "\\\\.\\pipe\\tinyclaw-daemon"
   : join(CONFIG_DIR, "daemon.sock");
 
 /** PID file — always a real file in CONFIG_DIR. */

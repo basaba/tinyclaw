@@ -1,5 +1,5 @@
 {
-  "name": "lobster-copilot",
+  "name": "tinyclaw",
   "version": "0.1.0",
   "description": "Copilot adapter and MCP auto-loader for OpenClaw Lobster workflows",
   "type": "module",
@@ -9,7 +9,7 @@
     "./adapters": "./dist/adapters/index.js"
   },
   "bin": {
-    "lobster-copilot": "dist/cli.js"
+    "tinyclaw": "dist/cli.js"
   },
   "scripts": {
     "build": "tsc",

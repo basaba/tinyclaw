@@ -1,6 +1,6 @@
 # Approval Gate Demo
 #
-# Demonstrates the approval feature in lobster-copilot workflows.
+# Demonstrates the approval feature in tinyclaw workflows.
 # Copilot drafts a stakeholder update from sample PR data, then the
 # workflow pauses at an approval gate for you to review before sending.
 #
@@ -11,8 +11,8 @@
 #   4. On approve → send to Teams; on reject → workflow stops
 #
 # Usage:
-#   lobster-copilot examples/approval-demo.yaml
-#   lobster-copilot examples/approval-demo.yaml --dry-run
+#   tinyclaw examples/approval-demo.yaml
+#   tinyclaw examples/approval-demo.yaml --dry-run
 
 name: approval-demo
 description: Demo workflow showcasing the approval gate feature

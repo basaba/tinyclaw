@@ -1,4 +1,4 @@
-# lobster-copilot
+# tinyclaw
 
 Bridge service integrating [OpenClaw Lobster](https://github.com/openclaw/lobster) workflows with GitHub Copilot as the LLM reasoning engine. Provides two integration modes:
 
@@ -9,7 +9,7 @@ Bridge service integrating [OpenClaw Lobster](https://github.com/openclaw/lobste
 
 ```
 ┌──────────────────────┐      MCP (stdio/sse)      ┌───────────────────────┐
-│   Lobster Workflow   │ ◄──────────────────────► │   lobster-copilot     │
+│   Lobster Workflow   │ ◄──────────────────────► │   tinyclaw     │
 │   Engine             │                           │   (MCP Server)        │
 └──────────────────────┘                           │                       │
                                                    │  ┌─────────────────┐  │
@@ -43,7 +43,7 @@ Bridge service integrating [OpenClaw Lobster](https://github.com/openclaw/lobste
 Use Copilot directly as an `llm.invoke` provider — no MCP server needed:
 
 ```typescript
-import { createCopilotAdapters } from 'lobster-copilot/adapters';
+import { createCopilotAdapters } from 'tinyclaw/adapters';
 import { runToolRequest } from '@basaba/lobster/tool_runtime';
 
 const { adapters, dispose } = createCopilotAdapters({
@@ -185,7 +185,7 @@ Lobster-native `llm-task` compatible tool. Supports both structured JSON and fre
 
 ## Memory Management
 
-lobster-copilot uses SQLite for persistent memory across workflow steps.
+tinyclaw uses SQLite for persistent memory across workflow steps.
 
 ### Conversations & Messages
 
@@ -212,7 +212,7 @@ See the [`examples/`](./examples) directory:
 | --------------------- | ---------------------- | ------------------------------------------ |
 | `COPILOT_API_KEY`     | *(none)*               | GitHub Copilot API key (uses GitHub auth by default) |
 | `COPILOT_CLI_URL`     | *(none)*               | URL to connect to an existing Copilot CLI server |
-| `SQLITE_PATH`         | `./lobster-copilot.db` | Path to the SQLite database file           |
+| `SQLITE_PATH`         | `./tinyclaw.db` | Path to the SQLite database file           |
 | `MEMORY_TTL_HOURS`    | `168`                  | Default memory entry TTL in hours (1 week) |
 | `CONTEXT_TOKEN_BUDGET`| `8000`                 | Max tokens for the LLM context window      |
 | `MCP_TRANSPORT`       | `stdio`                | MCP transport: `stdio` or `sse`            |

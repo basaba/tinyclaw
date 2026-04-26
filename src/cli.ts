@@ -52,14 +52,14 @@ if (args[0] === "copilot") {
 }
 
 function printHelp(): void {
-  console.log(`lobster-copilot — Run Lobster workflows with Copilot as the LLM engine
+  console.log(`tinyclaw — Run Lobster workflows with Copilot as the LLM engine
 
 Usage:
-  lobster-copilot <file> [options]
-  lobster-copilot -p '<pipeline>' [options]
-  lobster-copilot copilot '<prompt>' [options]
-  lobster-copilot sched <command> [options]
-  lobster-copilot help
+  tinyclaw <file> [options]
+  tinyclaw -p '<pipeline>' [options]
+  tinyclaw copilot '<prompt>' [options]
+  tinyclaw sched <command> [options]
+  tinyclaw help
 
 Commands:
   copilot                  Send a prompt directly to Copilot (shortcut)
@@ -85,18 +85,18 @@ MCP Config Resolution (first found wins):
   2. MCP_CONFIG env var
   3. mcp.json in current directory
   4. .mcp.json in current directory
-  5. ~/.config/lobster-copilot/mcp.json
+  5. ~/.config/tinyclaw/mcp.json
 
 Examples:
-  lobster-copilot copilot 'Explain async/await in TypeScript'
-  lobster-copilot copilot 'Review this code' --model gpt-4o < file.ts
-  lobster-copilot examples/piped-steps.yaml
-  lobster-copilot examples/piped-steps.yaml --dry-run
-  lobster-copilot -p "llm.invoke --provider copilot --prompt 'Hello'"
-  lobster-copilot -p "ado.pr.monitor --org myorg --project proj" --dry-run
-  lobster-copilot workflow.yaml --mcp-config ./mcp.json
-  lobster-copilot sched list
-  lobster-copilot sched run wf-abc123
+  tinyclaw copilot 'Explain async/await in TypeScript'
+  tinyclaw copilot 'Review this code' --model gpt-4o < file.ts
+  tinyclaw examples/piped-steps.yaml
+  tinyclaw examples/piped-steps.yaml --dry-run
+  tinyclaw -p "llm.invoke --provider copilot --prompt 'Hello'"
+  tinyclaw -p "ado.pr.monitor --org myorg --project proj" --dry-run
+  tinyclaw workflow.yaml --mcp-config ./mcp.json
+  tinyclaw sched list
+  tinyclaw sched run wf-abc123
 `);
 }
 
@@ -140,7 +140,7 @@ async function copilot(copilotArgs: string[]): Promise<void> {
   }
 
   if (!prompt) {
-    console.error("❌ Provide a prompt: lobster-copilot copilot 'your question'");
+    console.error("❌ Provide a prompt: tinyclaw copilot 'your question'");
     process.exit(1);
   }
 
@@ -547,7 +547,7 @@ async function handleDaemon(subCmd: string | undefined): Promise<void> {
     }
 
     default:
-      console.error("Usage: lobster-copilot daemon <start|stop|status>");
+      console.error("Usage: tinyclaw daemon <start|stop|status>");
       process.exit(1);
   }
 }

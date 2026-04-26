@@ -16,7 +16,7 @@ export interface CopilotAdaptersBundle {
  *
  * @example
  * ```typescript
- * import { createCopilotAdapters } from 'lobster-copilot/adapters';
+ * import { createCopilotAdapters } from 'tinyclaw/adapters';
  * import { runToolRequest } from '@basaba/lobster/tool_runtime';
  *
  * const { adapters, dispose } = createCopilotAdapters({ cliUrl: 'http://localhost:3000' });

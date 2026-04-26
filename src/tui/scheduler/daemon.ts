@@ -4,9 +4,9 @@
  * for TUI clients to connect, send commands, and receive push events.
  *
  * Usage:
- *   lobster-copilot daemon start   — start in background
- *   lobster-copilot daemon stop    — stop running daemon
- *   lobster-copilot daemon status  — check if daemon is running
+ *   tinyclaw daemon start   — start in background
+ *   tinyclaw daemon stop    — stop running daemon
+ *   tinyclaw daemon status  — check if daemon is running
  */
 import net from "node:net";
 import fs from "node:fs";

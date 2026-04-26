@@ -1824,25 +1824,25 @@ Run all tests with `npm test` (Node.js built-in test runner).
 
 ```bash
 # Run a workflow file
-lobster-copilot <file.yaml> [options]
+tinyclaw <file.yaml> [options]
 
 # Run a pipeline string
-lobster-copilot -p '<pipeline>' [options]
+tinyclaw -p '<pipeline>' [options]
 
 # Direct Copilot prompt
-lobster-copilot copilot '<prompt>' [options]
+tinyclaw copilot '<prompt>' [options]
 
 # Interactive TUI
-lobster-copilot tui
+tinyclaw tui
 
 # Scheduler CLI
-lobster-copilot sched <command> [options]
+tinyclaw sched <command> [options]
 
 # Daemon management
-lobster-copilot daemon start|stop|status
+tinyclaw daemon start|stop|status
 
 # Help
-lobster-copilot help
+tinyclaw help
 ```
 
 ### Run Flags
@@ -1859,7 +1859,7 @@ lobster-copilot help
 ### Copilot Shortcut Flags
 
 ```bash
-lobster-copilot copilot '<prompt>' [--model <id>] [--system <prompt>] [--mcp-config <path>] [--mcps <list>]
+tinyclaw copilot '<prompt>' [--model <id>] [--system <prompt>] [--mcp-config <path>] [--mcps <list>]
 ```
 
 | Flag | Description |
@@ -1874,25 +1874,25 @@ Accepts stdin — piped text is prepended to the prompt.
 ### Scheduler CLI
 
 ```bash
-lobster-copilot sched list                         # List all scheduled workflows
-lobster-copilot sched add --name <n> --file <f> --schedule '<expr>' [--args '<json>']
-lobster-copilot sched remove <id>                  # Remove a workflow
-lobster-copilot sched enable <id>                  # Enable a workflow
-lobster-copilot sched disable <id>                 # Disable a workflow
-lobster-copilot sched run <id>                     # Trigger manual run
-lobster-copilot sched history <id>                 # Show run history
-lobster-copilot sched help                         # Show subcommand help
+tinyclaw sched list                         # List all scheduled workflows
+tinyclaw sched add --name <n> --file <f> --schedule '<expr>' [--args '<json>']
+tinyclaw sched remove <id>                  # Remove a workflow
+tinyclaw sched enable <id>                  # Enable a workflow
+tinyclaw sched disable <id>                 # Disable a workflow
+tinyclaw sched run <id>                     # Trigger manual run
+tinyclaw sched history <id>                 # Show run history
+tinyclaw sched help                         # Show subcommand help
 ```
 
 ### Daemon Management
 
 ```bash
-lobster-copilot daemon start    # Start daemon (checks for existing)
-lobster-copilot daemon stop     # Stop running daemon
-lobster-copilot daemon status   # Check daemon status
+tinyclaw daemon start    # Start daemon (checks for existing)
+tinyclaw daemon stop     # Stop running daemon
+tinyclaw daemon status   # Check daemon status
 ```
 
-The daemon communicates with the TUI over a Unix domain socket. PID file and config are stored in `~/.config/lobster-copilot/`.
+The daemon communicates with the TUI over a Unix domain socket. PID file and config are stored in `~/.config/tinyclaw/`.
 
 ---
 
@@ -2132,7 +2132,7 @@ mail.read --id <message-id> --attachments
 2. `MCP_CONFIG` environment variable
 3. `mcp.json` in current directory
 4. `.mcp.json` in current directory
-5. `~/.config/lobster-copilot/mcp.json`
+5. `~/.config/tinyclaw/mcp.json`
 6. Empty (no servers loaded)
 
 ### Copilot SDK Auto-Discovery
@@ -2147,10 +2147,10 @@ These are merged with explicitly loaded servers. Explicit servers take precedenc
 
 ```bash
 # Load only specific servers
-lobster-copilot -p "..." --mcps teams,mail
+tinyclaw -p "..." --mcps teams,mail
 
 # Use custom config file
-lobster-copilot -p "..." --mcp-config ./custom-mcp.json
+tinyclaw -p "..." --mcp-config ./custom-mcp.json
 ```
 
 ---
@@ -2237,7 +2237,7 @@ The scheduler runs workflows on cron expressions or interval schedules. It consi
 
 ### Persistence
 
-All data is stored in `~/.config/lobster-copilot/`:
+All data is stored in `~/.config/tinyclaw/`:
 
 | File | Purpose |
 |------|---------|
@@ -2252,13 +2252,13 @@ All data is stored in `~/.config/lobster-copilot/`:
 
 ### Overview
 
-Plugins let consumers add custom commands without modifying lobster-copilot source. Drop a `.js` file in the plugin directory and it's auto-discovered on startup.
+Plugins let consumers add custom commands without modifying tinyclaw source. Drop a `.js` file in the plugin directory and it's auto-discovered on startup.
 
 ### Plugin Directory Resolution (first found wins)
 
 1. `--plugins <dir>` CLI flag
 2. `LOBSTER_PLUGINS` environment variable
-3. `~/.config/lobster-copilot/plugins/` (default)
+3. `~/.config/tinyclaw/plugins/` (default)
 
 ### Plugin Contract
 
@@ -2335,14 +2335,14 @@ See `examples/plugins/hello-world.js` for a complete, annotated example.
 
 ```bash
 # Copy example to default plugin dir
-mkdir -p ~/.config/lobster-copilot/plugins
-cp examples/plugins/hello-world.js ~/.config/lobster-copilot/plugins/
+mkdir -p ~/.config/tinyclaw/plugins
+cp examples/plugins/hello-world.js ~/.config/tinyclaw/plugins/
 
 # Use immediately
-lobster-copilot -p "hello.world --name Alice"
+tinyclaw -p "hello.world --name Alice"
 
 # Or point at a custom dir
-lobster-copilot -p "hello.world --name Alice" --plugins ./examples/plugins
+tinyclaw -p "hello.world --name Alice" --plugins ./examples/plugins
 ```
 
 ### Error Handling
@@ -2389,7 +2389,7 @@ steps:
 ```
 
 ```bash
-lobster-copilot examples/ado/pr-monitor.yaml \
+tinyclaw examples/ado/pr-monitor.yaml \
   --args-json '{"org":"https://dev.azure.com/myorg","project":"MyProject"}'
 ```
 
@@ -2444,14 +2444,14 @@ steps:
 
 ```bash
 # Schedule the PR monitor to run every 5 minutes
-lobster-copilot sched add \
+tinyclaw sched add \
   --name "ado-prs" \
   --file examples/ado/pr-monitor.yaml \
   --schedule "every 5m" \
   --args '{"org":"https://dev.azure.com/myorg","project":"MyProject"}'
 
 # Schedule a daily mail digest at 9 AM
-lobster-copilot sched add \
+tinyclaw sched add \
   --name "mail-digest" \
   --file examples/mail/mail-digest.yaml \
   --schedule "0 9 * * *"

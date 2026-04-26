@@ -67,7 +67,7 @@ function resolveConfigPath(options: LoadMcpConfigOptions = {}): string | undefin
   }
 
   // 4. User config directory
-  const userConfig = join(homedir(), ".config", "lobster-copilot", "mcp.json");
+  const userConfig = join(homedir(), ".config", "tinyclaw", "mcp.json");
   if (existsSync(userConfig)) return userConfig;
 
   return undefined;
@@ -83,7 +83,7 @@ function resolveConfigPath(options: LoadMcpConfigOptions = {}): string | undefin
  * 2. `MCP_CONFIG` env var
  * 3. `mcp.json` in CWD
  * 4. `.mcp.json` in CWD
- * 5. `~/.config/lobster-copilot/mcp.json`
+ * 5. `~/.config/tinyclaw/mcp.json`
  *
  * Returns empty record if no config file exists.
  */

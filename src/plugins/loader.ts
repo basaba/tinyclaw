@@ -66,5 +66,5 @@ export function resolvePluginDir(cliFlag?: string): string {
   if (process.env.LOBSTER_PLUGINS) return process.env.LOBSTER_PLUGINS;
 
   const home = process.env.HOME ?? process.env.USERPROFILE ?? ".";
-  return join(home, ".config", "lobster-copilot", "plugins");
+  return join(home, ".config", "tinyclaw", "plugins");
 }

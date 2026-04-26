@@ -2,7 +2,7 @@
  * CLI handler for scheduler commands.
  * Connects to the running daemon and executes operations.
  *
- * Usage: lobster-copilot sched <subcommand> [options]
+ * Usage: tinyclaw sched <subcommand> [options]
  */
 import { readFileSync } from "node:fs";
 import { DaemonClient } from "../tui/scheduler/daemon-client.js";
@@ -35,7 +35,7 @@ function needArg(args: string[], idx: number, flag: string): string {
 
 async function withClient<T>(fn: (client: DaemonClient) => Promise<T>): Promise<T> {
   if (!DaemonClient.isDaemonRunning()) {
-    die("Daemon is not running. Start it with: lobster-copilot daemon start");
+    die("Daemon is not running. Start it with: tinyclaw daemon start");
   }
   const client = new DaemonClient();
   try {
@@ -177,7 +177,7 @@ export async function handleScheduler(args: string[]): Promise<void> {
       if (!sub) {
         printSchedHelp();
       } else {
-        die(`Unknown sched command: ${sub}\nRun 'lobster-copilot sched help' for usage.`);
+        die(`Unknown sched command: ${sub}\nRun 'tinyclaw sched help' for usage.`);
       }
   }
 }
@@ -346,10 +346,10 @@ async function cmdCat(args: string[]): Promise<void> {
 // ── Help ────────────────────────────────────────────────────────────
 
 function printSchedHelp(): void {
-  console.log(`lobster-copilot sched — Scheduler management CLI
+  console.log(`tinyclaw sched — Scheduler management CLI
 
 Usage:
-  lobster-copilot sched <command> [options]
+  tinyclaw sched <command> [options]
 
 Workflow Management:
   list                         List all scheduled workflows
@@ -380,10 +380,10 @@ Global Options:
   --json                       Output raw JSON instead of formatted text
 
 Examples:
-  lobster-copilot sched list
-  lobster-copilot sched add --name "Daily report" --file ./report.lobster --schedule "every 24h"
-  lobster-copilot sched run wf-abc123
-  lobster-copilot sched history wf-abc123 --json
-  lobster-copilot sched approve run-xyz789
+  tinyclaw sched list
+  tinyclaw sched add --name "Daily report" --file ./report.lobster --schedule "every 24h"
+  tinyclaw sched run wf-abc123
+  tinyclaw sched history wf-abc123 --json
+  tinyclaw sched approve run-xyz789
 `);
 }

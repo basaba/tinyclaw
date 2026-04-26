@@ -22,7 +22,7 @@ describe("platform", () => {
   describe("SOCKET_PATH", () => {
     if (isWin) {
       it("returns a Windows named pipe path", () => {
-        expect(platform.SOCKET_PATH).toBe("\\\\.\\pipe\\lobster-copilot-daemon");
+        expect(platform.SOCKET_PATH).toBe("\\\\.\\pipe\\tinyclaw-daemon");
       });
     } else {
       it("returns a Unix socket path ending in daemon.sock", () => {
@@ -36,13 +36,13 @@ describe("platform", () => {
       it("lives under APPDATA on Windows", () => {
         const appdata = process.env.APPDATA;
         if (appdata) {
-          expect(platform.CONFIG_DIR).toContain("lobster-copilot");
+          expect(platform.CONFIG_DIR).toContain("tinyclaw");
           expect(platform.CONFIG_DIR.toLowerCase().startsWith(appdata.toLowerCase())).toBe(true);
         }
       });
     } else {
       it("lives under ~/.config on Unix", () => {
-        expect(platform.CONFIG_DIR).toMatch(/\.config[\\/]lobster-copilot$/);
+        expect(platform.CONFIG_DIR).toMatch(/\.config[\\/]tinyclaw$/);
       });
     }
   });
