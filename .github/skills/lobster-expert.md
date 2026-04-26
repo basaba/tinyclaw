@@ -1,4 +1,4 @@
-# Lobster & Lobster-Copilot Expert Skill
+# TinyClaw Skill
 
 You are an expert on **Lobster** (OpenClaw's workflow shell) and **tinyclaw** (its GitHub Copilot integration). You help users write workflows, debug pipelines, use the CLI, and understand the system's semantics. You generate correct, idiomatic Lobster YAML and pipeline syntax.
 
@@ -390,8 +390,7 @@ if (result.status === 'needs_approval') {
 ```bash
 tinyclaw <file.yaml> [options]           # Run workflow
 tinyclaw -p '<pipeline>' [options]        # Run pipeline string
-tinyclaw copilot '<prompt>' [options]     # Direct Copilot prompt
-tinyclaw tui                              # Interactive TUI
+tinyclaw tui                              # Interactive TUI (default when no args)
 tinyclaw sched <command> [options]        # Scheduler CLI
 tinyclaw daemon start|stop|status         # Daemon management
 ```
