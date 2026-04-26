@@ -1829,10 +1829,7 @@ tinyclaw <file.yaml> [options]
 # Run a pipeline string
 tinyclaw -p '<pipeline>' [options]
 
-# Direct Copilot prompt
-tinyclaw copilot '<prompt>' [options]
-
-# Interactive TUI
+# Interactive TUI (default when no args)
 tinyclaw tui
 
 # Scheduler CLI
@@ -1855,21 +1852,6 @@ tinyclaw help
 | `--mcp-config <path>` | Path to `mcp.json` config file |
 | `--mcps <list>` | Filter MCP servers from config (comma-separated) |
 | `--plugins <dir>` | Plugin directory override |
-
-### Copilot Shortcut Flags
-
-```bash
-tinyclaw copilot '<prompt>' [--model <id>] [--system <prompt>] [--mcp-config <path>] [--mcps <list>]
-```
-
-| Flag | Description |
-|------|-------------|
-| `--model <id>` | Model ID override (e.g. `gpt-4o`, `claude-sonnet-4`) |
-| `--system <prompt>` | System prompt override |
-| `--mcp-config <path>` | Path to `mcp.json` |
-| `--mcps <list>` | Filter MCP servers (comma-separated) |
-
-Accepts stdin — piped text is prepended to the prompt.
 
 ### Scheduler CLI
 

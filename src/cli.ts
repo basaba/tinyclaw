@@ -40,8 +40,6 @@ if (args[0] === "help" || args[0] === "--help" || args[0] === "-h") {
 if (!args.length) {
   const { startTui } = await import("./tui/index.js");
   await startTui();
-} else if (args[0] === "copilot") {
-  copilot(args.slice(1));
 } else if (args[0] === "tui") {
   const { startTui } = await import("./tui/index.js");
   await startTui();
@@ -58,14 +56,13 @@ function printHelp(): void {
   console.log(`tinyclaw — Run Lobster workflows with Copilot as the LLM engine
 
 Usage:
+  tinyclaw                         Launch the TUI (default)
   tinyclaw <file> [options]
   tinyclaw -p '<pipeline>' [options]
-  tinyclaw copilot '<prompt>' [options]
   tinyclaw sched <command> [options]
   tinyclaw help
 
 Commands:
-  copilot                  Send a prompt directly to Copilot (shortcut)
   tui                      Launch the workflow scheduler TUI (connects to daemon)
   sched                    Scheduler management CLI (non-interactive)
   sched help               Show all scheduler subcommands
@@ -91,8 +88,6 @@ MCP Config Resolution (first found wins):
   5. ~/.config/tinyclaw/mcp.json
 
 Examples:
-  tinyclaw copilot 'Explain async/await in TypeScript'
-  tinyclaw copilot 'Review this code' --model gpt-4o < file.ts
   tinyclaw examples/piped-steps.yaml
   tinyclaw examples/piped-steps.yaml --dry-run
   tinyclaw -p "llm.invoke --provider copilot --prompt 'Hello'"
@@ -101,73 +96,6 @@ Examples:
   tinyclaw sched list
   tinyclaw sched run wf-abc123
 `);
-}
-
-// ── copilot shortcut ────────────────────────────────────────────────
-
-async function copilot(copilotArgs: string[]): Promise<void> {
-  let prompt: string | undefined;
-  let model: string | undefined;
-  let systemPrompt: string | undefined;
-  let mcpConfigPath: string | undefined;
-  let mcpsFilter: string | undefined;
-  const positional: string[] = [];
-
-  for (let i = 0; i < copilotArgs.length; i++) {
-    const arg = copilotArgs[i];
-    if (arg === "--model") {
-      model = copilotArgs[++i];
-    } else if (arg === "--system") {
-      systemPrompt = copilotArgs[++i];
-    } else if (arg === "--mcp-config") {
-      mcpConfigPath = copilotArgs[++i];
-    } else if (arg === "--mcps") {
-      mcpsFilter = copilotArgs[++i];
-    } else if (!arg.startsWith("-")) {
-      positional.push(arg);
-    }
-  }
-
-  prompt = positional.join(" ");
-
-  // Read stdin if piped
-  if (!process.stdin.isTTY) {
-    const chunks: Buffer[] = [];
-    for await (const chunk of process.stdin) {
-      chunks.push(chunk);
-    }
-    const stdinText = Buffer.concat(chunks).toString("utf-8").trim();
-    if (stdinText) {
-      prompt = prompt ? `${stdinText}\n\n${prompt}` : stdinText;
-    }
-  }
-
-  if (!prompt) {
-    console.error("❌ Provide a prompt: tinyclaw copilot 'your question'");
-    process.exit(1);
-  }
-
-  const filter = mcpsFilter ? parseMcpFilter(mcpsFilter) : undefined;
-  const mcpServers = loadMcpConfig({ configPath: mcpConfigPath, filter });
-
-  const adapter = new CopilotAdapter({
-    cliUrl: process.env.COPILOT_CLI_URL,
-    mcpServers,
-  });
-
-  try {
-    await adapter.ensureStarted();
-    const response = await adapter.client.reason(prompt, undefined, systemPrompt, {
-      model,
-      mcpServers,
-    });
-    console.log(response);
-  } catch (err) {
-    console.error("❌", err instanceof Error ? err.message : String(err));
-    process.exit(1);
-  } finally {
-    await adapter.dispose();
-  }
 }
 
 // ── approval / input display ────────────────────────────────────────
