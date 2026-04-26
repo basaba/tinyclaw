@@ -551,6 +551,27 @@ Output: `{ kind: "diff.last", key, changed, before, after }`. **Side effects:** 
 
 Like `diff.last`, but **halts the pipeline** if data is unchanged. **Side effects:** `writes_state`.
 
+#### `diff.key` — Tag items as new/seen by key field
+
+```
+<items> | diff.key --key <stateKey> [--field <fieldName>]
+```
+
+Compares each item's key field (default: `id`) against a stored set of previously seen values. Each item is emitted with an added `changed` property: `true` if the key is new, `false` if seen before. The current set of keys is then persisted to `~/.lobster/state/<stateKey>.json`.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--key` | string | *(required)* | State key to track seen values |
+| `--field` | string | `id` | Field name to use as the unique key |
+
+**Example:**
+
+```
+mail.search --unread | diff.key --key inbox --field id | where changed==true
+```
+
+This filters to only *new* (unseen) emails. **Side effects:** `writes_state`.
+
 ### Human-in-the-Loop
 
 #### `approve` — Approval gate
