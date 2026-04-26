@@ -69,7 +69,7 @@ Each stage:
 3. Produces an output stream for the next stage (or halts the pipeline).
 
 A stage result may set:
-- `halt: true` — stops the pipeline (used by `approve`, `diff.gate`).
+- `halt: true` — stops the pipeline (used by `approve`, `diff.gate`, `break`).
 - `rendered: true` — tells human mode the stage already printed output.
 
 ---
@@ -480,6 +480,35 @@ Output: `{ kind: "diff.last", key, changed, before, after }`. **Side effects:** 
 
 Like `diff.last`, but **halts the pipeline** if data is unchanged. **Side effects:** `writes_state`.
 
+#### `break` — Halt pipeline or workflow
+
+```
+break
+break --message "Nothing to process"
+... | break --message "Done early"
+```
+
+| Arg | Type | Default | Description |
+|-----|------|---------|-------------|
+| `--message` | string | — | Optional reason for breaking |
+
+Halts the pipeline immediately. Any stdin items are passed through as output before halting.
+
+**In workflows**, use as a `pipeline:` step with `when:` for conditional early termination:
+
+```yaml
+steps:
+  - id: data
+    command: "fetch-stuff"
+  - id: guard
+    pipeline: 'break --message "Nothing to process"'
+    when: $data.json.count == 0
+  - id: process          # skipped when guard breaks
+    command: "do-work"
+```
+
+When a break step fires, the workflow returns `status: "ok"` with output from the last completed step before the break. If the break step has `stdin:`, those items become the workflow output instead.
+
 #### `diff.key` — Tag items as new/seen by key field
 
 ```
@@ -790,7 +819,23 @@ condition: "$data.json.count > 100"                 # alias for when
 ```
 
 **Condition expression operators:** `==`, `!=`, `<`, `<=`, `>`, `>=`, `&&`, `||`, `!`, `()`.  
-**Operand types:** `$step_id.field` references, string/number/boolean/null literals.
+**Operand types:** `$step_id.field` references, string/number/boolean/null literals.  
+**Functions:**
+
+| Function | Returns | Description |
+|----------|---------|-------------|
+| `length($ref.field)` | number | Array or string length (`null`/`undefined` → `0`) |
+| `some($ref.field, var, predicate)` | boolean | `true` if any element satisfies predicate |
+| `every($ref.field, var, predicate)` | boolean | `true` if all elements satisfy predicate |
+
+```yaml
+when: length($data.json.items) > 0
+when: some($data.json.items, item, $item.status == "ready")
+when: every($data.json.scores, s, $s.value >= 80)
+when: some($data.json.items, item, length($item.name) > 3)  # nested
+```
+
+In `some`/`every`, the iterator variable (e.g. `item`) is bound to each element and referenced with `$` prefix in the predicate (e.g. `$item.field`). Empty or `null`/`undefined` arrays follow JS semantics: `every([])` → `true`, `some([])` → `false`.
 
 **Skip behavior:** Skipped steps produce `{ id, skipped: true }` with no `stdout`/`json`.
 
