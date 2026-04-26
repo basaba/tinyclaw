@@ -2,6 +2,7 @@ import { createCopilotCommand, type LobsterCommand } from "./commands/copilot.js
 import { createMcpCallCommand } from "./commands/mcp.js";
 import { createAdoPrMonitorCommand } from "./commands/ado-pr-monitor.js";
 import { createTeamsSendCommand } from "./commands/teams.js";
+import { createFormatMd2HtmlCommand } from "./commands/format.js";
 import {
   createMailSendCommand,
   createMailSearchCommand,
@@ -58,6 +59,7 @@ export async function buildRegistry(
     createMailSendCommand(opts.getMcpServers),
     createMailSearchCommand(opts.getMcpServers),
     createMailReadCommand(opts.getMcpServers),
+    createFormatMd2HtmlCommand(),
     ...(opts.extraCommands ?? []),
     ...pluginCommands,
   ];

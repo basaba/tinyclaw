@@ -16,6 +16,7 @@
 import type { LobsterCommand } from "./copilot.js";
 import { resolveServer, callTool } from "../mcp-client/client.js";
 import type { McpServerConfig } from "../mcp-config/loader.js";
+import { marked } from "marked";
 
 function asStream(items: unknown[]): AsyncIterable<unknown> {
   return {
@@ -60,6 +61,8 @@ export function createTeamsSendCommand(
           "chat-id": { type: "string", description: "Chat ID (for chat messages)" },
           self: { type: "boolean", description: "Send to self (Notes to Self)" },
           message: { type: "string", description: "Message content (or pipe input)" },
+          markdown: { type: "boolean", description: "Convert piped markdown to HTML before sending" },
+          "content-type": { type: "string", description: "Content type: text (default) or html" },
           subject: { type: "string", description: "Subject line (channel messages only)" },
           importance: { type: "string", description: "normal | high | urgent" },
         },
@@ -81,8 +84,10 @@ export function createTeamsSendCommand(
         "  --channel-id   Channel ID (required for channel messages)",
         "  --chat-id      Chat ID (for direct/group chat messages)",
         "  --self         Send to yourself (Notes to Self)",
-        "  --message      Message text (if omitted, uses piped input)",
-        "  --subject      Subject line (channel messages only)",
+        "  --message        Message text (if omitted, uses piped input)",
+        "  --markdown       Convert piped markdown to HTML before sending (implies --content-type html)",
+        "  --content-type   Content type: text (default) or html",
+        "  --subject        Subject line (channel messages only)",
         "  --importance   normal (default) | high | urgent",
       ].join("\n");
     },
@@ -97,6 +102,8 @@ export function createTeamsSendCommand(
       const channelId = args["channel-id"] as string | undefined;
       const chatId = args["chat-id"] as string | undefined;
       const isSelf = args.self === true || args.self === "true";
+      const useMarkdown = args.markdown === true || args.markdown === "true";
+      let contentType = (args["content-type"] as string | undefined)?.toLowerCase() === "html" || useMarkdown ? "html" : undefined;
       const subject = args.subject as string | undefined;
       const importance = args.importance as string | undefined;
 
@@ -116,6 +123,11 @@ export function createTeamsSendCommand(
         throw new Error("teams.send: no message provided (use --message or pipe input)");
       }
 
+      // Convert markdown to HTML if --markdown flag is set
+      if (useMarkdown) {
+        message = await marked(message);
+      }
+
       // Determine which MCP tool to call
       let toolName: string;
       let toolArgs: Record<string, unknown>;
@@ -126,6 +138,7 @@ export function createTeamsSendCommand(
           teamId,
           channelId,
           content: message,
+          ...(contentType ? { contentType } : {}),
           ...(subject ? { subject } : {}),
           ...(importance ? { importance } : {}),
         };
@@ -134,12 +147,14 @@ export function createTeamsSendCommand(
         toolArgs = {
           chatId,
           content: message,
+          ...(contentType ? { contentType } : {}),
           ...(importance ? { importance } : {}),
         };
       } else if (isSelf) {
         toolName = "SendMessageToSelf";
         toolArgs = {
           content: message,
+          ...(contentType ? { contentType } : {}),
           ...(importance ? { importance } : {}),
         };
       } else {
