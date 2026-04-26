@@ -44,8 +44,8 @@ steps:
 
   # 3. For each NEW email: read body, then triage with Copilot.
   #    Copilot outputs structured JSON with all fields needed for sending.
+  #    If no new emails, for_each receives undefined and produces zero iterations.
   - id: triage
-    when: $new-mail.stdout != ""
     for_each: $new-mail.json
     steps:
       - id: body
@@ -80,9 +80,9 @@ steps:
         stdin: $body
 
   # 4. Copilot formats a readable summary, then approval gate blocks until you confirm.
-  #    Skipped if no emails were triaged.
+  #    Skipped if no emails need a reply.
   - id: review
-    when: $triage.skipped != true
+    when: some($triage.json, item, $item.decision.needs_reply == true)
     pipeline: >
       copilot --prompt "Format a triage summary from the data below.
 
@@ -96,13 +96,13 @@ steps:
       [draft text]
       ───────────────────────────────
 
-      Only show emails where needs_reply is true.
-      If no emails need a reply, just say 'No emails require a reply.'"
+      Only show emails where needs_reply is true."
     stdin: $triage.json
     approval: "Review the drafts above. Approve to create them as Outlook drafts."
 
   # 5. Create an Outlook draft for each email that needs a reply.
-  #    Skipped if review was not approved or no emails need reply.
+  #    Skipped if review was not approved.
+  #    for_each tolerates undefined (if triage was skipped/empty).
   - id: send-replies
     when: $review.approved == true
     for_each: $triage.json
