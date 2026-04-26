@@ -87,6 +87,21 @@ steps:
         run: "curl -s https://api.example.com/detail/$item.json.id"
 ```
 
+## Pattern: Guard with Early Termination
+
+```yaml
+# Fetch data; stop early if nothing to process
+steps:
+  - id: data
+    run: "curl -s https://api.example.com/items"
+  - id: guard
+    pipeline: 'break --message "Nothing to process"'
+    when: length($data.json.items) == 0
+  - id: process
+    pipeline: 'copilot --prompt "Summarize items"'
+    stdin: $data.json.items
+```
+
 ## Best Practices
 
 1. **Use `pipeline:` for data transformation** — chain Lobster commands instead of shell pipes.
@@ -97,3 +112,5 @@ steps:
 6. **Prefer `diff.gate` for monitors** — avoids duplicate notifications.
 7. **Keep pipelines flat** — avoid unnecessary nesting of workflows/sub-workflows.
 8. **Use `on_error: continue`** for non-critical steps that shouldn't block the workflow.
+9. **Use `break` with `when:` for early termination** — guard steps that halt the workflow when a condition is met (e.g. empty data).
+10. **Use `some()`/`every()` in `when:`** — for conditions over arrays instead of post-processing with `where`.

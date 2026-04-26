@@ -9,7 +9,7 @@
 | Equality | Loose (`==`) throughout (JavaScript semantics) |
 | Modes | `human` (default, interactive) · `tool` (single JSON envelope) |
 
-Pipeline flow: `Stage 1 → Stage 2 → Stage 3 → output`. Each stage receives input stream, calls `command.run()`, yields output stream. A stage may set `halt: true` (stops pipeline) or `rendered: true` (already printed output).
+Pipeline flow: `Stage 1 → Stage 2 → Stage 3 → output`. Each stage receives input stream, calls `command.run()`, yields output stream. A stage may set `halt: true` (stops pipeline — used by `approve`, `diff.gate`, `break`) or `rendered: true` (already printed output).
 
 ### Tool-Mode Envelope
 
@@ -169,6 +169,7 @@ Date tokens: `YYYY`, `MM`, `DD`, `HH`, `mm`, `ss` — all UTC, zero-padded.
 | `diff.last` | `<items> \| diff.last --key myKey` | Compare to previous snapshot → `{ changed, before, after }` |
 | `diff.gate` | `<items> \| diff.gate --key myKey` | Like `diff.last` but **halts** if unchanged |
 | `diff.key` | `<items> \| diff.key --key myKey [--field id]` | Tag each item `changed: true/false` by comparing a key field against stored state. Persists seen keys to `~/.lobster/state/<key>.json`. Use with `where changed==true` to act only on new items. |
+| `break` | `break [--message "reason"]` | Halt pipeline immediately. Stdin items pass through as output before halting. In workflows, use as `pipeline:` step with `when:` for conditional early termination — workflow returns `status: "ok"` with output from last completed step. |
 
 ### Human-in-the-Loop
 
@@ -231,7 +232,7 @@ Every step requires a unique `id` and exactly **one** execution mode:
 | Pipeline | `pipeline` | Lobster pipeline string. Use `stdin:` to provide input |
 | Nested workflow | `workflow` | Path to sub-workflow. `workflow_args:` for params |
 | Parallel | `parallel` | `{ wait, timeout_ms, branches: [...] }` |
-| Loop | `for_each` | Iterate array. `item_var`, `index_var`, `batch_size`, `steps:` |
+| Loop | `for_each` | Iterate array. `item_var`, `index_var`, `include_unmatched`, `batch_size`, `steps:`. Iterations where all sub-steps are skipped are excluded from output by default; set `include_unmatched: true` to keep them. |
 | Approval | `approval` | String prompt or `{ prompt, items, preview, ... }` |
 | Input | `input` | `{ prompt, responseSchema, defaults }` |
 
@@ -266,7 +267,13 @@ Abort/cancellation errors are **never** retried.
 ```yaml
 when: $approval.approved == true
 when: "($a.json.x == 1 || $b.json.y == 2) && $c.json.z > 0"
+when: length($data.json.items) > 0
+when: some($data.json.items, item, $item.status == "ready")
+when: every($data.json.scores, s, $s.value >= 80)
 ```
+
+**Operators:** `==`, `!=`, `<`, `<=`, `>`, `>=`, `&&`, `||`, `!`, `()`.  
+**Functions:** `length($ref.field)` → number (array/string length), `some($ref.field, var, predicate)` → boolean, `every($ref.field, var, predicate)` → boolean. Iterator variable is referenced with `$` prefix (e.g. `$item.field`). Empty/null arrays: `every([])` → `true`, `some([])` → `false`.
 
 Skipped steps produce `{ id, skipped: true }` — no `stdout`/`json`.
 
