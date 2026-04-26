@@ -12,6 +12,9 @@ import type { LobsterCommand } from "./copilot.js";
 import { resolveServer, callTool } from "../mcp-client/client.js";
 import type { McpServerConfig } from "../mcp-config/loader.js";
 
+/** Default $select fields — keeps payloads small and avoids Graph API size limits. */
+const DEFAULT_SELECT = "id,subject,from,receivedDateTime,isRead,hasAttachments,bodyPreview";
+
 function asStream(items: unknown[]): AsyncIterable<unknown> {
   return {
     async *[Symbol.asyncIterator]() {
@@ -287,8 +290,8 @@ export function createMailSearchCommand(
           top: { type: "number", description: "Max results to return (default 25)" },
           unread: { type: "boolean", description: "Shorthand for --filter 'isRead eq false'" },
           "order-by": { type: "string", description: "Order by date: newest (default) or oldest" },
-          select: { type: "string", description: "Comma-separated fields to return (e.g. 'id,subject,from,receivedDateTime')" },
-          all: { type: "boolean", description: "Auto-paginate to fetch all results (up to --top limit)" },
+          select: { type: "string", description: "Comma-separated fields to return (default: id,subject,from,receivedDateTime,isRead,hasAttachments,bodyPreview). Use --select '' to fetch all fields" },
+          all: { type: "boolean", description: "Auto-paginate to fetch all results (default: true). Use --no-all for single page" },
           "page-size": { type: "number", description: "Items per page when using --all (default 25)" },
         },
       },
@@ -320,8 +323,10 @@ export function createMailSearchCommand(
         "  --unread   Shorthand for --filter 'isRead eq false'",
         "  --order-by Order by date: newest (default) or oldest",
         "  --select   Comma-separated fields to return (reduces payload)",
-        "             e.g. --select id,subject,from,receivedDateTime",
-        "  --all      Auto-paginate to fetch all matching results (up to --top)",
+        "             Default: id,subject,from,receivedDateTime,isRead,hasAttachments,bodyPreview",
+        "             Use --select '' to fetch all fields",
+        "  --all      Auto-paginate to fetch all matching results (default: on)",
+        "  --no-all   Disable auto-pagination (single page only)",
         "  --page-size Items per page when using --all (default 25)",
         "",
         "Notes:",
@@ -345,8 +350,9 @@ export function createMailSearchCommand(
       const top = args.top !== undefined ? Number(args.top) : undefined;
       const unread = args.unread === true || args.unread === "true";
       const orderBy = (args["order-by"] as string | undefined)?.toLowerCase();
-      const select = args.select as string | undefined;
-      const fetchAll = args.all === true || args.all === "true";
+      const select = args.select !== undefined ? (args.select as string) : DEFAULT_SELECT;
+      const noAll = args["no-all"] === true || args["no-all"] === "true";
+      const fetchAll = noAll ? false : (args.all !== false && args.all !== "false");
       const pageSize = args["page-size"] !== undefined ? Number(args["page-size"]) : undefined;
 
       if (unread && !filter) {

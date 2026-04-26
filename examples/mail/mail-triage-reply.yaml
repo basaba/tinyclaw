@@ -33,8 +33,7 @@ steps:
   # 1. Fetch recent unread emails (metadata only)
   - id: unread
     pipeline: >
-      mail.search --unread --folder inbox --top 20 --order-by newest --all
-      --select id,subject,from,receivedDateTime,isRead,hasAttachments,bodyPreview
+      mail.search --unread --folder inbox --top 20 --order-by newest
 
   # 2. Tag each email as new (changed=true) or seen (changed=false).
   #    Only new emails (not processed in previous runs) pass through.
