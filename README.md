@@ -1,4 +1,4 @@
-# tinyclaw
+# TinyClaw
 
 Bridge service integrating [OpenClaw Lobster](https://github.com/openclaw/lobster) workflows with GitHub Copilot as the LLM reasoning engine. Provides two integration modes:
 

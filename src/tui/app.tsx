@@ -107,7 +107,7 @@ export function App({ client }: AppProps) {
     <Box flexDirection="column" width={termSize.columns} height={termSize.rows} padding={1}>
       <Box marginBottom={1}>
         <Text bold color="cyan">
-          🦞 Lobster Workflow Scheduler
+          🦞 TinyClaw
         </Text>
         <Text color="gray">
           {" "}(daemon {daemonRunning ? "connected" : "disconnected"})
