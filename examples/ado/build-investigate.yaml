@@ -25,10 +25,6 @@ steps:
       --project One
       --output json
 
-  # - id: test
-  #   pipeline: >
-  #     $latest-build.json.0.id
-
 
   # 2. Check if this build was already investigated — skip all remaining steps if so
   - id: check-new

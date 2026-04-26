@@ -36,9 +36,8 @@ steps:
       mail.search --unread --folder inbox --top 20 --order-by newest --all
       --select id,subject,from,receivedDateTime,isRead,hasAttachments,bodyPreview
 
-  # 2. Tag each email as new (_changed=true) or seen (_changed=false).
+  # 2. Tag each email as new (changed=true) or seen (changed=false).
   #    Only new emails (not processed in previous runs) pass through.
-  #    Stores seen IDs in ~/.lobster/state/mail-triage-inbox.json
   - id: new-mail
     pipeline: >
       diff.key --key mail-triage-inbox --field id | where changed==true

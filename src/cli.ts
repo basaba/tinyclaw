@@ -2,6 +2,8 @@
 // Suppress Node.js experimental warnings (e.g. SQLite) in this process and subprocesses
 process.env.NODE_NO_WARNINGS = "1";
 
+import { PassThrough } from "node:stream";
+import * as readline from "node:readline/promises";
 import { CopilotAdapter } from "./adapters/copilot-adapter.js";
 import { createCopilotAdapters } from "./adapters/index.js";
 import { loadMcpConfig, parseMcpFilter } from "./mcp-config/loader.js";
@@ -165,11 +167,140 @@ async function copilot(copilotArgs: string[]): Promise<void> {
   }
 }
 
+// ── approval / input display ────────────────────────────────────────
+
+function formatValue(v: unknown): string {
+  if (v == null) return "—";
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (Array.isArray(v)) {
+    if (v.length === 0) return "(none)";
+    if (v.every((item) => typeof item === "string" || typeof item === "number"))
+      return v.join(", ");
+    return `${v.length} items`;
+  }
+  if (typeof v === "object") {
+    const entries = Object.entries(v as Record<string, unknown>);
+    return entries
+      .map(([k, val]) =>
+        `${k}: ${typeof val === "string" || typeof val === "number" || typeof val === "boolean" ? String(val) : "…"}`,
+      )
+      .join(", ");
+  }
+  return String(v);
+}
+
+function formatApprovalItem(item: unknown, index: number): string[] {
+  if (typeof item === "string") return [`  ${item}`];
+  if (item == null) return ["  (empty)"];
+  if (typeof item !== "object") return [`  ${String(item)}`];
+
+  const obj = item as Record<string, unknown>;
+  const lines: string[] = [];
+
+  const heading = obj.subject ?? obj.title ?? obj.name ?? obj.id;
+  lines.push(heading ? `  #${index + 1}: ${String(heading)}` : `  #${index + 1}`);
+
+  const knownFields: Array<[string, string]> = [
+    ["from", "From"], ["to", "To"], ["category", "Category"],
+    ["summary", "Summary"], ["replyText", "Reply"], ["bodyPreview", "Preview"],
+    ["status", "Status"], ["description", "Desc"], ["message", "Message"], ["url", "URL"],
+  ];
+
+  const rendered = new Set<string>(["subject", "title", "name", "id"]);
+  for (const [key, label] of knownFields) {
+    if (key in obj && obj[key] != null) {
+      const val = formatValue(obj[key]);
+      lines.push(`    ${label}: ${val.length > 80 ? val.slice(0, 77) + "..." : val}`);
+      rendered.add(key);
+    }
+  }
+
+  const remaining = Object.entries(obj).filter(([k]) => !rendered.has(k));
+  for (const [k, v] of remaining) {
+    const label = k.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()).trim();
+    const val = formatValue(v);
+    lines.push(`    ${label}: ${val.length > 60 ? val.slice(0, 57) + "..." : val}`);
+  }
+
+  return lines;
+}
+
+function renderApprovalBox(approval: { prompt: string; items?: unknown[]; preview?: string }): void {
+  const w = process.stderr;
+
+  w.write(`\n⏳ Approval Required\n`);
+  w.write(`${approval.prompt}\n`);
+
+  if (approval.preview) {
+    w.write(`\n── Preview ──\n`);
+    const previewLines = approval.preview.split("\n").slice(0, 20);
+    for (const line of previewLines) {
+      w.write(`${line}\n`);
+    }
+    if (approval.preview.split("\n").length > 20) {
+      w.write(`... (truncated)\n`);
+    }
+  }
+
+  if (approval.items && approval.items.length > 0) {
+    w.write(`\n── Items (${approval.items.length}) ──\n`);
+    for (let i = 0; i < approval.items.length; i++) {
+      const itemLines = formatApprovalItem(approval.items[i], i);
+      for (const line of itemLines) {
+        w.write(`${line}\n`);
+      }
+      if (i < approval.items.length - 1) {
+        w.write(`\n`);
+      }
+    }
+  }
+
+  w.write(`\n`);
+}
+
+async function promptApproval(approval: { prompt: string; items?: unknown[]; preview?: string }): Promise<boolean> {
+  if (!process.stdin.isTTY) {
+    // Non-interactive: dump structured info and reject
+    process.stderr.write(JSON.stringify({ status: "needs_approval", approval }, null, 2) + "\n");
+    return false;
+  }
+
+  renderApprovalBox(approval);
+
+  const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
+  try {
+    const answer = await rl.question("  Approve? (y/N) ");
+    return /^y(es)?$/i.test(answer.trim());
+  } finally {
+    rl.close();
+  }
+}
+
+async function promptInput(input: { prompt: string; responseSchema?: unknown }): Promise<unknown | null> {
+  if (!process.stdin.isTTY) {
+    process.stderr.write(JSON.stringify({ status: "needs_input", input }, null, 2) + "\n");
+    return null;
+  }
+
+  process.stderr.write(`\n📝 Input Required\n`);
+  process.stderr.write(`   ${input.prompt}\n`);
+
+  const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
+  try {
+    const answer = await rl.question("  > ");
+    if (!answer.trim()) return null;
+    try { return JSON.parse(answer); } catch { return answer; }
+  } finally {
+    rl.close();
+  }
+}
+
 // ── workflow runner ─────────────────────────────────────────────────
 
 async function run(runArgs: string[]): Promise<void> {
   const lobsterCore: any = await import("@basaba/lobster/core");
-  const { runWorkflowFile, runPipeline, parsePipeline } = lobsterCore;
+  const { runPipeline, parsePipeline, runToolRequest, resumeToolRequest } = lobsterCore;
 
   let filePath: string | undefined;
   let pipeline: string | undefined;
@@ -241,22 +372,67 @@ async function run(runArgs: string[]): Promise<void> {
     pluginDir: pluginsDir,
   });
 
-  // Use runWorkflowFile in human mode so approvals prompt interactively
-  const ctx = {
-    cwd: process.cwd(),
-    env: { ...process.env, LOBSTER_LLM_PROVIDER: "copilot" },
-    mode: "human" as const,
-    stdin: process.stdin,
-    stdout: process.stdout,
-    stderr: process.stderr,
-    llmAdapters: { copilot: adapter as any },
-    registry,
-    dryRun,
-  };
-
   try {
     if (filePath) {
-      const result: any = await runWorkflowFile({ filePath, args: argsJson, ctx });
+      // Use tool-mode API so approval gates return structured data
+      // instead of prompting inline — enables rich CLI display.
+      const stdout = new PassThrough();
+      const stderr = new PassThrough();
+
+      // Stream logs to the real stderr in real-time
+      stderr.on("data", (chunk: Buffer) => process.stderr.write(chunk));
+      stdout.on("data", (chunk: Buffer) => process.stderr.write(chunk));
+
+      const toolCtx = {
+        cwd: process.cwd(),
+        env: { ...process.env, LOBSTER_LLM_PROVIDER: "copilot" },
+        llmAdapters: { copilot: adapter as any },
+        registry,
+        stdout,
+        stderr,
+        dryRun,
+      };
+
+      let result: any = await runToolRequest({ filePath, args: argsJson, ctx: toolCtx });
+
+      // Loop: handle approval/input gates, resume until terminal status
+      while (result.ok && (result.status === "needs_approval" || result.status === "needs_input")) {
+        if (result.status === "needs_approval" && result.requiresApproval) {
+          const approval = result.requiresApproval;
+          const approved = await promptApproval(approval);
+
+          result = await resumeToolRequest({
+            token: approval.resumeToken,
+            approved,
+            cancel: !approved,
+            ctx: toolCtx,
+          });
+        } else if (result.status === "needs_input" && result.requiresInput) {
+          const input = result.requiresInput;
+          const response = await promptInput(input);
+
+          if (response === null) {
+            result = await resumeToolRequest({
+              token: input.resumeToken,
+              cancel: true,
+              ctx: toolCtx,
+            });
+          } else {
+            result = await resumeToolRequest({
+              token: input.resumeToken,
+              response,
+              ctx: toolCtx,
+            });
+          }
+        } else {
+          break;
+        }
+      }
+
+      if (!result.ok) {
+        console.error("❌", result.error?.message ?? "Unknown error");
+        process.exit(1);
+      }
 
       if (result.status === "cancelled") {
         process.stderr.write("🚫 Cancelled\n");
