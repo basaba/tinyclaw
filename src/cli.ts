@@ -32,12 +32,15 @@ function parseJsonRelaxed(text: string): unknown {
 
 const args = process.argv.slice(2);
 
-if (args[0] === "help" || args[0] === "--help" || args[0] === "-h" || !args.length) {
+if (args[0] === "help" || args[0] === "--help" || args[0] === "-h") {
   printHelp();
   process.exit(0);
 }
 
-if (args[0] === "copilot") {
+if (!args.length) {
+  const { startTui } = await import("./tui/index.js");
+  await startTui();
+} else if (args[0] === "copilot") {
   copilot(args.slice(1));
 } else if (args[0] === "tui") {
   const { startTui } = await import("./tui/index.js");
