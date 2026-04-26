@@ -24,9 +24,8 @@ steps:
       | pick from,subject
 
 
-  # 3. (Optional) Send the digest to yourself on Teams
-  #    Uncomment to enable:
-  # - id: notify
-  #   pipeline: >
-  #     teams.send --self
-  #   stdin: $digest
+  # 2. Send the digest to yourself on Teams
+  - id: notify
+    pipeline: >
+      teams.send --self
+    stdin: $digest
