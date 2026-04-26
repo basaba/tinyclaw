@@ -168,20 +168,30 @@ Date tokens: `YYYY`, `MM`, `DD`, `HH`, `mm`, `ss` — all UTC, zero-padded.
 | `state.set` | `<items> \| state.set myKey` | Store input as JSON value |
 | `diff.last` | `<items> \| diff.last --key myKey` | Compare to previous snapshot → `{ changed, before, after }` |
 | `diff.gate` | `<items> \| diff.gate --key myKey` | Like `diff.last` but **halts** if unchanged |
-| `diff.key` | `<items> \| diff.key --key myKey [--field id]` | Tag each item `changed: true/false` by comparing a key field against stored state. Persists seen keys to `~/.lobster/state/<key>.json`. Use with `where changed==true` to act only on new items. |
+| `diff.key` | `<items> \| diff.key --key myKey [--field id]` | Tag each item `changed: true/false` by comparing a key field against stored state. Use with `where changed==true` to act only on new items. |
+| `break` | `break --message "Done"` | Halt pipeline immediately. Any stdin items pass through as output before halting. |
+
+**`break` in workflows:** Use as a `pipeline:` step with `when:` for conditional early termination. When a break fires, the workflow returns `status: "ok"` with output from the last completed step.
+
+```yaml
+- id: guard
+  pipeline: 'break --message "Nothing to process"'
+  when: $data.json.count == 0
+```
 
 ### Human-in-the-Loop
 
 | Command | Usage | Description |
 |---------|-------|-------------|
 | `approve` | `... \| approve --prompt "Send?"` | Approval gate. Flags: `--emit`, `--preview-from-stdin`, `--limit` |
-| `ask` | `... \| ask --prompt "Review:" --schema '{...}'` | Request structured input |
+| `ask` | `... \| ask --prompt "Review:" --schema '{...}'` | Request structured input. Flags: `--subject-from-stdin` |
 
 ### LLM Integration
 
 | Command | Usage | Description |
 |---------|-------|-------------|
 | `llm.invoke` | `llm.invoke --prompt '...' --provider copilot` | Call an LLM. Flags: `--model`, `--output-schema`, `--temperature`, `--max-output-tokens`, `--artifacts-json` |
+| `llm_task.invoke` | *(legacy alias)* | Backward-compatible alias for `llm.invoke` using `openclaw` provider. Use `llm.invoke` for new workflows. |
 
 Provider resolution: `--provider` flag → `LOBSTER_LLM_PROVIDER` env → auto-detect.
 
@@ -268,7 +278,38 @@ when: $approval.approved == true
 when: "($a.json.x == 1 || $b.json.y == 2) && $c.json.z > 0"
 ```
 
+**Functions available in `when:` expressions:**
+
+| Function | Returns | Description |
+|----------|---------|-------------|
+| `length($ref.field)` | number | Array or string length (`null`/`undefined` → `0`) |
+| `some($ref.field, var, predicate)` | boolean | `true` if any element satisfies predicate |
+| `every($ref.field, var, predicate)` | boolean | `true` if all elements satisfy predicate |
+
+```yaml
+when: length($data.json.items) > 0
+when: some($data.json.items, item, $item.status == "ready")
+when: every($data.json.scores, s, $s.value >= 80)
+when: some($data.json.items, item, length($item.name) > 3)  # nested
+```
+
+In `some`/`every`, the iterator variable (e.g. `item`) is bound to each element and referenced with `$` prefix (e.g. `$item.field`). Empty/null arrays: `every([])` → `true`, `some([])` → `false`.
+
 Skipped steps produce `{ id, skipped: true }` — no `stdout`/`json`.
+
+### Loop: `for_each` Details
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `for_each` | string | — | Reference to array (e.g. `$step.json`) |
+| `item_var` | string | `"item"` | Variable name for current item |
+| `index_var` | string | `"index"` | Variable name for 0-based index |
+| `include_unmatched` | boolean | `false` | Keep iterations where all sub-steps were skipped |
+| `batch_size` | number | 1 | Items per batch |
+| `pause_ms` | number | 0 | Delay between batches (ms) |
+| `steps` | array | — | Sub-steps (no approval/input/nested loops) |
+
+Inside loop: `$item.json` = current item, `$index.json` = iteration index.
 
 ### stdin Resolution
 
@@ -279,6 +320,22 @@ Skipped steps produce `{ id, skipped: true }` — no `stdout`/`json`.
 | Other string | Template with `${arg}` and `$step.field` interpolation |
 | Object/array literal | Serialized to JSON |
 | `null` | Empty input |
+
+### Step Output Fields
+
+Every completed step produces a result accessible by later steps:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `.stdout` | string | Raw output |
+| `.json` | any | Parsed JSON (if valid), else `undefined` |
+| `.skipped` | boolean | `true` if condition prevented execution |
+| `.error` | boolean | `true` if step failed with `on_error: continue` |
+| `.errorMessage` | string | Error description |
+| `.approved` | boolean | Approval result |
+| `.approvedBy` | string | Approver identity |
+| `.response` | any | Input step response |
+| `.subject` | any | Input step subject data |
 
 ---
 
@@ -359,4 +416,36 @@ if (result.status === 'needs_approval') {
 
 **Result shape:** `{ ok, status, output[], runId, requiresApproval?, requiresInput?, error? }`
 
-**Events:** `run:start`, `step:start`, `step:complete`, `run:complete` (SDK-only, not CLI).
+**Events (SDK-only):** `run:start`, `step:start`, `step:complete`, `run:complete` — subscribe via `wf.on('event', handler)`. Each event includes a `runId` UUID for correlation.
+
+---
+
+## Built-in Workflow Registry
+
+Pre-built workflows available via `workflows.run`:
+
+### `github.pr.monitor`
+
+Monitor a PR via `gh` CLI and diff against last state.
+
+```bash
+lobster 'workflows.run --name github.pr.monitor --args-json "{\"repo\":\"owner/repo\",\"pr\":123}"'
+```
+
+| Arg | Required | Description |
+|-----|----------|-------------|
+| `repo` | ✓ | GitHub repo (`owner/repo`) |
+| `pr` | ✓ | Pull request number |
+| `key` | ✗ | State key override |
+| `changesOnly` | ✗ | Only emit on change |
+| `summaryOnly` | ✗ | Emit summary only |
+
+### `github.pr.monitor.notify`
+
+Monitor a PR and emit a human-friendly message when it changes.
+
+| Arg | Required | Description |
+|-----|----------|-------------|
+| `repo` | ✓ | GitHub repo (`owner/repo`) |
+| `pr` | ✓ | Pull request number |
+| `key` | ✗ | State key override |
