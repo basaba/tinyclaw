@@ -1,6 +1,6 @@
 # Lobster & Lobster-Copilot Expert Skill
 
-You are an expert on **Lobster** (OpenClaw's workflow shell) and **lobster-copilot** (its GitHub Copilot integration). You help users write workflows, debug pipelines, use the CLI, and understand the system's semantics. You generate correct, idiomatic Lobster YAML and pipeline syntax.
+You are an expert on **Lobster** (OpenClaw's workflow shell) and **tinyclaw** (its GitHub Copilot integration). You help users write workflows, debug pipelines, use the CLI, and understand the system's semantics. You generate correct, idiomatic Lobster YAML and pipeline syntax.
 
 ---
 
@@ -11,7 +11,7 @@ You are an expert on **Lobster** (OpenClaw's workflow shell) and **lobster-copil
 - **Two integration modes:**
   - **Native adapter:** `llm.invoke --provider copilot --prompt '...'` — plugs Copilot directly into Lobster pipelines.
   - **MCP server:** Exposes reasoning tools via Model Context Protocol.
-- Use `copilot --prompt '...'` for direct Copilot calls in lobster-copilot pipelines.
+- Use `copilot --prompt '...'` for direct Copilot calls in tinyclaw pipelines.
 - Use `agency.mcp.call --server <name> --tool <tool>` for direct MCP tool calls (no LLM).
 - Prefer simple pipelines over unnecessary nesting. A single pipeline step often suffices.
 - When generating workflows, always include unique `id` fields on every step.
@@ -388,12 +388,12 @@ if (result.status === 'needs_approval') {
 ### Extended CLI
 
 ```bash
-lobster-copilot <file.yaml> [options]           # Run workflow
-lobster-copilot -p '<pipeline>' [options]        # Run pipeline string
-lobster-copilot copilot '<prompt>' [options]     # Direct Copilot prompt
-lobster-copilot tui                              # Interactive TUI
-lobster-copilot sched <command> [options]        # Scheduler CLI
-lobster-copilot daemon start|stop|status         # Daemon management
+tinyclaw <file.yaml> [options]           # Run workflow
+tinyclaw -p '<pipeline>' [options]        # Run pipeline string
+tinyclaw copilot '<prompt>' [options]     # Direct Copilot prompt
+tinyclaw tui                              # Interactive TUI
+tinyclaw sched <command> [options]        # Scheduler CLI
+tinyclaw daemon start|stop|status         # Daemon management
 ```
 
 | Flag | Description |
@@ -498,7 +498,7 @@ Config file format:
 
 **Server types:** `stdio`/`local` (command + args) or `http`/`sse` (url + headers).
 
-**Resolution chain:** `--mcp-config` flag → `MCP_CONFIG` env → `mcp.json` in CWD → `.mcp.json` in CWD → `~/.config/lobster-copilot/mcp.json` → empty.
+**Resolution chain:** `--mcp-config` flag → `MCP_CONFIG` env → `mcp.json` in CWD → `.mcp.json` in CWD → `~/.config/tinyclaw/mcp.json` → empty.
 
 Copilot SDK also auto-discovers `.mcp.json` and `.vscode/mcp.json` in working directory.
 
@@ -515,20 +515,20 @@ Copilot SDK also auto-discovers `.mcp.json` and `.vscode/mcp.json` in working di
 
 **Scheduler CLI:**
 ```bash
-lobster-copilot sched list
-lobster-copilot sched add --name <n> --file <f> --schedule '<expr>' [--args '<json>']
-lobster-copilot sched remove|enable|disable|run|history <id>
+tinyclaw sched list
+tinyclaw sched add --name <n> --file <f> --schedule '<expr>' [--args '<json>']
+tinyclaw sched remove|enable|disable|run|history <id>
 ```
 
-**Daemon:** `lobster-copilot daemon start|stop|status`. Uses Unix socket IPC. Data in `~/.config/lobster-copilot/`.
+**Daemon:** `tinyclaw daemon start|stop|status`. Uses Unix socket IPC. Data in `~/.config/tinyclaw/`.
 
-**TUI:** `lobster-copilot tui` — React/Ink terminal UI. Screens: list, add, edit, history, run-detail, yaml-view, graph-view.
+**TUI:** `tinyclaw tui` — React/Ink terminal UI. Screens: list, add, edit, history, run-detail, yaml-view, graph-view.
 
 ---
 
 ### Plugin System
 
-Drop `.js` files in the plugin directory (default `~/.config/lobster-copilot/plugins/`).
+Drop `.js` files in the plugin directory (default `~/.config/tinyclaw/plugins/`).
 
 **Resolution:** `--plugins` flag → `LOBSTER_PLUGINS` env → default.
 
@@ -684,6 +684,6 @@ steps:
 
 1. **`--dry-run`** — Validate workflow structure without executing.
 2. **Check step references** — Ensure `$step.json` references match actual step IDs.
-3. **Test pipeline stages individually** — Run each stage separately via `lobster-copilot -p '...'`.
+3. **Test pipeline stages individually** — Run each stage separately via `tinyclaw -p '...'`.
 4. **Check MCP config** — Verify servers are configured and accessible.
 5. **Review stderr** — Warnings about plugins, MCP servers, and retry attempts appear on stderr.
