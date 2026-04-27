@@ -178,11 +178,21 @@ function cleanup(): void {
 }
 
 export function startDaemon(): void {
+  // Config dir must exist before binding the Unix socket inside it.
+  ensureConfigDir();
+
   // Remove stale socket (no-op on Windows named pipes)
   cleanupSocket();
 
+  server.on("error", (err) => {
+    process.stderr.write(
+      `🦞 Daemon failed to start: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+    cleanup();
+    process.exit(1);
+  });
+
   server.listen(SOCKET_PATH, () => {
-    ensureConfigDir();
     fs.writeFileSync(PID_FILE, String(process.pid), "utf-8");
 
     engine.start();
