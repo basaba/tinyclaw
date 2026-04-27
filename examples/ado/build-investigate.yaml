@@ -31,9 +31,9 @@ steps:
       --output json
 
   # 2. Check if this build was already investigated — skip all remaining steps if so
-  # - id: check-new
-  #   pipeline: "diff.gate --key ado-build-investigate:273080"
-  #   stdin: $latest-build.json.0.id
+  - id: check-new
+    pipeline: "diff.gate --key ado-build-investigate:273080"
+    stdin: $latest-build.json.0.id
 
   # 3. Fetch test runs associated with the build
   #    Note: api-version is passed via --url-parameters to avoid & in the URL
