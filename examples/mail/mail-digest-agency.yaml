@@ -1,0 +1,30 @@
+# Email digest via Agency Copilot
+#
+# Uses `exec` to call `agency copilot` (the Copilot CLI wrapper)
+# instead of the built-in `copilot` command — useful when you need
+# Agency-specific model routing, agents, or MCP tool access.
+#
+# Agency copilot discovers and summarizes emails autonomously
+# using its configured MCP tools (e.g., workiq, mail).
+#
+# Flow:
+#   1. exec runs `agency copilot` with a summarization prompt
+#   2. Agency uses its MCP tools to find and summarize unread emails
+#   3. Send markdown digest to Teams (self)
+#
+# Prerequisites:
+#   - Agency CLI installed (`agency copilot` available on PATH)
+#   - Agency MCP tools configured (e.g., workiq, mail)
+#   - Authenticated via agency / Entra ID
+#
+# Usage:
+#   tinyclaw examples/mail/mail-digest-agency.yaml
+
+name: mail-digest-agency
+description: Summarize unread emails using agency copilot
+
+steps:
+  - id: digest
+    pipeline: >
+      exec agency copilot -p "List my unread emails from the last 24 hours and summarise them as a concise bullet-point digest grouped by sender."
+      | teams.send --self --markdown
