@@ -130,7 +130,7 @@ export function App({ client }: AppProps) {
         )}
 
         {view.screen === "add" && (
-          <AddWorkflow client={client} onDone={goList} />
+          <AddWorkflow client={client} availableHeight={contentHeight} onDone={goList} />
         )}
 
         {view.screen === "edit" && (() => {
@@ -145,7 +145,7 @@ export function App({ client }: AppProps) {
             );
           }
           return (
-            <EditWorkflow client={client} workflow={wf} onDone={goList} />
+            <EditWorkflow client={client} workflow={wf} availableHeight={contentHeight} onDone={goList} />
           );
         })()}
 

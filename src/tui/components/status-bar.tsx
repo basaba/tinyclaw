@@ -12,8 +12,8 @@ export function StatusBar({ view, schedulerRunning }: Props) {
 
   const keys: Record<string, string> = {
     list: "a:Add  e:Edit  d:Delete  r:Run  o:Output  v:YAML  g:Graph  Tab:Approvals  space:Enable/Disable  enter:History  q:Quit",
-    add: "enter:Next  esc:Cancel",
-    edit: "enter:Next  esc:Cancel",
+    add: "Tab:Next  Shift+Tab:Back  esc:Cancel  Ctrl+O:View file",
+    edit: "Tab:Next  Shift+Tab:Back  esc:Cancel  Ctrl+O:View file",
     history: "enter:Detail  esc:Back",
     "run-detail": "↑↓:Scroll  y:Approve  n:Reject  esc:Back",
     "yaml-view": "↑↓:Scroll  PgUp/PgDn:Page  esc:Back",

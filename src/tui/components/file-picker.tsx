@@ -12,11 +12,13 @@ interface Props {
   onNext: () => void;
   /** Called when user presses Shift+Tab to go back. */
   onPrev: () => void;
+  /** Called when user wants to view the file. Undefined if no valid file. */
+  onView?: () => void;
 }
 
 const MAX_SUGGESTIONS = 5;
 
-export function FilePicker({ value, cursor, active, onChange, onNext, onPrev }: Props) {
+export function FilePicker({ value, cursor, active, onChange, onNext, onPrev, onView }: Props) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -52,6 +54,12 @@ export function FilePicker({ value, cursor, active, onChange, onNext, onPrev }: 
           setShowSuggestions(false);
           return;
         }
+        return;
+      }
+
+      // Ctrl+O to view file
+      if (input === "o" && key.ctrl && onView) {
+        onView();
         return;
       }
 

@@ -4,9 +4,11 @@ import { randomUUID } from "node:crypto";
 import type { DaemonClient } from "../scheduler/daemon-client.js";
 import { ArgsTable, rowsToArgs, type ArgRow } from "./args-table.js";
 import { FilePicker } from "./file-picker.js";
+import { YamlView } from "./yaml-view.js";
 
 interface Props {
   client: DaemonClient;
+  availableHeight: number;
   onDone: () => void;
 }
 
@@ -141,13 +143,14 @@ function formatSchedule(num: string, unit: ScheduleUnit): string {
   return `every ${num} ${unit}`;
 }
 
-export function AddWorkflow({ client, onDone }: Props) {
+export function AddWorkflow({ client, availableHeight, onDone }: Props) {
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
   const stateRef = useRef(state);
   stateRef.current = state;
   const [argRows, setArgRows] = useState<ArgRow[]>([]);
   const argRowsRef = useRef(argRows);
   argRowsRef.current = argRows;
+  const [viewing, setViewing] = useState(false);
 
   const handleInput = useCallback(
     (input: string, key: { return: boolean; escape: boolean; backspace: boolean; delete: boolean; ctrl: boolean; meta: boolean; upArrow: boolean; downArrow: boolean; leftArrow: boolean; rightArrow: boolean; shift: boolean; tab: boolean }) => {
@@ -157,6 +160,12 @@ export function AddWorkflow({ client, onDone }: Props) {
       }
 
       const s = stateRef.current;
+
+      // Ctrl+O to view file
+      if (input === "o" && key.ctrl && s.filePath.trim()) {
+        setViewing(true);
+        return;
+      }
 
       if (s.field === "submit") {
         if (key.return) {
@@ -225,11 +234,21 @@ export function AddWorkflow({ client, onDone }: Props) {
     [client, onDone],
   );
 
-  useInput(handleInput, { isActive: state.field !== "args" && state.field !== "filePath" });
+  useInput(handleInput, { isActive: !viewing && state.field !== "args" && state.field !== "filePath" });
 
   const handleArgsExit = useCallback((dir: "next" | "prev") => {
     dispatch({ type: dir === "next" ? "next_field" : "prev_field" });
   }, []);
+
+  if (viewing) {
+    return (
+      <YamlView
+        filePath={state.filePath.trim()}
+        availableHeight={availableHeight}
+        onBack={() => setViewing(false)}
+      />
+    );
+  }
 
   const fieldColor = (f: Field) => (f === state.field ? "cyan" : "gray");
   const isScheduleActive = state.field === "scheduleNum" || state.field === "scheduleUnit";
@@ -239,7 +258,6 @@ export function AddWorkflow({ client, onDone }: Props) {
       <Text bold color="green">
         Add New Workflow
       </Text>
-      <Text color="gray">Enter/Tab to advance, Shift+Tab to go back, Esc to cancel</Text>
       <Box marginTop={1} flexDirection="column">
         <Box>
           <Text color={fieldColor("name")}>Name: </Text>
@@ -250,13 +268,11 @@ export function AddWorkflow({ client, onDone }: Props) {
           cursor={state.cursor}
           active={state.field === "filePath"}
           onChange={(v, c) => {
-            // Directly update state via dispatches — replace entire value
-            // We need sequential clear + set, but reducer doesn't support "set_value"
-            // So we add a set_filepath action handled below
             dispatch({ type: "set_filepath", value: v, cursor: c });
           }}
           onNext={() => dispatch({ type: "next_field" })}
           onPrev={() => dispatch({ type: "prev_field" })}
+          onView={state.filePath.trim() ? () => setViewing(true) : undefined}
         />
         <Box>
           <Text color={isScheduleActive ? "cyan" : "gray"}>Schedule: </Text>

@@ -4,10 +4,12 @@ import type { DaemonClient } from "../scheduler/daemon-client.js";
 import type { WorkflowEntry } from "../scheduler/types.js";
 import { ArgsTable, argsToRows, rowsToArgs, type ArgRow } from "./args-table.js";
 import { FilePicker } from "./file-picker.js";
+import { YamlView } from "./yaml-view.js";
 
 interface Props {
   client: DaemonClient;
   workflow: WorkflowEntry;
+  availableHeight: number;
   onDone: () => void;
 }
 
@@ -181,13 +183,14 @@ function buildInitialState(wf: WorkflowEntry): FormState {
   };
 }
 
-export function EditWorkflow({ client, workflow, onDone }: Props) {
+export function EditWorkflow({ client, workflow, availableHeight, onDone }: Props) {
   const [state, dispatch] = useReducer(reducer, buildInitialState(workflow));
   const stateRef = useRef(state);
   stateRef.current = state;
   const [argRows, setArgRows] = useState<ArgRow[]>(() => argsToRows(workflow.args));
   const argRowsRef = useRef(argRows);
   argRowsRef.current = argRows;
+  const [viewing, setViewing] = useState(false);
 
   const handleInput = useCallback(
     (
@@ -213,6 +216,12 @@ export function EditWorkflow({ client, workflow, onDone }: Props) {
       }
 
       const s = stateRef.current;
+
+      // Ctrl+O to view file
+      if (input === "o" && key.ctrl && s.filePath.trim()) {
+        setViewing(true);
+        return;
+      }
 
       if (s.field === "submit") {
         if (key.return) {
@@ -306,11 +315,21 @@ export function EditWorkflow({ client, workflow, onDone }: Props) {
     [client, workflow, onDone],
   );
 
-  useInput(handleInput, { isActive: state.field !== "args" && state.field !== "filePath" });
+  useInput(handleInput, { isActive: !viewing && state.field !== "args" && state.field !== "filePath" });
 
   const handleArgsExit = useCallback((dir: "next" | "prev") => {
     dispatch({ type: dir === "next" ? "next_field" : "prev_field" });
   }, []);
+
+  if (viewing) {
+    return (
+      <YamlView
+        filePath={state.filePath.trim()}
+        availableHeight={availableHeight}
+        onBack={() => setViewing(false)}
+      />
+    );
+  }
 
   const fields = getFields(state.useRawSchedule);
   const fieldColor = (f: Field) => (fields.includes(f) && f === state.field ? "cyan" : "gray");
@@ -321,7 +340,6 @@ export function EditWorkflow({ client, workflow, onDone }: Props) {
       <Text bold color="yellow">
         Edit Workflow
       </Text>
-      <Text color="gray">Enter/Tab to advance, Shift+Tab to go back, Esc to cancel</Text>
       <Box marginTop={1} flexDirection="column">
         <Box>
           <Text color={fieldColor("name")}>Name: </Text>
@@ -336,6 +354,7 @@ export function EditWorkflow({ client, workflow, onDone }: Props) {
           }}
           onNext={() => dispatch({ type: "next_field" })}
           onPrev={() => dispatch({ type: "prev_field" })}
+          onView={state.filePath.trim() ? () => setViewing(true) : undefined}
         />
 
         {state.useRawSchedule ? (
