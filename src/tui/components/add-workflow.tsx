@@ -3,6 +3,7 @@ import { Box, Text, useInput } from "ink";
 import { randomUUID } from "node:crypto";
 import type { DaemonClient } from "../scheduler/daemon-client.js";
 import { ArgsTable, rowsToArgs, type ArgRow } from "./args-table.js";
+import { FilePicker } from "./file-picker.js";
 
 interface Props {
   client: DaemonClient;
@@ -38,7 +39,8 @@ type Action =
   | { type: "delete_char" }
   | { type: "move_cursor"; dir: "left" | "right" | "home" | "end" }
   | { type: "cycle_unit"; dir: 1 | -1 }
-  | { type: "set_error"; error: string };
+  | { type: "set_error"; error: string }
+  | { type: "set_filepath"; value: string; cursor: number };
 
 /** Get the text value of the currently focused text field. */
 function getFieldValue(state: FormState): string {
@@ -103,6 +105,8 @@ function reducer(state: FormState, action: Action): FormState {
     }
     case "set_error":
       return { ...state, error: action.error };
+    case "set_filepath":
+      return { ...state, filePath: action.value, cursor: action.cursor };
     default:
       return state;
   }
@@ -219,7 +223,7 @@ export function AddWorkflow({ client, onDone }: Props) {
     [client, onDone],
   );
 
-  useInput(handleInput, { isActive: state.field !== "args" });
+  useInput(handleInput, { isActive: state.field !== "args" && state.field !== "filePath" });
 
   const handleArgsExit = useCallback((dir: "next" | "prev") => {
     dispatch({ type: dir === "next" ? "next_field" : "prev_field" });
@@ -239,10 +243,19 @@ export function AddWorkflow({ client, onDone }: Props) {
           <Text color={fieldColor("name")}>Name: </Text>
           <TextWithCursor value={state.name} cursor={state.cursor} active={state.field === "name"} />
         </Box>
-        <Box>
-          <Text color={fieldColor("filePath")}>File: </Text>
-          <TextWithCursor value={state.filePath} cursor={state.cursor} active={state.field === "filePath"} />
-        </Box>
+        <FilePicker
+          value={state.filePath}
+          cursor={state.cursor}
+          active={state.field === "filePath"}
+          onChange={(v, c) => {
+            // Directly update state via dispatches — replace entire value
+            // We need sequential clear + set, but reducer doesn't support "set_value"
+            // So we add a set_filepath action handled below
+            dispatch({ type: "set_filepath", value: v, cursor: c });
+          }}
+          onNext={() => dispatch({ type: "next_field" })}
+          onPrev={() => dispatch({ type: "prev_field" })}
+        />
         <Box>
           <Text color={isScheduleActive ? "cyan" : "gray"}>Schedule: </Text>
           <Text color={fieldColor("scheduleNum")}>every </Text>

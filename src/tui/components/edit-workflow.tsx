@@ -3,6 +3,7 @@ import { Box, Text, useInput } from "ink";
 import type { DaemonClient } from "../scheduler/daemon-client.js";
 import type { WorkflowEntry } from "../scheduler/types.js";
 import { ArgsTable, argsToRows, rowsToArgs, type ArgRow } from "./args-table.js";
+import { FilePicker } from "./file-picker.js";
 
 interface Props {
   client: DaemonClient;
@@ -40,7 +41,8 @@ type Action =
   | { type: "delete_char" }
   | { type: "move_cursor"; dir: "left" | "right" | "home" | "end" }
   | { type: "cycle_unit"; dir: 1 | -1 }
-  | { type: "set_error"; error: string };
+  | { type: "set_error"; error: string }
+  | { type: "set_filepath"; value: string; cursor: number };
 
 const INTERVAL_RE = /^every\s+(\d+)\s*(s|sec|seconds?|m|min|minutes?|h|hr|hours?|d|day|days?)$/i;
 
@@ -130,6 +132,8 @@ function reducer(state: FormState, action: Action): FormState {
     }
     case "set_error":
       return { ...state, error: action.error };
+    case "set_filepath":
+      return { ...state, filePath: action.value, cursor: action.cursor };
     default:
       return state;
   }
@@ -300,7 +304,7 @@ export function EditWorkflow({ client, workflow, onDone }: Props) {
     [client, workflow, onDone],
   );
 
-  useInput(handleInput, { isActive: state.field !== "args" });
+  useInput(handleInput, { isActive: state.field !== "args" && state.field !== "filePath" });
 
   const handleArgsExit = useCallback((dir: "next" | "prev") => {
     dispatch({ type: dir === "next" ? "next_field" : "prev_field" });
@@ -321,10 +325,16 @@ export function EditWorkflow({ client, workflow, onDone }: Props) {
           <Text color={fieldColor("name")}>Name: </Text>
           <TextWithCursor value={state.name} cursor={state.cursor} active={state.field === "name"} />
         </Box>
-        <Box>
-          <Text color={fieldColor("filePath")}>File: </Text>
-          <TextWithCursor value={state.filePath} cursor={state.cursor} active={state.field === "filePath"} />
-        </Box>
+        <FilePicker
+          value={state.filePath}
+          cursor={state.cursor}
+          active={state.field === "filePath"}
+          onChange={(v, c) => {
+            dispatch({ type: "set_filepath", value: v, cursor: c });
+          }}
+          onNext={() => dispatch({ type: "next_field" })}
+          onPrev={() => dispatch({ type: "prev_field" })}
+        />
 
         {state.useRawSchedule ? (
           <Box>

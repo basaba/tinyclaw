@@ -1,6 +1,6 @@
 {
   "name": "@basaba/tinyclaw",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A Lobster workflow runner powered by GitHub Copilot — run, schedule, and orchestrate LLM workflows from the terminal",
   "type": "module",
   "main": "dist/index.js",
