@@ -2394,6 +2394,25 @@ steps:
     stdin: $summary
 ```
 
+### Mail Digest via Agency Copilot
+
+Uses `exec --stdin-file` to pass email data to `agency copilot` (the Copilot CLI
+wrapper) via a temp file. Useful when you need Agency-specific model routing,
+agents, or MCP tool access.
+
+```yaml
+# examples/mail/mail-digest-agency.yaml
+name: mail-digest-agency
+description: Summarize unread emails using agency copilot
+steps:
+  - id: digest
+    pipeline: >
+      mail.search --unread --since 1d --folder inbox --top 20
+      | pick from,subject,date,preview
+      | exec --stdin-file json agency copilot -p "Read the file at $LOBSTER_STDIN_FILE containing email metadata and summarise as a concise bullet-point digest grouped by sender."
+      | teams.send --self
+```
+
 ### Scheduled Workflow (via CLI)
 
 ```bash
