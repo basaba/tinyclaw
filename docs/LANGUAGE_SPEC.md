@@ -1823,8 +1823,6 @@ tinyclaw help
 | `-p, --pipeline <text>` | Run pipeline string instead of file |
 | `--dry-run` | Validate and print execution plan without running |
 | `--args-json <json>` | JSON object of workflow arguments |
-| `--mcp-config <path>` | Path to `mcp.json` config file |
-| `--mcps <list>` | Filter MCP servers from config (comma-separated) |
 | `--plugins <dir>` | Plugin directory override |
 
 ### Scheduler CLI
@@ -2093,32 +2091,19 @@ preserving input order in the output stream.
 | `tools` | string[] | Advertised tools |
 | `timeout` | number | Timeout in seconds |
 
-### Resolution Chain (first found wins)
+### Discovery
 
-1. `--mcp-config <path>` CLI flag
-2. `MCP_CONFIG` environment variable
-3. `mcp.json` in current directory
-4. `.mcp.json` in current directory
-5. `~/.config/tinyclaw/mcp.json`
-6. Empty (no servers loaded)
+MCP servers are discovered automatically through two independent mechanisms:
 
-### Copilot SDK Auto-Discovery
-
-In addition to the explicit MCP config, the Copilot SDK (`enableConfigDiscovery: true` by default) also discovers:
+**Copilot LLM Sessions** — The Copilot SDK (`enableConfigDiscovery: true` by default) discovers MCP servers on its own from:
 - `.mcp.json` in the working directory
 - `.vscode/mcp.json` in the working directory
 
-These are merged with explicitly loaded servers. Explicit servers take precedence on name collision.
+No manual configuration is needed for LLM sessions.
 
-### Filtering
-
-```bash
-# Load only specific servers
-tinyclaw -p "..." --mcps teams,mail
-
-# Use custom config file
-tinyclaw -p "..." --mcp-config ./custom-mcp.json
-```
+**Direct MCP Commands** (`mcp.call`, `teams.send`, `mail.*`) — These resolve servers in two ways:
+1. **Config file** — If a config file is found (`MCP_CONFIG` env var, `mcp.json` / `.mcp.json` in CWD, or `~/.config/tinyclaw/mcp.json`), matching server entries are used.
+2. **Agency fallback** — If a server name isn't in the config (or no config exists), it is automatically resolved to `agency mcp <name>` (e.g. `--server teams` → `{ command: "agency", args: ["mcp", "teams"] }`).
 
 ---
 
@@ -2233,7 +2218,7 @@ Each `.js` file must export a `createCommand` function (or default export):
 
 ```javascript
 /**
- * @param {{ mcpServers: Record<string, unknown>, getAdapter: () => unknown }} ctx
+ * @param {Record<string, never>} ctx
  * @returns {LobsterCommand | LobsterCommand[]}
  */
 export function createCommand(ctx) {
@@ -2289,12 +2274,7 @@ export function createCommand(ctx) {
 
 ### Plugin Context
 
-Plugins receive a context object with:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `mcpServers` | `Record<string, McpServerConfig>` | Loaded MCP server configurations |
-| `getAdapter` | `() => unknown` | Access to the CopilotAdapter instance |
+Plugins receive a context object (currently empty, reserved for future extension).
 
 ### Example Plugin
 
@@ -2329,7 +2309,7 @@ The scheduler engine loads plugins from the same directory, so custom commands w
 |----------|-------------|
 | `COPILOT_CLI_URL` | Override Copilot SDK CLI URL |
 | `LOBSTER_LLM_PROVIDER` | Default LLM provider (set to `copilot` automatically) |
-| `MCP_CONFIG` | Path to MCP config file |
+| `MCP_CONFIG` | Path to MCP config file (for direct MCP commands only) |
 | `LOBSTER_PLUGINS` | Plugin directory path |
 | `NODE_NO_WARNINGS` | Set to `1` automatically to suppress experimental warnings |
 

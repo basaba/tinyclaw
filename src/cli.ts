@@ -6,7 +6,7 @@ import { PassThrough } from "node:stream";
 import * as readline from "node:readline/promises";
 import { CopilotAdapter } from "./adapters/copilot-adapter.js";
 import { createCopilotAdapters } from "./adapters/index.js";
-import { loadMcpConfig, parseMcpFilter } from "./mcp-config/loader.js";
+import { loadMcpConfig } from "./mcp-config/loader.js";
 import { buildRegistry } from "./registry.js";
 
 /**
@@ -75,24 +75,20 @@ Options:
   --dry-run                Validate and print the execution plan without running
   --model <model>          Model to use (e.g. gpt-4o, claude-sonnet-4)
   --system <prompt>        System prompt override
-  --mcp-config <path>      Path to mcp.json config file
-  --mcps <list>            Filter MCP servers from config (comma-separated)
   --args-json <json>       JSON object of workflow arguments
   --plugins <dir>          Plugin directory (or set LOBSTER_PLUGINS env var)
 
-MCP Config Resolution (first found wins):
-  1. --mcp-config <path>
-  2. MCP_CONFIG env var
-  3. mcp.json in current directory
-  4. .mcp.json in current directory
-  5. ~/.config/tinyclaw/mcp.json
+MCP Server Discovery:
+  Copilot LLM sessions discover MCP servers automatically via the SDK
+  (e.g. .mcp.json, .vscode/mcp.json).
+  Direct MCP commands (mcp.call, teams.send, mail.*) auto-discover from:
+    mcp.json / .mcp.json in CWD, MCP_CONFIG env var, or ~/.config/tinyclaw/mcp.json
 
 Examples:
   tinyclaw examples/piped-steps.yaml
   tinyclaw examples/piped-steps.yaml --dry-run
   tinyclaw -p "llm.invoke --provider copilot --prompt 'Hello'"
   tinyclaw -p "ado.pr.monitor --org myorg --project proj" --dry-run
-  tinyclaw workflow.yaml --mcp-config ./mcp.json
   tinyclaw sched list
   tinyclaw sched run wf-abc123
 `);
@@ -236,8 +232,6 @@ async function run(runArgs: string[]): Promise<void> {
   let filePath: string | undefined;
   let pipeline: string | undefined;
   let argsJson: Record<string, unknown> | undefined;
-  let mcpConfigPath: string | undefined;
-  let mcpsFilter: string | undefined;
   let dryRun = false;
   let pluginsDir: string | undefined;
 
@@ -264,10 +258,6 @@ async function run(runArgs: string[]): Promise<void> {
         console.error(`❌ --args-json must be valid JSON, got: ${parts.join(" ")}`);
         process.exit(1);
       }
-    } else if (arg === "--mcp-config") {
-      mcpConfigPath = runArgs[++i];
-    } else if (arg === "--mcps") {
-      mcpsFilter = runArgs[++i];
     } else if (arg === "--plugins") {
       pluginsDir = runArgs[++i];
     } else if (!arg.startsWith("-")) {
@@ -280,8 +270,7 @@ async function run(runArgs: string[]): Promise<void> {
     process.exit(1);
   }
 
-  const filter = mcpsFilter ? parseMcpFilter(mcpsFilter) : undefined;
-  const mcpServers = loadMcpConfig({ configPath: mcpConfigPath, filter });
+  const mcpServers = loadMcpConfig({});
 
   const serverNames = Object.keys(mcpServers);
   if (serverNames.length > 0) {
@@ -290,7 +279,6 @@ async function run(runArgs: string[]): Promise<void> {
 
   const adapter = new CopilotAdapter({
     cliUrl: process.env.COPILOT_CLI_URL,
-    mcpServers,
   });
   const dispose = () => adapter.dispose();
 
@@ -299,7 +287,6 @@ async function run(runArgs: string[]): Promise<void> {
     getClient: () => adapter.client,
     ensureStarted: () => adapter.ensureStarted(),
     getMcpServers: () => mcpServers,
-    getAdapter: () => adapter,
     pluginDir: pluginsDir,
   });
 

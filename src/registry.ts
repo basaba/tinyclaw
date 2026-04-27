@@ -27,8 +27,6 @@ export type BuildRegistryOptions = {
   extraCommands?: LobsterCommand[];
   /** Plugin directory path (overrides env/default) */
   pluginDir?: string;
-  /** Adapter instance for plugin context */
-  getAdapter?: () => unknown;
 };
 
 /**
@@ -45,10 +43,7 @@ export async function buildRegistry(
 
   // Load file-based plugins
   const pluginDir = resolvePluginDir(opts.pluginDir);
-  const pluginCtx: PluginContext = {
-    mcpServers: opts.getMcpServers(),
-    getAdapter: opts.getAdapter ?? (() => null),
-  };
+  const pluginCtx: PluginContext = {};
   const pluginCommands = await loadPlugins(pluginDir, pluginCtx);
 
   const commands: LobsterCommand[] = [

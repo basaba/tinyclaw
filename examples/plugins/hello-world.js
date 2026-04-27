@@ -10,7 +10,7 @@
  *
  * Plugin contract:
  *   - Export a `createCommand(ctx)` function (or use `export default`)
- *   - It receives { mcpServers, getAdapter } context
+ *   - It receives a context object (reserved for future extension)
  *   - Return a single LobsterCommand or an array of them
  *
  * LobsterCommand shape:
@@ -32,7 +32,7 @@
 // @ts-check
 
 /**
- * @param {{ mcpServers: Record<string, unknown>, getAdapter: () => unknown }} ctx
+ * @param {Record<string, never>} ctx
  */
 export function createCommand(ctx) {
   return {

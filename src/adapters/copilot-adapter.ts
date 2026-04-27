@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { CopilotBridgeClient, type CopilotBridgeConfig } from "../copilot/client.js";
-import { loadMcpConfig, type McpServerConfig } from "../mcp-config/loader.js";
 
 // ── Lobster-compatible types ────────────────────────────────────────
 
@@ -43,10 +42,6 @@ export interface CopilotAdapterOptions extends CopilotBridgeConfig {
   defaultModel?: string;
   /** Default reasoning effort level */
   defaultReasoningEffort?: "low" | "medium" | "high" | "xhigh";
-  /** MCP servers to attach (already resolved configs) */
-  mcpServers?: Record<string, McpServerConfig>;
-  /** Path to mcp.json config file (alternative to passing mcpServers directly) */
-  mcpConfigPath?: string;
 }
 
 const DEFAULT_MAX_ARTIFACT_CHARS = 8000;
@@ -74,14 +69,9 @@ export class CopilotAdapter implements DirectAdapter {
   constructor(options: CopilotAdapterOptions = {}) {
     this.options = options;
 
-    // Resolve MCP servers: explicit mcpServers > mcpConfigPath > auto-discover
-    const mcpServers = options.mcpServers
-      ?? (options.mcpConfigPath ? loadMcpConfig({ configPath: options.mcpConfigPath }) : undefined);
-
     this.client = new CopilotBridgeClient({
       cliUrl: options.cliUrl,
       apiKey: options.apiKey,
-      ...(mcpServers && Object.keys(mcpServers).length > 0 ? { mcpServers } : {}),
     });
     // Bind invoke so it works when Lobster extracts it via `direct.invoke`
     this.invoke = this.invoke.bind(this);

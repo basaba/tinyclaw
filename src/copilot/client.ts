@@ -9,8 +9,6 @@ export interface CopilotBridgeConfig {
   model?: string;
   /** Reasoning effort level for models that support it */
   reasoningEffort?: "low" | "medium" | "high" | "xhigh";
-  /** MCP servers to attach to sessions (Copilot SDK MCPServerConfig format) */
-  mcpServers?: Record<string, any>;
   /** Auto-discover .mcp.json / .vscode/mcp.json from workingDirectory (default: true) */
   enableConfigDiscovery?: boolean;
   /** Working directory for config discovery and tool operations */
@@ -57,7 +55,6 @@ export class CopilotBridgeClient {
     options?: {
       model?: string;
       reasoningEffort?: "low" | "medium" | "high" | "xhigh";
-      mcpServers?: Record<string, any>;
     },
   ): Promise<string> {
     if (!this.client) {
@@ -66,7 +63,6 @@ export class CopilotBridgeClient {
 
     const model = options?.model ?? this.config.model;
     const reasoningEffort = options?.reasoningEffort ?? this.config.reasoningEffort;
-    const mcpServers = options?.mcpServers ?? this.config.mcpServers;
     const enableConfigDiscovery = this.config.enableConfigDiscovery ?? true;
     const workingDirectory = this.config.workingDirectory ?? process.cwd();
 
@@ -76,7 +72,6 @@ export class CopilotBridgeClient {
       workingDirectory,
       ...(model ? { model } : {}),
       ...(reasoningEffort ? { reasoningEffort } : {}),
-      ...(mcpServers && Object.keys(mcpServers).length > 0 ? { mcpServers } : {}),
     });
 
     try {

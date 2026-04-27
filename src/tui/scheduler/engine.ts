@@ -130,7 +130,6 @@ export class SchedulerEngine extends EventEmitter {
     const mcpServers = loadMcpConfig({});
     const adapter = new CopilotAdapter({
       cliUrl: process.env.COPILOT_CLI_URL,
-      mcpServers,
     });
 
     try {
@@ -276,7 +275,6 @@ export class SchedulerEngine extends EventEmitter {
     const mcpServers = loadMcpConfig({});
     const adapter = new CopilotAdapter({
       cliUrl: process.env.COPILOT_CLI_URL,
-      mcpServers,
     });
 
     try {

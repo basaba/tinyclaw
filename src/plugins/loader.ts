@@ -3,16 +3,12 @@ import { join, resolve, extname } from "node:path";
 import { existsSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import type { LobsterCommand } from "../commands/copilot.js";
-import type { McpServerConfig } from "../mcp-config/loader.js";
 
 /**
  * Context provided to plugin `createCommand()` functions.
- * Plugins use this to access MCP servers and the Copilot adapter.
+ * Reserved for future extension.
  */
-export type PluginContext = {
-  mcpServers: Record<string, McpServerConfig>;
-  getAdapter: () => unknown;
-};
+export type PluginContext = Record<string, never>;
 
 /**
  * Scan a directory for `.js` plugin files and load them.
