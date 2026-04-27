@@ -186,6 +186,8 @@ export function EditWorkflow({ client, workflow, onDone }: Props) {
   const stateRef = useRef(state);
   stateRef.current = state;
   const [argRows, setArgRows] = useState<ArgRow[]>(() => argsToRows(workflow.args));
+  const argRowsRef = useRef(argRows);
+  argRowsRef.current = argRows;
 
   const handleInput = useCallback(
     (
@@ -232,7 +234,7 @@ export function EditWorkflow({ client, workflow, onDone }: Props) {
           if (newSchedule && newSchedule !== workflow.schedule) patch.schedule = newSchedule;
 
           // Build args from table rows
-          const newArgs = rowsToArgs(argRows);
+          const newArgs = rowsToArgs(argRowsRef.current);
           const oldArgsJson = workflow.args ? JSON.stringify(workflow.args) : "";
           const newArgsJson = newArgs ? JSON.stringify(newArgs) : "";
           if (newArgsJson !== oldArgsJson) {

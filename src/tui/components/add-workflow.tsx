@@ -146,6 +146,8 @@ export function AddWorkflow({ client, onDone }: Props) {
   const stateRef = useRef(state);
   stateRef.current = state;
   const [argRows, setArgRows] = useState<ArgRow[]>([]);
+  const argRowsRef = useRef(argRows);
+  argRowsRef.current = argRows;
 
   const handleInput = useCallback(
     (input: string, key: { return: boolean; escape: boolean; backspace: boolean; delete: boolean; ctrl: boolean; meta: boolean; upArrow: boolean; downArrow: boolean; leftArrow: boolean; rightArrow: boolean; shift: boolean; tab: boolean }) => {
@@ -158,7 +160,7 @@ export function AddWorkflow({ client, onDone }: Props) {
 
       if (s.field === "submit") {
         if (key.return) {
-          const wfArgs = rowsToArgs(argRows);
+          const wfArgs = rowsToArgs(argRowsRef.current);
           client
             .addWorkflow({
               id: randomUUID().slice(0, 8),
