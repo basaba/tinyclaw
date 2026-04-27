@@ -1940,17 +1940,20 @@ teams.send --team-id <guid> --channel-id <id> --message "Hello team"
 teams.send --chat-id <id> --message "Hi"
 teams.send --self --message "Note to self"
 copilot --prompt '...' | teams.send --self
+copilot --prompt '...' | teams.send --self --markdown
 ```
 
-| Flag | Type | Description |
-|------|------|-------------|
-| `--team-id <guid>` | string | Team GUID (required for channel) |
-| `--channel-id <id>` | string | Channel ID (required for channel) |
-| `--chat-id <id>` | string | Chat ID (for direct/group chat) |
-| `--self` | boolean | Send to yourself (Notes to Self) |
-| `--message <text>` | string | Message body (or use piped input) |
-| `--subject <text>` | string | Subject line (channel only) |
-| `--importance <level>` | string | `normal` (default) \| `high` \| `urgent` |
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--team-id <guid>` | string | — | Team GUID (required for channel) |
+| `--channel-id <id>` | string | — | Channel ID (required for channel) |
+| `--chat-id <id>` | string | — | Chat ID (for direct/group chat) |
+| `--self` | boolean | — | Send to yourself (Notes to Self) |
+| `--message <text>` | string | — | Message body (or use piped input) |
+| `--markdown` | boolean | `false` | Convert piped markdown to HTML before sending (implies `--content-type html`) |
+| `--content-type <type>` | string | `text` | `text` or `html` |
+| `--subject <text>` | string | — | Subject line (channel only) |
+| `--importance <level>` | string | `normal` | `normal` \| `high` \| `urgent` |
 
 **Input:** Piped input used as message body if `--message` is omitted.  
 **MCP Server:** `teams` (agency fallback: `{ command: "agency", args: ["mcp", "teams"] }`).
@@ -2021,13 +2024,21 @@ mail.search --unread --folder inbox --top 10
 
 ```
 mail.read --id <message-id>
-mail.read --id <message-id> --attachments
+mail.read --id <message-id> --html
+mail.read --id <message-id> --preview-only
+mail.search --unread --since 1d | mail.read
 ```
 
 | Flag | Type | Description |
 |------|------|-------------|
-| `--id <string>` | string | Email message ID (required) |
-| `--attachments` | boolean | Include attachment details |
+| `--id <string>` | string | Email message ID (optional if piped from `mail.search`) |
+| `--html` | boolean | Return HTML body format |
+| `--preview-only` | boolean | Return body preview only (~255 chars) |
+
+**Input:** When piped from `mail.search` (or any source yielding objects with an `id` field),
+reads the full body of each message. Items without an `id` are passed through unchanged.
+Multiple messages are fetched **in parallel** (up to 5 concurrent requests) while
+preserving input order in the output stream.
 
 **MCP Tool:** `GetMessage`.
 
