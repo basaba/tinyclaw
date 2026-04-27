@@ -149,14 +149,18 @@ export function App({ client }: AppProps) {
           );
         })()}
 
-        {view.screen === "history" && (
-          <RunHistory
-            client={client}
-            workflowId={view.workflowId}
-            onBack={goList}
-            onSelectRun={goRunDetail}
-          />
-        )}
+        {view.screen === "history" && (() => {
+          const wf = workflows.find((w) => w.id === view.workflowId);
+          return (
+            <RunHistory
+              client={client}
+              workflowId={view.workflowId}
+              onBack={goList}
+              onSelectRun={goRunDetail}
+              onViewFile={wf ? () => goYamlView(wf.filePath, view) : undefined}
+            />
+          );
+        })()}
 
         {view.screen === "run-detail" && (
           <RunDetail

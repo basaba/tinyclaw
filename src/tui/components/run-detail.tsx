@@ -208,7 +208,7 @@ export function RunDetail({ run: initialRun, availableHeight, client, liveOutput
       }
     }
 
-    if (input === "o") {
+    if (input === "o" || input === "v") {
       onOpenFile(run.input.filePath);
     }
   });

@@ -8,9 +8,10 @@ interface Props {
   workflowId: string;
   onBack: () => void;
   onSelectRun: (run: RunRecord, workflowId: string) => void;
+  onViewFile?: () => void;
 }
 
-export function RunHistory({ client, workflowId, onBack, onSelectRun }: Props) {
+export function RunHistory({ client, workflowId, onBack, onSelectRun, onViewFile }: Props) {
   const [runs, setRuns] = useState<RunRecord[]>([]);
   const [cursor, setCursor] = useState(0);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -57,6 +58,9 @@ export function RunHistory({ client, workflowId, onBack, onSelectRun }: Props) {
     }
     if (input === "c") {
       setConfirmClear(true);
+    }
+    if (input === "v" && onViewFile) {
+      onViewFile();
     }
   });
 
@@ -109,12 +113,8 @@ export function RunHistory({ client, workflowId, onBack, onSelectRun }: Props) {
           </Box>
         );
       })}
-      {confirmClear ? (
+      {confirmClear && (
         <Text color="red" bold>Clear all history? Press y to confirm, any other key to cancel</Text>
-      ) : (
-        <Text color="gray" dimColor>
-          Enter: view details  d: delete entry  c: clear all
-        </Text>
       )}
     </Box>
   );
