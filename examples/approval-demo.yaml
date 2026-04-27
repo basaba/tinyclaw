@@ -43,5 +43,5 @@ steps:
   - id: send
     when: $draft.approved == true
     pipeline: >
-      teams.send --self
+      teams.send --self --markdown
     stdin: $draft.json

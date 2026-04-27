@@ -25,9 +25,8 @@ description: Track unread emails — summarize new ones and send to Teams
 steps:
   - id: mail-tracker
     pipeline: >
-      mail.search --since 1d --folder inbox --top 50 --order-by newest
+      mail.search --since 1d --folder inbox --top 5 --order-by newest
       | diff.key --key mail-tracker --field id
-      | where changed==true
       | mail.read
       | copilot --prompt "Summarize these emails as a digest.
       For each email show the sender, subject, date, and a 1-2 sentence summary."

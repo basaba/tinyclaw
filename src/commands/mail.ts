@@ -543,18 +543,66 @@ export function createMailReadCommand(
         throw new Error("mail.read: --id is required, or pipe messages from mail.search");
       }
 
+      const READ_CONCURRENCY = 5;
+
       async function* readAll() {
-        for (const item of piped) {
-          const msgId = (item as Record<string, unknown>)?.id as string | undefined;
-          if (!msgId) { yield item; continue; }
+        // Build ordered slots: passthrough items yield immediately,
+        // fetch items are read in parallel with a rolling concurrency pool.
+        type Slot =
+          | { kind: "passthrough"; item: unknown }
+          | { kind: "fetch"; promise: Promise<unknown[]> };
+
+        const slots: Slot[] = [];
+        let inFlight = 0;
+        let slotIndex = 0;
+
+        function startFetch(msgId: string): Promise<unknown[]> {
           const toolArgs: Record<string, unknown> = {
             id: msgId,
             ...(preferHtml ? { preferHtml: true } : {}),
             ...(previewOnly ? { bodyPreviewOnly: true } : {}),
           };
-          const result = await callTool(config, "GetMessage", toolArgs, timeout);
-          if (result.isError) handleError("mail.read", result);
-          for (const msg of result.content as unknown[]) yield msg;
+          return callTool(config, "GetMessage", toolArgs, timeout).then((result) => {
+            if (result.isError) handleError("mail.read", result);
+            return result.content as unknown[];
+          });
+        }
+
+        // Enqueue all items, launching up to READ_CONCURRENCY fetches eagerly
+        for (const item of piped) {
+          const msgId = (item as Record<string, unknown>)?.id as string | undefined;
+          if (!msgId) {
+            slots.push({ kind: "passthrough", item });
+          } else {
+            slots.push({ kind: "fetch", promise: startFetch(msgId) });
+            inFlight++;
+          }
+
+          // Drain completed slots to bound memory and maintain streaming
+          while (inFlight >= READ_CONCURRENCY && slotIndex < slots.length) {
+            const slot = slots[slotIndex];
+            if (slot.kind === "passthrough") {
+              yield slot.item;
+              slotIndex++;
+            } else {
+              const msgs = await slot.promise;
+              for (const msg of msgs) yield msg;
+              inFlight--;
+              slotIndex++;
+            }
+          }
+        }
+
+        // Drain remaining slots in order
+        while (slotIndex < slots.length) {
+          const slot = slots[slotIndex];
+          if (slot.kind === "passthrough") {
+            yield slot.item;
+          } else {
+            const msgs = await slot.promise;
+            for (const msg of msgs) yield msg;
+          }
+          slotIndex++;
         }
       }
 
