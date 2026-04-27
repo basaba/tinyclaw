@@ -312,6 +312,7 @@ exec ls -la
 exec --shell "echo 'hello world'"
 exec --json node -e 'console.log(JSON.stringify({x:1}))'
 exec --stdin raw grep pattern
+exec --stdin-file jsonl mycli --input-file "$LOBSTER_STDIN_FILE"
 ```
 
 | Arg | Type | Description |
@@ -319,7 +320,12 @@ exec --stdin raw grep pattern
 | `_` (positional) | array | Command + arguments |
 | `--shell` | string | Run via system shell |
 | `--stdin` | `raw\|json\|jsonl` | How to encode input stream to command stdin |
+| `--stdin-file` | `raw\|json\|jsonl` | Write input to a temp file; sets `LOBSTER_STDIN_FILE` env var |
 | `--json` | boolean | Parse stdout as single JSON value |
+
+`--stdin` and `--stdin-file` are mutually exclusive. Use `--stdin-file` when pipeline
+data is too large for pipe/stdin buffering. The temp file is cleaned up after the
+command exits. The child process can read `LOBSTER_STDIN_FILE` to find the file path.
 
 **Side effects:** `local_exec`
 
@@ -1017,6 +1023,7 @@ Range: 1 to 2,147,483,647 ms.
 | `LOBSTER_ARGS_JSON` | JSON-serialized workflow args | — |
 | `LOBSTER_ARG_<NAME>` | Individual arg (key uppercased, non-alnum → `_`) | — |
 | `LOBSTER_SHELL` | Shell for `run`/`command` steps | System default |
+| `LOBSTER_STDIN_FILE` | Temp file path set by `exec --stdin-file` | — |
 | `LOBSTER_CACHE_DIR` | Cache directory | — |
 | `LOBSTER_MAX_TOOL_ENVELOPE_BYTES` | Max envelope size | 512KB |
 
