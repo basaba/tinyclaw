@@ -137,7 +137,7 @@ Date tokens: `YYYY`, `MM`, `DD`, `HH`, `mm`, `ss` — all UTC, zero-padded.
 
 | Command | Usage | Description |
 |---------|-------|-------------|
-| `exec` | `exec ls -la` / `exec --shell "echo hi"` / `exec --json node -e '...'` | Run OS command. Flags: `--shell`, `--json`, `--stdin raw\|json\|jsonl` |
+| `exec` | `exec ls -la` / `exec --shell "echo hi"` / `exec --json node -e '...'` | Run OS command. Flags: `--shell`, `--json`, `--stdin raw\|json\|jsonl`, `--stdin-file raw\|json\|jsonl` (writes to temp file, sets `LOBSTER_STDIN_FILE`) |
 | `json` | `... \| json` | Render items as JSON |
 | `table` | `... \| table` | Render as table |
 | `template` | `... \| template --text 'PR #{{number}}: {{title}}'` | Render template per item. Flags: `--text`, `--file` |
