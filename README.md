@@ -62,7 +62,7 @@ See more:
 ### From npm
 
 ```bash
-npm install -g tinyclaw
+npm install -g @basaba/tinyclaw
 ```
 
 ### From source
