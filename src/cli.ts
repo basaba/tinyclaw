@@ -279,6 +279,8 @@ async function run(runArgs: string[]): Promise<void> {
 
   const adapter = new CopilotAdapter({
     cliUrl: process.env.COPILOT_CLI_URL,
+    defaultModel: "claude-opus-4.7",
+    timeoutMs: 20 * 60_000,
   });
   const dispose = () => adapter.dispose();
 

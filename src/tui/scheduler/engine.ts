@@ -130,6 +130,8 @@ export class SchedulerEngine extends EventEmitter {
     const mcpServers = loadMcpConfig({});
     const adapter = new CopilotAdapter({
       cliUrl: process.env.COPILOT_CLI_URL,
+      defaultModel: "claude-opus-4.7",
+      timeoutMs: 20 * 60_000,
     });
 
     try {
@@ -275,6 +277,8 @@ export class SchedulerEngine extends EventEmitter {
     const mcpServers = loadMcpConfig({});
     const adapter = new CopilotAdapter({
       cliUrl: process.env.COPILOT_CLI_URL,
+      defaultModel: "claude-opus-4.7",
+      timeoutMs: 20 * 60_000,
     });
 
     try {

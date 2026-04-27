@@ -13,6 +13,8 @@ export interface CopilotBridgeConfig {
   enableConfigDiscovery?: boolean;
   /** Working directory for config discovery and tool operations */
   workingDirectory?: string;
+  /** Timeout in milliseconds for sendAndWait (default: 60 000) */
+  timeoutMs?: number;
 }
 
 export class CopilotBridgeClient {
@@ -97,7 +99,7 @@ export class CopilotBridgeClient {
 
       fullPrompt += `${system}\n\n${prompt}`;
 
-      const response = await session.sendAndWait({ prompt: fullPrompt });
+      const response = await session.sendAndWait({ prompt: fullPrompt }, this.config.timeoutMs);
       const content = response?.data?.content;
 
       if (typeof content !== "string") {
