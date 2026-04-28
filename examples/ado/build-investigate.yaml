@@ -31,9 +31,9 @@ steps:
       --output json
 
   # 2. Check if this build was already investigated — skip all remaining steps if so
-  - id: check-new
-    pipeline: "diff.gate --key ado-build-investigate:273080"
-    stdin: $latest-build.json.0.id
+  # - id: check-new
+  #   pipeline: "diff.gate --key ado-build-investigate:273080"
+  #   stdin: $latest-build.json.0.id
 
   # 3. Fetch test runs associated with the build
   #    Note: api-version is passed via --url-parameters to avoid & in the URL
@@ -68,7 +68,7 @@ steps:
   # 6. Run agency copilot to investigate failures in the repo context
   - id: investigate
     pipeline: >
-      exec --stdin-file json agency copilot -sp "/cm-e2e-investigation: Read the file at $LOBSTER_STDIN_FILE containing test failure data. Please investigate these failures and suggest root causes and next steps." --mcp kusto
+      agency.copilot "/cm-e2e-investigation: Please investigate these failures and suggest root causes and next steps."
       | teams.send --self --markdown
     stdin: $failures.json
     cwd: "${workdir}"

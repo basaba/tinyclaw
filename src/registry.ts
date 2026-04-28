@@ -3,6 +3,7 @@ import { createMcpCallCommand } from "./commands/mcp.js";
 import { createAdoPrMonitorCommand } from "./commands/ado-pr-monitor.js";
 import { createTeamsSendCommand } from "./commands/teams.js";
 import { createFormatMd2HtmlCommand } from "./commands/format.js";
+import { createAgencyCopilotCommand } from "./commands/agency-copilot.js";
 import {
   createMailSendCommand,
   createMailSearchCommand,
@@ -55,6 +56,7 @@ export async function buildRegistry(
     createMailSearchCommand(opts.getMcpServers),
     createMailReadCommand(opts.getMcpServers),
     createFormatMd2HtmlCommand(),
+    createAgencyCopilotCommand(),
     ...(opts.extraCommands ?? []),
     ...pluginCommands,
   ];

@@ -89,6 +89,7 @@ Examples:
   tinyclaw examples/piped-steps.yaml --dry-run
   tinyclaw -p "llm.invoke --provider copilot --prompt 'Hello'"
   tinyclaw -p "ado.pr.monitor --org myorg --project proj" --dry-run
+  tinyclaw -p "agency.copilot -sp 'Summarize my emails'"
   tinyclaw sched list
   tinyclaw sched run wf-abc123
 `);
