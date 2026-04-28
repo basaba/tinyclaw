@@ -16,7 +16,7 @@
 import type { LobsterCommand } from "./copilot.js";
 import { resolveServer, callTool } from "../mcp-client/client.js";
 import type { McpServerConfig } from "../mcp-config/loader.js";
-import { marked } from "marked";
+import { markdownToTeamsHtml, sanitizeForTeams } from "./teams-html.js";
 
 function asStream(items: unknown[]): AsyncIterable<unknown> {
   return {
@@ -123,9 +123,12 @@ export function createTeamsSendCommand(
         throw new Error("teams.send: no message provided (use --message or pipe input)");
       }
 
-      // Convert markdown to HTML if --markdown flag is set
+      // Convert markdown to Teams-safe HTML if --markdown flag is set
       if (useMarkdown) {
-        message = await marked(message);
+        message = await markdownToTeamsHtml(message);
+      } else if (contentType === "html") {
+        // Sanitize raw HTML input for Teams compatibility
+        message = sanitizeForTeams(message);
       }
 
       // Determine which MCP tool to call
