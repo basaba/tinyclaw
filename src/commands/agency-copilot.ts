@@ -69,7 +69,26 @@ export function createAgencyCopilotCommand(): LobsterCommand {
         for (const item of inputItems) yield item;
       })();
 
-      return execCmd.run({ input: inputStream, args: execArgs, ctx });
+      const result = await execCmd.run({ input: inputStream, args: execArgs, ctx });
+
+      // Collect exec output lines into a single string so we return the same
+      // { output: AsyncIterable<string> } shape that the `copilot` command uses,
+      // rather than an opaque exec result.
+      const lines: string[] = [];
+      const out: AsyncIterable<unknown> | undefined = result?.output ?? result;
+      if (out && typeof out === "object" && Symbol.asyncIterator in out) {
+        for await (const chunk of out as AsyncIterable<unknown>) {
+          if (typeof chunk === "string") lines.push(chunk);
+          else if (chunk != null) lines.push(String(chunk));
+        }
+      }
+
+      const response = lines.join("\n");
+      return {
+        output: (async function* () {
+          yield response;
+        })(),
+      };
     },
   };
 }

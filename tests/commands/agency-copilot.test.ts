@@ -22,6 +22,41 @@ describe("agency.copilot command metadata", () => {
   });
 });
 
+// ── run() returns { output } like copilot command ───────────────────
+
+describe("agency.copilot run() returns structured output", () => {
+  it("returns { output: AsyncIterable } with joined response", async () => {
+    const cmd = createAgencyCopilotCommand();
+
+    // Fake exec command that yields lines via an async iterable
+    const fakeExec = {
+      run: async () => ({
+        output: (async function* () {
+          yield "line1";
+          yield "line2";
+          yield "line3";
+        })(),
+      }),
+    };
+
+    const emptyInput = (async function* () {})();
+    const result = await cmd.run({
+      input: emptyInput,
+      args: { _: ["Hello"] },
+      rawArgs: ["Hello"],
+      ctx: { registry: { get: (name: string) => name === "exec" ? fakeExec : undefined } },
+    });
+
+    expect(result).toHaveProperty("output");
+
+    const chunks: string[] = [];
+    for await (const chunk of result.output) {
+      chunks.push(chunk as string);
+    }
+    expect(chunks).toEqual(["line1\nline2\nline3"]);
+  });
+});
+
 // ── extractPromptAndFlags ───────────────────────────────────────────
 
 describe("extractPromptAndFlags", () => {
