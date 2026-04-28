@@ -1,0 +1,107 @@
+# Azure DevOps PR adversarial reviewer
+#
+# Fetches PRs created in the last week by a given author from a repo,
+# runs the `/cm-adversarial-reviewer` Copilot agent against each one
+# (with cwd set to the local clone so the agent has repo context),
+# and emails the reviewer's output to the recipient.
+#
+# Prerequisites:
+#   - Azure CLI with azure-devops extension (`az extension add --name azure-devops`)
+#   - Authenticated via `az login`
+#   - Local clone of the repo at the path passed via `repoPath`
+#   - mail MCP available (`agency mcp mail`) and authenticated
+#
+# Usage:
+#   tinyclaw examples/ado/pr-adversarial-review.yaml
+#   tinyclaw examples/ado/pr-adversarial-review.yaml \
+#     --args-json '{"mailTo":"someone.else@microsoft.com"}'
+#
+# Schedule:
+#   tinyclaw sched add \
+#     --name pr-adversarial-review \
+#     --file examples/ado/pr-adversarial-review.yaml \
+#     --schedule "every 1d"
+
+name: ado-pr-adversarial-review
+description: Run /cm-adversarial-reviewer on recent PRs by an author and email results
+
+args:
+  org:
+    description: "Azure DevOps org URL"
+    default: "https://dev.azure.com/msazure"
+  project:
+    description: "Project name"
+    default: "One"
+  repository:
+    description: "Repository name"
+    default: "Azure-Kusto-Service"
+  repoPath:
+    description: "Local clone path used as Copilot cwd"
+    default: 'c:\Azure-Kusto-Service'
+  creator:
+    description: "PR Creator Alias"
+    default: null
+  status:
+    description: "PR status filter (active/completed/abandoned/all)"
+    default: "all"
+  days:
+    description: "Only include PRs created within the last N days"
+    default: "7"
+  mailTo:
+    description: "Email recipient alias"
+    default: null
+
+steps:
+  # 1. Fetch PRs created in the last `days` by `creator` in the target repo
+  - id: prs
+    pipeline: >
+      ado.pr.monitor
+      --org "${org}"
+      --project "${project}"
+      --repository "${repository}"
+      --creator "${creator}"
+      --status "${status}"
+      --days "${days}"
+
+  # 2. If no PRs, email a "nothing to review" notice and halt the workflow
+  - id: empty-mail
+    when: length($prs.json) == 0
+    pipeline: >
+      mail.send
+      --to "${mailTo}"
+      --subject "Adversarial review: no PRs from ${creator} in the last ${days} days"
+      --body "No PRs were found for ${creator} in ${repository} over the last ${days} days."
+
+  # 3. Stop early when there's nothing to review (cleaner than guarding every later step)
+  - id: stop-if-empty
+    when: length($prs.json) == 0
+    pipeline: break --message "No PRs to review"
+
+  # 4. For each PR: run the adversarial reviewer agent, then email the output
+  - id: reviews
+    for_each: $prs.json
+    steps:
+      - id: log-start
+        run: >
+          echo "[review] starting PR #$item.json.pullRequestId — $item.json.title"
+
+      - id: review
+        cwd: '${repoPath}'
+        pipeline: >
+          copilot
+          --prompt "/cm-adversarial-reviewer review PR #$item.json.pullRequestId
+          titled '$item.json.title' at $item.json.url — don't post any comments to the PR,
+          just output the comments inline you found in the CLI and don't wait for me
+          to provide feedback on your findings"
+
+      - id: log-done
+        run: >
+          echo "[review] finished PR #$item.json.pullRequestId — emailing ${mailTo}"
+
+      - id: mail
+        pipeline: >
+          mail.send
+          --to "${mailTo}"
+          --subject "Adversarial review: PR #$item.json.pullRequestId — $item.json.title"
+          --content-type Text
+        stdin: $review.stdout
