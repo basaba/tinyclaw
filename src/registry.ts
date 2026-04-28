@@ -8,6 +8,7 @@ import {
   createMailSendCommand,
   createMailSearchCommand,
   createMailReadCommand,
+  createMailReplyCommand,
 } from "./commands/mail.js";
 import type { CopilotBridgeClient } from "./copilot/client.js";
 
@@ -55,6 +56,7 @@ export async function buildRegistry(
     createMailSendCommand(opts.getMcpServers),
     createMailSearchCommand(opts.getMcpServers),
     createMailReadCommand(opts.getMcpServers),
+    createMailReplyCommand(opts.getMcpServers),
     createFormatMd2HtmlCommand(),
     createAgencyCopilotCommand(),
     ...(opts.extraCommands ?? []),

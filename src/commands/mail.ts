@@ -2,18 +2,28 @@
  * `mail.send`   — Send an email via the agency mail MCP.
  * `mail.search` — Search emails via the agency mail MCP.
  * `mail.read`   — Read a specific email by ID via the agency mail MCP.
+ * `mail.reply`  — Reply to an email by ID via the agency mail MCP.
  *
  * Usage in .lobster workflows:
  *   copilot --prompt "Summarise PRs" | mail.send --to alice@example.com --subject "PR Summary"
  *   mail.search --query "from:bob subject:deploy" | mail.read
+ *   mail.reply --id <messageId> --body "Thanks!"
  */
 
 import type { LobsterCommand } from "./copilot.js";
 import { resolveServer, callTool } from "../mcp-client/client.js";
 import type { McpServerConfig } from "../mcp-config/loader.js";
+import { Marked } from "marked";
 
 /** Default $select fields — keeps payloads small and avoids Graph API size limits. */
 const DEFAULT_SELECT = "id,conversationId,subject,from,receivedDateTime,isRead,hasAttachments,bodyPreview";
+
+/** Convert markdown text to HTML for email bodies. */
+async function markdownToHtml(md: string): Promise<string> {
+  const marked = new Marked();
+  const html = await marked.parse(md);
+  return typeof html === "string" ? html : md;
+}
 
 function asStream(items: unknown[]): AsyncIterable<unknown> {
   return {
@@ -188,6 +198,7 @@ export function createMailSendCommand(
           bcc: { type: "string", description: "Comma-separated Bcc recipients" },
           subject: { type: "string", description: "Email subject" },
           body: { type: "string", description: "Email body (or pipe input)" },
+          markdown: { type: "boolean", description: "Convert piped markdown to HTML before sending" },
           "content-type": { type: "string", description: "Text (default) or HTML" },
           draft: { type: "boolean", description: "Create a draft instead of sending" },
         },
@@ -209,6 +220,7 @@ export function createMailSendCommand(
         "  --bcc            Bcc recipients (comma-separated)",
         "  --subject        Email subject line",
         "  --body           Email body (if omitted, uses piped input)",
+        "  --markdown       Convert piped markdown to HTML before sending (implies --content-type html)",
         "  --content-type   Text (default) or HTML",
         "  --draft          Create a draft instead of sending immediately",
       ].join("\n");
@@ -224,7 +236,8 @@ export function createMailSendCommand(
       const cc = args.cc as string | undefined;
       const bcc = args.bcc as string | undefined;
       const subject = args.subject as string | undefined;
-      const contentType = args["content-type"] as string | undefined;
+      const useMarkdown = args.markdown === true || args.markdown === "true";
+      let contentType = (args["content-type"] as string | undefined)?.toUpperCase() === "HTML" || useMarkdown ? "HTML" : undefined;
       const isDraft = args.draft === true || args.draft === "true";
 
       // Determine body content
@@ -234,6 +247,12 @@ export function createMailSendCommand(
         if (piped.trim()) body = piped;
       } else {
         await drain(input);
+      }
+
+      // Convert markdown to HTML if --markdown flag is set
+      if (body && useMarkdown) {
+        body = await markdownToHtml(body);
+        contentType = "HTML";
       }
 
       if (!to && !isDraft) {
@@ -609,6 +628,149 @@ export function createMailReadCommand(
       }
 
       return { output: readAll() };
+    },
+  };
+}
+
+// ── mail.reply ─────────────────────────────────────────────────────
+
+export function createMailReplyCommand(
+  getServers: () => Record<string, McpServerConfig>,
+): LobsterCommand {
+  return {
+    name: "mail.reply",
+    meta: {
+      description: "Reply to an email by message ID via Microsoft 365",
+      argsSchema: {
+        type: "object",
+        properties: {
+          id: { type: "string", description: "Message ID to reply to" },
+          body: { type: "string", description: "Reply body (or pipe input)" },
+          markdown: { type: "boolean", description: "Convert piped markdown to HTML before sending" },
+          "content-type": { type: "string", description: "text (default) or html" },
+          "reply-all": { type: "boolean", description: "Reply to all recipients" },
+          send: { type: "boolean", description: "Send immediately (default true). Use --send false to create a draft reply" },
+          html: { type: "boolean", description: "Return HTML body in the response" },
+        },
+      },
+      sideEffects: ["network"],
+    },
+    help() {
+      return [
+        "mail.reply — Reply to an email via Microsoft 365",
+        "",
+        "Usage:",
+        "  mail.reply --id <messageId> --body 'Thanks!'",
+        "  mail.reply --id <messageId> --reply-all --body 'Acknowledged'",
+        "  copilot --prompt '...' | mail.reply --id <messageId>",
+        "  mail.search --unread | mail.reply --body 'Auto-reply'",
+        "",
+        "Options:",
+        "  --id             Message ID to reply to (optional if piped from mail.search)",
+        "  --body           Reply body (or pipe input as body)",
+        "  --markdown       Convert piped markdown to HTML before sending (implies --content-type html)",
+        "  --content-type   text (default) or html",
+        "  --reply-all      Reply to all recipients (default: reply to sender only)",
+        "  --send           Send immediately (default true). --send false creates draft",
+        "  --html           Return HTML body in the response",
+        "",
+        "When piped from mail.search, replies to each message with the same body.",
+      ].join("\n");
+    },
+    async run({
+      input,
+      args,
+    }: {
+      input: AsyncIterable<unknown>;
+      args: Record<string, unknown>;
+    }) {
+      const messageId = args.id as string | undefined;
+      const replyAll = args["reply-all"] === true || args["reply-all"] === "true";
+      const sendImmediately = args.send !== false && args.send !== "false";
+      const useMarkdown = args.markdown === true || args.markdown === "true";
+      const preferHtml = args.html === true || args.html === "true" || useMarkdown;
+      const contentType = (args["content-type"] as string | undefined)?.toUpperCase() === "HTML" || useMarkdown ? "HTML" : undefined;
+
+      const { config, timeout } = getMailConfig(getServers);
+
+      // Collect piped input
+      const piped: unknown[] = [];
+      for await (const item of input) piped.push(item);
+
+      // Determine reply body
+      let body = args.body as string | undefined;
+      if (!body) {
+        // If piped items look like text/content, use them as the body
+        const textParts: string[] = [];
+        const msgItems: unknown[] = [];
+        for (const item of piped) {
+          const msgId = (item as Record<string, unknown>)?.id as string | undefined;
+          if (msgId && !body) {
+            // This looks like a mail message from mail.search — separate it
+            msgItems.push(item);
+          } else if (typeof item === "string") {
+            textParts.push(item);
+          } else if (item && typeof item === "object") {
+            const obj = item as Record<string, unknown>;
+            const text = obj.text ?? obj.content ?? obj.message ?? obj.body ?? obj.output;
+            if (typeof text === "string") {
+              textParts.push(text);
+            } else {
+              textParts.push(JSON.stringify(item, null, 2));
+            }
+          }
+        }
+
+        if (textParts.length > 0) {
+          body = textParts.join("\n");
+        }
+
+        // If we have mail messages to reply to (from pipe), use them
+        if (msgItems.length > 0 && !messageId) {
+          if (!body) {
+            throw new Error("mail.reply: --body is required when piping messages from mail.search");
+          }
+
+          if (useMarkdown) body = await markdownToHtml(body);
+
+          const results: unknown[] = [];
+          for (const msg of msgItems) {
+            const id = (msg as Record<string, unknown>).id as string;
+            const toolName = replyAll ? "ReplyAllToMessage" : "ReplyToMessage";
+            const toolArgs: Record<string, unknown> = {
+              id,
+              comment: body,
+              sendImmediately,
+              ...(preferHtml ? { preferHtml: true } : {}),
+            };
+            const result = await callTool(config, toolName, toolArgs, timeout);
+            if (result.isError) handleError("mail.reply", result);
+            results.push(...(result.content as unknown[]));
+          }
+          return { output: asStream(results) };
+        }
+      }
+
+      if (!messageId) {
+        throw new Error("mail.reply: --id is required, or pipe messages from mail.search");
+      }
+      if (!body) {
+        throw new Error("mail.reply: --body is required, or pipe input as reply body");
+      }
+
+      if (useMarkdown) body = await markdownToHtml(body);
+
+      const toolName = replyAll ? "ReplyAllToMessage" : "ReplyToMessage";
+      const toolArgs: Record<string, unknown> = {
+        id: messageId,
+        comment: body,
+        sendImmediately,
+        ...(preferHtml ? { preferHtml: true } : {}),
+      };
+
+      const result = await callTool(config, toolName, toolArgs, timeout);
+      if (result.isError) handleError("mail.reply", result);
+      return { output: asStream(result.content as unknown[]) };
     },
   };
 }
