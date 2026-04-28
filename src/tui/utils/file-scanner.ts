@@ -1,5 +1,6 @@
 import { readdirSync, statSync, existsSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, resolve, relative } from "node:path";
+import { homedir } from "node:os";
 
 const DEFAULT_MAX_DEPTH = 4;
 const DEFAULT_MAX_FILES = 200;
@@ -7,7 +8,7 @@ const YAML_RE = /\.ya?ml$/;
 
 /**
  * Recursively scan directories for YAML files.
- * Returns paths relative to the first base directory.
+ * Returns absolute paths so workflows work regardless of where the TUI is opened.
  */
 export function scanYamlFiles(
   baseDirs: string[],
@@ -15,11 +16,10 @@ export function scanYamlFiles(
   maxFiles = DEFAULT_MAX_FILES,
 ): string[] {
   const results: string[] = [];
-  const relBase = baseDirs[0] ?? process.cwd();
 
   for (const dir of baseDirs) {
     if (results.length >= maxFiles) break;
-    walk(dir, 0, maxDepth, maxFiles, results, relBase);
+    walk(resolve(dir), 0, maxDepth, maxFiles, results);
   }
 
   return results;
@@ -31,7 +31,6 @@ function walk(
   maxDepth: number,
   maxFiles: number,
   results: string[],
-  relBase: string,
 ): void {
   if (depth > maxDepth || results.length >= maxFiles) return;
 
@@ -55,9 +54,9 @@ function walk(
     }
 
     if (stat.isDirectory()) {
-      walk(full, depth + 1, maxDepth, maxFiles, results, relBase);
+      walk(full, depth + 1, maxDepth, maxFiles, results);
     } else if (stat.isFile() && YAML_RE.test(entry)) {
-      results.push(relative(relBase, full));
+      results.push(full);
     }
   }
 }
@@ -117,8 +116,32 @@ function fuzzyScore(query: string, target: string): number {
 /** Check whether a path resolves to an existing file. */
 export function fileExists(path: string): boolean {
   try {
-    return existsSync(path) && statSync(path).isFile();
+    const resolved = resolve(path);
+    return existsSync(resolved) && statSync(resolved).isFile();
   } catch {
     return false;
   }
+}
+
+/**
+ * Shorten an absolute path for display purposes.
+ * Replaces home directory with ~ and uses relative path if under cwd.
+ */
+export function shortenPath(absPath: string): string {
+  const cwd = process.cwd();
+  const rel = relative(cwd, absPath);
+  // If the relative path doesn't start with "..", it's under cwd — use it
+  if (!rel.startsWith("..") && !isAbsolute(rel)) {
+    return rel || absPath;
+  }
+  // Otherwise, try replacing home dir with ~
+  const home = homedir();
+  if (absPath.startsWith(home)) {
+    return "~" + absPath.slice(home.length);
+  }
+  return absPath;
+}
+
+function isAbsolute(p: string): boolean {
+  return /^[/\\]|^[a-zA-Z]:/.test(p);
 }

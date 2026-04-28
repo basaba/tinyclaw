@@ -1,6 +1,7 @@
 import React, { useReducer, useCallback, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { randomUUID } from "node:crypto";
+import { resolve } from "node:path";
 import type { DaemonClient } from "../scheduler/daemon-client.js";
 import { ArgsTable, rowsToArgs, type ArgRow } from "./args-table.js";
 import { FilePicker } from "./file-picker.js";
@@ -174,7 +175,7 @@ export function AddWorkflow({ client, availableHeight, onDone }: Props) {
             .addWorkflow({
               id: randomUUID().slice(0, 8),
               name: s.name.trim(),
-              filePath: s.filePath.trim(),
+              filePath: resolve(s.filePath.trim()),
               schedule: formatSchedule(s.scheduleNum.trim(), s.scheduleUnit),
               enabled: true,
               ...(wfArgs ? { args: wfArgs } : {}),

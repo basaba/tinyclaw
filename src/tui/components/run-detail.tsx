@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import type { RunRecord } from "../scheduler/types.js";
 import type { DaemonClient } from "../scheduler/daemon-client.js";
+import { shortenPath } from "../utils/file-scanner.js";
 
 interface Props {
   run: RunRecord;
@@ -229,7 +230,7 @@ export function RunDetail({ run: initialRun, availableHeight, client, liveOutput
         <Text bold color="gray">── Input ──</Text>
         <Box>
           <Text color="gray">File:      </Text>
-          <Text>{run.input.filePath}</Text>
+          <Text>{shortenPath(run.input.filePath)}</Text>
         </Box>
         <Box>
           <Text color="gray">Schedule:  </Text>

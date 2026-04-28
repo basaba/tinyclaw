@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
-import { join } from "node:path";
-import { scanYamlFiles, fuzzyMatch, fileExists } from "../../../src/tui/utils/file-scanner.js";
+import { join, resolve, sep } from "node:path";
+import { scanYamlFiles, fuzzyMatch, fileExists, shortenPath } from "../../../src/tui/utils/file-scanner.js";
 
 const TMP = join(import.meta.dirname ?? __dirname, "__tmp_file_scanner__");
 
@@ -20,17 +20,22 @@ describe("scanYamlFiles", () => {
   beforeEach(setup);
   afterEach(() => rmSync(TMP, { recursive: true, force: true }));
 
-  it("finds yaml/yml files recursively", () => {
+  it("finds yaml/yml files recursively as absolute paths", () => {
     const files = scanYamlFiles([TMP]);
-    expect(files).toContain("a.yaml");
-    expect(files).toContain("b.yml");
-    expect(files).toContain(join("sub", "d.yaml"));
-    expect(files).toContain(join("sub", "deep", "e.yaml"));
+    expect(files).toContain(resolve(TMP, "a.yaml"));
+    expect(files).toContain(resolve(TMP, "b.yml"));
+    expect(files).toContain(resolve(TMP, "sub", "d.yaml"));
+    expect(files).toContain(resolve(TMP, "sub", "deep", "e.yaml"));
+    // All paths should be absolute
+    for (const f of files) {
+      expect(f).toMatch(/^[/\\]|^[a-zA-Z]:/);
+    }
   });
 
   it("excludes non-yaml files", () => {
     const files = scanYamlFiles([TMP]);
-    expect(files).not.toContain("c.txt");
+    const txtFiles = files.filter((f) => f.endsWith(".txt"));
+    expect(txtFiles).toHaveLength(0);
   });
 
   it("excludes node_modules", () => {
@@ -41,9 +46,9 @@ describe("scanYamlFiles", () => {
 
   it("respects maxDepth", () => {
     const files = scanYamlFiles([TMP], 0);
-    expect(files).toContain("a.yaml");
-    expect(files).toContain("b.yml");
-    expect(files).not.toContain(join("sub", "d.yaml"));
+    expect(files).toContain(resolve(TMP, "a.yaml"));
+    expect(files).toContain(resolve(TMP, "b.yml"));
+    expect(files).not.toContain(resolve(TMP, "sub", "d.yaml"));
   });
 
   it("respects maxFiles", () => {
@@ -102,5 +107,34 @@ describe("fileExists", () => {
 
   it("returns false for non-existent path", () => {
     expect(fileExists(join(TMP, "nope.yaml"))).toBe(false);
+  });
+});
+
+describe("shortenPath", () => {
+  it("returns relative path when under cwd", () => {
+    const abs = resolve("sub", "file.yaml");
+    const short = shortenPath(abs);
+    expect(short).toBe(join("sub", "file.yaml"));
+  });
+
+  it("uses ~ for home directory paths", () => {
+    const { homedir } = require("node:os");
+    const home = homedir();
+    const abs = join(home, "projects", "test.yaml");
+    const short = shortenPath(abs);
+    // If not under cwd, should use ~ prefix
+    if (!abs.startsWith(process.cwd())) {
+      expect(short).toMatch(/^~/);
+      expect(short).toContain("projects");
+    }
+  });
+
+  it("returns absolute path as-is when not under cwd or home", () => {
+    // A path that won't be under cwd or home on any platform
+    const fakePath = process.platform === "win32"
+      ? "Z:\\nowhere\\file.yaml"
+      : "/nowhere/file.yaml";
+    const short = shortenPath(fakePath);
+    expect(short).toBe(fakePath);
   });
 });

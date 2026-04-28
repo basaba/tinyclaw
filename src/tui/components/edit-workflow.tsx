@@ -1,5 +1,6 @@
 import React, { useReducer, useCallback, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
+import { resolve } from "node:path";
 import type { DaemonClient } from "../scheduler/daemon-client.js";
 import type { WorkflowEntry } from "../scheduler/types.js";
 import { ArgsTable, argsToRows, rowsToArgs, type ArgRow } from "./args-table.js";
@@ -231,7 +232,7 @@ export function EditWorkflow({ client, workflow, availableHeight, onDone }: Prop
           const newName = s.name.trim();
           if (newName && newName !== workflow.name) patch.name = newName;
 
-          const newFilePath = s.filePath.trim();
+          const newFilePath = resolve(s.filePath.trim());
           if (newFilePath && newFilePath !== workflow.filePath) patch.filePath = newFilePath;
 
           let newSchedule: string;

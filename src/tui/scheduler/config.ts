@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, isAbsolute, resolve } from "node:path";
 import type { ScheduleConfig, RunHistory, RunRecord } from "./types.js";
 import { CONFIG_DIR, ensureConfigDir } from "./platform.js";
 
@@ -12,7 +12,19 @@ const MAX_RUNS_PER_WORKFLOW = 100;
 export function loadSchedules(): ScheduleConfig {
   try {
     const raw = readFileSync(SCHEDULES_FILE, "utf-8");
-    return JSON.parse(raw) as ScheduleConfig;
+    const config = JSON.parse(raw) as ScheduleConfig;
+    // Migrate any relative paths to absolute
+    let migrated = false;
+    for (const wf of config.workflows) {
+      if (!isAbsolute(wf.filePath)) {
+        wf.filePath = resolve(wf.filePath);
+        migrated = true;
+      }
+    }
+    if (migrated) {
+      saveSchedules(config);
+    }
+    return config;
   } catch {
     return { workflows: [] };
   }

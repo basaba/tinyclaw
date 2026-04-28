@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
-import { scanYamlFiles, fuzzyMatch, fileExists } from "../utils/file-scanner.js";
+import { scanYamlFiles, fuzzyMatch, fileExists, shortenPath } from "../utils/file-scanner.js";
 
 interface Props {
   value: string;
@@ -158,7 +158,7 @@ export function FilePicker({ value, cursor, active, onChange, onNext, onPrev, on
             <Box key={s}>
               <Text color={i === selectedIdx ? "cyan" : "gray"}>
                 {i === selectedIdx ? "❯ " : "  "}
-                {s}
+                {shortenPath(s)}
               </Text>
             </Box>
           ))}
