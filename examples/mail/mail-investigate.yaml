@@ -47,6 +47,7 @@ steps:
       | compute _flag='contains(preview, "@@@investigate")'
       | where _flag==true
       | diff.key --key mail-investigate --field conversationId
+      | where changed==true
 
   # 2. For each new thread: read body, investigate, reply
   - id: investigate
