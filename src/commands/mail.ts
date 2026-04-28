@@ -13,7 +13,7 @@ import { resolveServer, callTool } from "../mcp-client/client.js";
 import type { McpServerConfig } from "../mcp-config/loader.js";
 
 /** Default $select fields — keeps payloads small and avoids Graph API size limits. */
-const DEFAULT_SELECT = "id,subject,from,receivedDateTime,isRead,hasAttachments,bodyPreview";
+const DEFAULT_SELECT = "id,conversationId,subject,from,receivedDateTime,isRead,hasAttachments,bodyPreview";
 
 function asStream(items: unknown[]): AsyncIterable<unknown> {
   return {
@@ -28,6 +28,7 @@ function asStream(items: unknown[]): AsyncIterable<unknown> {
 /** Normalised mail message — the fields downstream steps actually need. */
 interface MailSummary {
   id: string;
+  conversationId: string;
   from: string;
   to: string[];
   subject: string;
@@ -108,6 +109,7 @@ export function normaliseMailResults(content: unknown[]): NormalisedMailResult {
         if (!m.id && !m.subject) continue; // not a mail message
         messages.push({
           id: m.id ?? "",
+          conversationId: m.conversationId ?? "",
           from: formatRecipient(m.from ?? m.sender),
           to: Array.isArray(m.toRecipients)
             ? m.toRecipients.map(formatRecipient)
@@ -305,7 +307,7 @@ export function createMailSearchCommand(
           unread: { type: "boolean", description: "Shorthand for --filter 'isRead eq false'" },
           since: { type: "string", description: "Relative time filter: 1h, 6h, 1d, 3d, 1w, 2w, 30d (shorthand for receivedDateTime OData filter)" },
           "order-by": { type: "string", description: "Order by date: newest (default) or oldest" },
-          select: { type: "string", description: "Comma-separated fields to return (default: id,subject,from,receivedDateTime,isRead,hasAttachments,bodyPreview). Use --select '' to fetch all fields" },
+          select: { type: "string", description: "Comma-separated fields to return (default: id,conversationId,subject,from,receivedDateTime,isRead,hasAttachments,bodyPreview). Use --select '' to fetch all fields" },
           all: { type: "boolean", description: "Auto-paginate to fetch all results (default: true). Use --no-all for single page" },
           "page-size": { type: "number", description: "Items per page when using --all (default 25)" },
         },

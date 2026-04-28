@@ -34,6 +34,7 @@ describe("formatRecipient", () => {
 describe("normaliseMailResults", () => {
   const graphMessage = {
     id: "msg-1",
+    conversationId: "conv-abc-123",
     subject: "Hello",
     from: { emailAddress: { name: "Alice", address: "alice@example.com" } },
     toRecipients: [
@@ -52,6 +53,7 @@ describe("normaliseMailResults", () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual({
       id: "msg-1",
+      conversationId: "conv-abc-123",
       from: "Alice <alice@example.com>",
       to: ["Bob <bob@example.com>"],
       subject: "Hello",
@@ -125,6 +127,7 @@ describe("normaliseMailResults", () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual({
       id: "msg-minimal",
+      conversationId: "",
       from: "",
       to: [],
       subject: "(no subject)",
