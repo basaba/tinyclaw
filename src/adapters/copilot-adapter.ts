@@ -72,6 +72,7 @@ export class CopilotAdapter implements DirectAdapter {
     this.client = new CopilotBridgeClient({
       cliUrl: options.cliUrl,
       apiKey: options.apiKey,
+      timeoutMs: options.timeoutMs,
     });
     // Bind invoke so it works when Lobster extracts it via `direct.invoke`
     this.invoke = this.invoke.bind(this);
