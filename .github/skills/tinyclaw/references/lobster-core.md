@@ -92,6 +92,8 @@ Missing paths → empty string. Objects/arrays → JSON-stringified.
 
 **Workflow argument interpolation:** `${arg_name}` — substitutes workflow args. Unresolved → left as-is.
 
+**Environment variable interpolation:** `${env:VAR_NAME}` — substitutes host env vars. The `env:` prefix distinguishes from workflow args. Unset → left as-is. Not resolved in `--dry-run` or `graph` output to avoid leaking secrets.
+
 **Step references:** `$step_id.field`
 
 | Reference | Resolves To |
@@ -103,7 +105,7 @@ Missing paths → empty string. Objects/arrays → JSON-stringified.
 | `$step.response` | Input step response |
 | `$step.skipped` | Whether step was skipped |
 
-**Resolution order:** `${arg}` first, then `$step.field`.
+**Resolution order:** `${arg}` and `${env:VAR}` first, then `$step.field`.
 
 ---
 
@@ -170,6 +172,7 @@ Date tokens: `YYYY`, `MM`, `DD`, `HH`, `mm`, `ss` — all UTC, zero-padded.
 | `diff.gate` | `<items> \| diff.gate --key myKey` | Like `diff.last` but **halts** if unchanged |
 | `diff.key` | `<items> \| diff.key --key myKey [--field id]` | Tag each item `changed: true/false` by comparing a key field against stored state. Persists seen keys to `~/.lobster/state/<key>.json`. Use with `where changed==true` to act only on new items. |
 | `break` | `break [--message "reason"]` | Halt pipeline immediately. Stdin items pass through as output before halting. In workflows, use as `pipeline:` step with `when:` for conditional early termination — workflow returns `status: "ok"` with output from last completed step. |
+| `gate` | `... \| gate --when empty` / `... \| gate --when "length($) > 10"` | Conditional pipeline halt. Collects items, evaluates condition, halts if true. Built-in: `empty`, `not_empty`. Expression: `$` = items array, `@` = per-element. Items pass through as output. |
 
 ### Human-in-the-Loop
 
@@ -232,7 +235,7 @@ Every step requires a unique `id` and exactly **one** execution mode:
 | Pipeline | `pipeline` | Lobster pipeline string. Use `stdin:` to provide input |
 | Nested workflow | `workflow` | Path to sub-workflow. `workflow_args:` for params |
 | Parallel | `parallel` | `{ wait, timeout_ms, branches: [...] }` |
-| Loop | `for_each` | Iterate array. `item_var`, `index_var`, `include_unmatched`, `batch_size`, `steps:`. Iterations where all sub-steps are skipped are excluded from output by default; set `include_unmatched: true` to keep them. |
+| Loop | `for_each` | Iterate array or object (single object treated as one-element array). `item_var`, `index_var`, `include_unmatched`, `batch_size`, `steps:`. Iterations where all sub-steps are skipped are excluded from output by default; set `include_unmatched: true` to keep them. |
 | Approval | `approval` | String prompt or `{ prompt, items, preview, ... }` |
 | Input | `input` | `{ prompt, responseSchema, defaults }` |
 

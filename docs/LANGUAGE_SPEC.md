@@ -258,8 +258,25 @@ when: $approval.approved == true   # in conditions
 | `$step_id.skipped` | Whether step was skipped |
 
 **Resolution order** in a single expression:
-1. First pass: resolve `${arg_name}` → arg values.
+1. First pass: resolve `${arg_name}` and `${env:VAR}` → arg/env values.
 2. Second pass: resolve `$step_id.field` → step output values.
+
+### Environment Variable Interpolation
+
+Reference host environment variables with `${env:VAR_NAME}`:
+
+```yaml
+run: "deploy --token ${env:DEPLOY_TOKEN} --region ${env:AWS_REGION}"
+cwd: "${env:PROJECT_ROOT}/subdir"
+env:
+  DERIVED: "${env:BASE_URL}/api/v2"
+```
+
+- Syntax: `${env:NAME}` — the `env:` prefix distinguishes from workflow args.
+- If the variable is not set, the literal `${env:NAME}` is left as-is.
+- Works in all the same fields as `${arg_name}`: `run`/`command`, `pipeline`, `stdin`, `env`, `cwd`, `workflow` paths.
+- In `env` blocks, workflow-level vars resolve against the base process env; step-level vars resolve against base + workflow env (no circular refs).
+- Not resolved in `--dry-run` or `graph` output to avoid leaking secrets.
 
 ---
 
@@ -536,6 +553,38 @@ mail.search --unread | diff.key --key inbox --field id | where changed==true
 
 This filters to only *new* (unseen) emails. **Side effects:** `writes_state`.
 
+#### `gate` — Conditional pipeline halt
+
+```
+... | gate --when empty
+... | gate --when not_empty --message "Items found"
+... | gate --when "length($) > 10"
+... | gate --when "some($, @.status == \"failed\")"
+```
+
+| Arg | Type | Default | Description |
+|-----|------|---------|-------------|
+| `--when` | string | — | Condition: `empty`, `not_empty`, or an expression using `$` (items array) |
+| `--message` | string | — | Optional reason for halting |
+
+Collects all input items, evaluates the condition, and **halts the pipeline** if the condition is true. Input items are passed through as output whether or not the gate halts.
+
+Built-in conditions: `empty` (halt when no items), `not_empty` (halt when items exist).
+Expression conditions use the expression engine with `$` bound to the collected items array and `@` for per-element access in functions like `some()`, `every()`, `count()`.
+
+**In workflows**, use as a `pipeline:` step with `stdin:` for conditional early termination:
+
+```yaml
+steps:
+  - id: data
+    command: "fetch-items"
+  - id: guard
+    pipeline: 'gate --when empty --message "Nothing to process"'
+    stdin: $data.json
+  - id: process          # skipped when guard halts
+    command: "do-work"
+```
+
 ### Human-in-the-Loop
 
 #### `approve` — Approval gate
@@ -680,6 +729,9 @@ args:                                  # optional — parameter definitions
   branch:
     description: "Git branch"
     default: "main"
+  token:
+    description: "Deploy token"
+    default: "${env:DEPLOY_TOKEN}"     # default from env var
 env:                                   # optional — env vars for all steps
   API_KEY: "secret"
   REPO: "${repo}"                      # supports arg interpolation
@@ -769,7 +821,7 @@ Sub-workflows cannot contain approval/input gates. Circular dependencies are det
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `for_each` | string | — | Reference to array (e.g. `$step.json`) |
+| `for_each` | string | — | Reference to array or object (e.g. `$step.json`). A single object is treated as a one-element array. |
 | `item_var` | string | `"item"` | Variable name for current item |
 | `index_var` | string | `"index"` | Variable name for 0-based index |
 | `include_unmatched` | boolean | `false` | Keep iterations where all sub-steps were skipped |
