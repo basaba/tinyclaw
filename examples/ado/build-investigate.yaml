@@ -16,6 +16,10 @@ args:
   workdir:
     description: "Working directory for the Copilot investigation step"
     default: "."
+  team:
+    description: "Teams team ID to post results to"
+  channel:
+    description: "Teams channel ID to post results to"
 
 steps:
   # 1. Get the latest failed build for the pipeline
@@ -69,6 +73,6 @@ steps:
   - id: investigate
     pipeline: >
       agency.copilot "/cm-e2e-investigation: Please investigate these failures and suggest root causes and next steps."
-      | teams.send --self --markdown
+      | teams.send --team-id ${team} --channel-id ${channel} --markdown
     stdin: $failures.json
     cwd: "${workdir}"

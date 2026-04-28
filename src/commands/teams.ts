@@ -136,7 +136,7 @@ export function createTeamsSendCommand(
       let toolArgs: Record<string, unknown>;
 
       if (teamId && channelId) {
-        toolName = "PostChannelMessage";
+        toolName = "SendMessageToChannel";
         toolArgs = {
           teamId,
           channelId,
@@ -146,7 +146,7 @@ export function createTeamsSendCommand(
           ...(importance ? { importance } : {}),
         };
       } else if (chatId) {
-        toolName = "PostMessage";
+        toolName = "SendMessageToChat";
         toolArgs = {
           chatId,
           content: message,
