@@ -186,11 +186,21 @@ export function AddWorkflow({ client, availableHeight, onDone }: Props) {
   const argRowsRef = useRef(argRows);
   argRowsRef.current = argRows;
   const [viewing, setViewing] = useState(false);
+  const [confirmingExit, setConfirmingExit] = useState(false);
+
+  const hasChanges = useCallback(() => {
+    const s = stateRef.current;
+    return !!(s.name.trim() || s.filePath.trim() || s.scheduleNum.trim() || s.scheduleTime.trim() || argRowsRef.current.length > 0);
+  }, []);
 
   const handleInput = useCallback(
     (input: string, key: { return: boolean; escape: boolean; backspace: boolean; delete: boolean; ctrl: boolean; meta: boolean; upArrow: boolean; downArrow: boolean; leftArrow: boolean; rightArrow: boolean; shift: boolean; tab: boolean }) => {
       if (key.escape) {
-        onDone();
+        if (hasChanges()) {
+          setConfirmingExit(true);
+        } else {
+          onDone();
+        }
         return;
       }
 
@@ -280,7 +290,15 @@ export function AddWorkflow({ client, availableHeight, onDone }: Props) {
     [client, onDone],
   );
 
-  useInput(handleInput, { isActive: !viewing && state.field !== "args" && state.field !== "filePath" });
+  useInput(handleInput, { isActive: !viewing && !confirmingExit && state.field !== "args" && state.field !== "filePath" });
+
+  useInput(
+    (_input, key) => {
+      if (key.escape) onDone();
+      if (key.return) setConfirmingExit(false);
+    },
+    { isActive: confirmingExit },
+  );
 
   const handleArgsExit = useCallback((dir: "next" | "prev") => {
     dispatch({ type: dir === "next" ? "next_field" : "prev_field" });
@@ -301,6 +319,11 @@ export function AddWorkflow({ client, availableHeight, onDone }: Props) {
 
   return (
     <Box flexDirection="column">
+      {confirmingExit && (
+        <Box marginBottom={1}>
+          <Text color="yellow">⚠ You have unsaved changes. Press Esc again to discard, Enter to go back.</Text>
+        </Box>
+      )}
       <Text bold color="green">
         Add New Workflow
       </Text>

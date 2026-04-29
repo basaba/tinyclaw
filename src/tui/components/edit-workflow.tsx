@@ -244,6 +244,22 @@ export function EditWorkflow({ client, workflow, availableHeight, onDone }: Prop
   const argRowsRef = useRef(argRows);
   argRowsRef.current = argRows;
   const [viewing, setViewing] = useState(false);
+  const [confirmingExit, setConfirmingExit] = useState(false);
+  const initialStateRef = useRef(buildInitialState(workflow));
+  const initialArgsRef = useRef(argsToRows(workflow.args));
+
+  const hasChanges = useCallback(() => {
+    const s = stateRef.current;
+    const init = initialStateRef.current;
+    if (s.name !== init.name || s.filePath !== init.filePath) return true;
+    if (s.scheduleMode !== init.scheduleMode) return true;
+    if (s.scheduleNum !== init.scheduleNum || s.scheduleUnit !== init.scheduleUnit) return true;
+    if (s.scheduleTime !== init.scheduleTime) return true;
+    if (s.rawSchedule !== init.rawSchedule) return true;
+    const curArgs = JSON.stringify(rowsToArgs(argRowsRef.current) ?? {});
+    const origArgs = JSON.stringify(rowsToArgs(initialArgsRef.current) ?? {});
+    return curArgs !== origArgs;
+  }, []);
 
   const handleInput = useCallback(
     (
@@ -264,7 +280,11 @@ export function EditWorkflow({ client, workflow, availableHeight, onDone }: Prop
       },
     ) => {
       if (key.escape) {
-        onDone();
+        if (hasChanges()) {
+          setConfirmingExit(true);
+        } else {
+          onDone();
+        }
         return;
       }
 
@@ -382,7 +402,15 @@ export function EditWorkflow({ client, workflow, availableHeight, onDone }: Prop
     [client, workflow, onDone],
   );
 
-  useInput(handleInput, { isActive: !viewing && state.field !== "args" && state.field !== "filePath" });
+  useInput(handleInput, { isActive: !viewing && !confirmingExit && state.field !== "args" && state.field !== "filePath" });
+
+  useInput(
+    (_input, key) => {
+      if (key.escape) onDone();
+      if (key.return) setConfirmingExit(false);
+    },
+    { isActive: confirmingExit },
+  );
 
   const handleArgsExit = useCallback((dir: "next" | "prev") => {
     dispatch({ type: dir === "next" ? "next_field" : "prev_field" });
@@ -403,6 +431,11 @@ export function EditWorkflow({ client, workflow, availableHeight, onDone }: Prop
 
   return (
     <Box flexDirection="column">
+      {confirmingExit && (
+        <Box marginBottom={1}>
+          <Text color="yellow">⚠ You have unsaved changes. Press Esc again to discard, Enter to go back.</Text>
+        </Box>
+      )}
       <Text bold color="yellow">
         Edit Workflow
       </Text>
