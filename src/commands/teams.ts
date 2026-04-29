@@ -17,6 +17,7 @@ import type { LobsterCommand } from "./copilot.js";
 import { resolveServer, callTool } from "../mcp-client/client.js";
 import type { McpServerConfig } from "../mcp-config/loader.js";
 import { markdownToTeamsHtml, sanitizeForTeams } from "./teams-html.js";
+import { appendWatermark } from "./watermark.js";
 
 function asStream(items: unknown[]): AsyncIterable<unknown> {
   return {
@@ -130,6 +131,9 @@ export function createTeamsSendCommand(
         // Sanitize raw HTML input for Teams compatibility
         message = sanitizeForTeams(message);
       }
+
+      // Append watermark if enabled
+      message = appendWatermark(message, contentType === "html");
 
       // Determine which MCP tool to call
       let toolName: string;

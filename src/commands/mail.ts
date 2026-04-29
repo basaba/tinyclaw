@@ -14,6 +14,7 @@ import type { LobsterCommand } from "./copilot.js";
 import { resolveServer, callTool } from "../mcp-client/client.js";
 import type { McpServerConfig } from "../mcp-config/loader.js";
 import { Marked } from "marked";
+import { appendWatermark } from "./watermark.js";
 
 /** Default $select fields — keeps payloads small and avoids Graph API size limits. */
 const DEFAULT_SELECT = "id,conversationId,subject,from,receivedDateTime,isRead,hasAttachments,bodyPreview";
@@ -253,6 +254,11 @@ export function createMailSendCommand(
       if (body && useMarkdown) {
         body = await markdownToHtml(body);
         contentType = "HTML";
+      }
+
+      // Append watermark if enabled
+      if (body) {
+        body = appendWatermark(body, contentType === "HTML");
       }
 
       if (!to && !isDraft) {
@@ -732,6 +738,7 @@ export function createMailReplyCommand(
           }
 
           if (useMarkdown) body = await markdownToHtml(body);
+          body = appendWatermark(body, contentType === "HTML");
 
           const results: unknown[] = [];
           for (const msg of msgItems) {
@@ -759,6 +766,7 @@ export function createMailReplyCommand(
       }
 
       if (useMarkdown) body = await markdownToHtml(body);
+      body = appendWatermark(body, contentType === "HTML");
 
       const toolName = replyAll ? "ReplyAllToMessage" : "ReplyToMessage";
       const toolArgs: Record<string, unknown> = {
