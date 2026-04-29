@@ -26,21 +26,50 @@ function formatTime(date: Date): string {
   return `${h12}:${m} ${ampm}`;
 }
 
+const DAILY_CRON_RE = /^(\d{1,2})\s+(\d{1,2})\s+\*\s+\*\s+\*$/;
+
+function formatScheduleDisplay(schedule: string): string {
+  const cm = DAILY_CRON_RE.exec(schedule.trim());
+  if (cm) {
+    const h = parseInt(cm[2], 10);
+    const m = cm[1].padStart(2, "0");
+    const ampm = h >= 12 ? "PM" : "AM";
+    const h12 = h % 12 || 12;
+    return `daily ${h12}:${m} ${ampm}`;
+  }
+  return schedule;
+}
+
 function formatNextRun(wf: WorkflowEntry, lastRun: RunRecord | null): string {
   if (!wf.enabled) return "paused";
 
   const intervalMs = parseIntervalMs(wf.schedule);
-  if (!intervalMs) return "—";
+  if (intervalMs) {
+    if (!lastRun) return "soon";
+    const lastTime = new Date(lastRun.completedAt ?? lastRun.triggeredAt).getTime();
+    const nextTime = lastTime + intervalMs;
+    const nowMs = Date.now();
+    if (nextTime <= nowMs) return "soon";
+    const next = new Date(nextTime);
+    return formatNextDate(next);
+  }
 
-  if (!lastRun) return "soon";
+  // Daily cron: M H * * *
+  const cm = DAILY_CRON_RE.exec(wf.schedule.trim());
+  if (cm) {
+    const minute = parseInt(cm[1], 10);
+    const hour = parseInt(cm[2], 10);
+    const now = new Date();
+    const next = new Date(now);
+    next.setHours(hour, minute, 0, 0);
+    if (next <= now) next.setDate(next.getDate() + 1);
+    return formatNextDate(next);
+  }
 
-  const lastTime = new Date(lastRun.completedAt ?? lastRun.triggeredAt).getTime();
-  const nextTime = lastTime + intervalMs;
-  const nowMs = Date.now();
+  return "—";
+}
 
-  if (nextTime <= nowMs) return "soon";
-
-  const next = new Date(nextTime);
+function formatNextDate(next: Date): string {
   const today = new Date();
   const isToday = next.getFullYear() === today.getFullYear()
     && next.getMonth() === today.getMonth()
@@ -244,7 +273,7 @@ export function WorkflowList({ client, workflows, onAdd, onEdit, onHistory, onVi
                     {selected ? "▸ " : "  "}
                     {status.padEnd(10)}
                     {wf.name.padEnd(25)}
-                    {wf.schedule.padEnd(20)}
+                    {formatScheduleDisplay(wf.schedule).padEnd(20)}
                     {nextRunStr.padEnd(14)}
                     {lastRunStr.padEnd(14)}
                     {shortenPath(wf.filePath)}

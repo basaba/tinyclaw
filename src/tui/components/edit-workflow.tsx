@@ -14,7 +14,15 @@ interface Props {
   onDone: () => void;
 }
 
-type Field = "name" | "filePath" | "schedule" | "scheduleNum" | "scheduleUnit" | "args" | "submit";
+type Field = "name" | "filePath" | "schedule" | "scheduleMode" | "scheduleNum" | "scheduleUnit" | "scheduleTime" | "args" | "submit";
+
+const MODES = ["interval", "daily"] as const;
+type ScheduleMode = (typeof MODES)[number];
+
+const MODE_LABELS: Record<ScheduleMode, string> = {
+  interval: "every …",
+  daily: "daily at …",
+};
 
 const UNITS = ["min", "hour", "day"] as const;
 type ScheduleUnit = (typeof UNITS)[number];
@@ -29,8 +37,10 @@ interface FormState {
   field: Field;
   name: string;
   filePath: string;
+  scheduleMode: ScheduleMode;
   scheduleNum: string;
   scheduleUnit: ScheduleUnit;
+  scheduleTime: string; // HH:MM
   rawSchedule: string;
   useRawSchedule: boolean;
   cursor: number;
@@ -44,47 +54,61 @@ type Action =
   | { type: "delete_char" }
   | { type: "move_cursor"; dir: "left" | "right" | "home" | "end" }
   | { type: "cycle_unit"; dir: 1 | -1 }
+  | { type: "cycle_mode"; dir: 1 | -1 }
   | { type: "set_error"; error: string }
   | { type: "set_filepath"; value: string; cursor: number };
 
 const INTERVAL_RE = /^every\s+(\d+)\s*(s|sec|seconds?|m|min|minutes?|h|hr|hours?|d|day|days?)$/i;
 
-function parseSchedule(schedule: string): { num: string; unit: ScheduleUnit } | null {
+const DAILY_CRON_RE = /^(\d{1,2})\s+(\d{1,2})\s+\*\s+\*\s+\*$/;
+
+function parseSchedule(schedule: string): { mode: "interval"; num: string; unit: ScheduleUnit } | { mode: "daily"; time: string } | null {
   const m = INTERVAL_RE.exec(schedule.trim());
-  if (!m) return null;
-  const num = m[1];
-  const u = m[2].toLowerCase();
-  let unit: ScheduleUnit;
-  if (u.startsWith("d")) unit = "day";
-  else if (u.startsWith("h")) unit = "hour";
-  else unit = "min";
-  return { num, unit };
+  if (m) {
+    const num = m[1];
+    const u = m[2].toLowerCase();
+    let unit: ScheduleUnit;
+    if (u.startsWith("d")) unit = "day";
+    else if (u.startsWith("h")) unit = "hour";
+    else unit = "min";
+    return { mode: "interval", num, unit };
+  }
+  const cm = DAILY_CRON_RE.exec(schedule.trim());
+  if (cm) {
+    const minute = cm[1].padStart(2, "0");
+    const hour = cm[2].padStart(2, "0");
+    return { mode: "daily", time: `${hour}:${minute}` };
+  }
+  return null;
 }
 
-function getFields(useRaw: boolean): Field[] {
-  return useRaw
-    ? ["name", "filePath", "schedule", "args", "submit"]
-    : ["name", "filePath", "scheduleNum", "scheduleUnit", "args", "submit"];
+function getFields(state: FormState): Field[] {
+  if (state.useRawSchedule) return ["name", "filePath", "schedule", "args", "submit"];
+  return state.scheduleMode === "interval"
+    ? ["name", "filePath", "scheduleMode", "scheduleNum", "scheduleUnit", "args", "submit"]
+    : ["name", "filePath", "scheduleMode", "scheduleTime", "args", "submit"];
 }
 
 function getFieldValue(state: FormState): string {
   const f = state.field;
   if (f === "scheduleNum") return state.scheduleNum;
+  if (f === "scheduleTime") return state.scheduleTime;
   if (f === "schedule") return state.rawSchedule;
-  if (f === "submit" || f === "scheduleUnit" || f === "args") return "";
+  if (f === "submit" || f === "scheduleUnit" || f === "scheduleMode" || f === "args") return "";
   return state[f] as string;
 }
 
 function reducer(state: FormState, action: Action): FormState {
-  const fields = getFields(state.useRawSchedule);
+  const fields = getFields(state);
 
   switch (action.type) {
     case "next_field": {
       const idx = fields.indexOf(state.field);
       const next = fields[(idx + 1) % fields.length];
       const val = next === "scheduleNum" ? state.scheduleNum
+        : next === "scheduleTime" ? state.scheduleTime
         : next === "schedule" ? state.rawSchedule
-        : next === "submit" || next === "scheduleUnit" || next === "args" ? ""
+        : next === "submit" || next === "scheduleUnit" || next === "scheduleMode" || next === "args" ? ""
         : (state[next] as string);
       return { ...state, field: next, cursor: val.length };
     }
@@ -92,30 +116,34 @@ function reducer(state: FormState, action: Action): FormState {
       const idx = fields.indexOf(state.field);
       const prev = fields[(idx - 1 + fields.length) % fields.length];
       const val = prev === "scheduleNum" ? state.scheduleNum
+        : prev === "scheduleTime" ? state.scheduleTime
         : prev === "schedule" ? state.rawSchedule
-        : prev === "submit" || prev === "scheduleUnit" || prev === "args" ? ""
+        : prev === "submit" || prev === "scheduleUnit" || prev === "scheduleMode" || prev === "args" ? ""
         : (state[prev] as string);
       return { ...state, field: prev, cursor: val.length };
     }
     case "append": {
       const f = state.field;
-      if (f === "submit" || f === "scheduleUnit" || f === "args") return state;
+      if (f === "submit" || f === "scheduleUnit" || f === "scheduleMode" || f === "args") return state;
       const cur = getFieldValue(state);
       const pos = state.cursor;
       if (f === "scheduleNum" && !/^\d$/.test(action.char)) return state;
+      if (f === "scheduleTime" && !/^[\d:]$/.test(action.char)) return state;
       const updated = cur.slice(0, pos) + action.char + cur.slice(pos);
       if (f === "scheduleNum") return { ...state, scheduleNum: updated, cursor: pos + 1 };
+      if (f === "scheduleTime") return { ...state, scheduleTime: updated, cursor: pos + 1 };
       if (f === "schedule") return { ...state, rawSchedule: updated, cursor: pos + 1 };
       return { ...state, [f]: updated, cursor: pos + 1 };
     }
     case "delete_char": {
       const f = state.field;
-      if (f === "submit" || f === "scheduleUnit" || f === "args") return state;
+      if (f === "submit" || f === "scheduleUnit" || f === "scheduleMode" || f === "args") return state;
       const cur = getFieldValue(state);
       const pos = state.cursor;
       if (pos === 0) return state;
       const updated = cur.slice(0, pos - 1) + cur.slice(pos);
       if (f === "scheduleNum") return { ...state, scheduleNum: updated, cursor: pos - 1 };
+      if (f === "scheduleTime") return { ...state, scheduleTime: updated, cursor: pos - 1 };
       if (f === "schedule") return { ...state, rawSchedule: updated, cursor: pos - 1 };
       return { ...state, [f]: updated, cursor: pos - 1 };
     }
@@ -132,6 +160,11 @@ function reducer(state: FormState, action: Action): FormState {
       const idx = UNITS.indexOf(state.scheduleUnit);
       const next = (idx + action.dir + UNITS.length) % UNITS.length;
       return { ...state, scheduleUnit: UNITS[next] };
+    }
+    case "cycle_mode": {
+      const idx = MODES.indexOf(state.scheduleMode);
+      const next = (idx + action.dir + MODES.length) % MODES.length;
+      return { ...state, scheduleMode: MODES[next] };
     }
     case "set_error":
       return { ...state, error: action.error };
@@ -158,13 +191,30 @@ function TextWithCursor({ value, cursor, active }: { value: string; cursor: numb
 
 function buildInitialState(wf: WorkflowEntry): FormState {
   const parsed = parseSchedule(wf.schedule);
-  if (parsed) {
+  if (parsed?.mode === "interval") {
     return {
       field: "name",
       name: wf.name,
       filePath: wf.filePath,
+      scheduleMode: "interval",
       scheduleNum: parsed.num,
       scheduleUnit: parsed.unit,
+      scheduleTime: "",
+      rawSchedule: wf.schedule,
+      useRawSchedule: false,
+      cursor: 0,
+      error: "",
+    };
+  }
+  if (parsed?.mode === "daily") {
+    return {
+      field: "name",
+      name: wf.name,
+      filePath: wf.filePath,
+      scheduleMode: "daily",
+      scheduleNum: "",
+      scheduleUnit: "min",
+      scheduleTime: parsed.time,
       rawSchedule: wf.schedule,
       useRawSchedule: false,
       cursor: 0,
@@ -175,8 +225,10 @@ function buildInitialState(wf: WorkflowEntry): FormState {
     field: "name",
     name: wf.name,
     filePath: wf.filePath,
+    scheduleMode: "interval",
     scheduleNum: "",
     scheduleUnit: "min",
+    scheduleTime: "",
     rawSchedule: wf.schedule,
     useRawSchedule: true,
     cursor: 0,
@@ -238,6 +290,9 @@ export function EditWorkflow({ client, workflow, availableHeight, onDone }: Prop
           let newSchedule: string;
           if (s.useRawSchedule) {
             newSchedule = s.rawSchedule.trim();
+          } else if (s.scheduleMode === "daily") {
+            const [h, m] = s.scheduleTime.split(":");
+            newSchedule = `${parseInt(m || "0", 10)} ${parseInt(h || "0", 10)} * * *`;
           } else {
             newSchedule = `every ${s.scheduleNum.trim()} ${s.scheduleUnit}`;
           }
@@ -280,6 +335,17 @@ export function EditWorkflow({ client, workflow, availableHeight, onDone }: Prop
         }
         if (key.rightArrow || key.downArrow) {
           dispatch({ type: "cycle_unit", dir: 1 });
+          return;
+        }
+      }
+
+      if (s.field === "scheduleMode") {
+        if (key.leftArrow || key.upArrow) {
+          dispatch({ type: "cycle_mode", dir: -1 });
+          return;
+        }
+        if (key.rightArrow || key.downArrow) {
+          dispatch({ type: "cycle_mode", dir: 1 });
           return;
         }
       }
@@ -332,9 +398,8 @@ export function EditWorkflow({ client, workflow, availableHeight, onDone }: Prop
     );
   }
 
-  const fields = getFields(state.useRawSchedule);
+  const fields = getFields(state);
   const fieldColor = (f: Field) => (fields.includes(f) && f === state.field ? "cyan" : "gray");
-  const isScheduleActive = state.field === "scheduleNum" || state.field === "scheduleUnit";
 
   return (
     <Box flexDirection="column">
@@ -364,30 +429,59 @@ export function EditWorkflow({ client, workflow, availableHeight, onDone }: Prop
             <TextWithCursor value={state.rawSchedule} cursor={state.cursor} active={state.field === "schedule"} />
           </Box>
         ) : (
-          <Box>
-            <Text color={isScheduleActive ? "cyan" : "gray"}>Schedule: </Text>
-            <Text color={fieldColor("scheduleNum")}>every </Text>
-            <TextWithCursor
-              value={state.scheduleNum || (state.field === "scheduleNum" ? "" : "…")}
-              cursor={state.cursor}
-              active={state.field === "scheduleNum"}
-            />
-            <Text> </Text>
-            {UNITS.map((u) => (
-              <Text key={u}>
-                {state.field === "scheduleUnit" && u === state.scheduleUnit ? (
-                  <Text bold inverse color="cyan">{` ${UNIT_LABELS[u]} `}</Text>
-                ) : u === state.scheduleUnit ? (
-                  <Text bold color="cyan">{` ${UNIT_LABELS[u]} `}</Text>
-                ) : (
-                  <Text color="gray">{` ${UNIT_LABELS[u]} `}</Text>
+          <>
+            <Box>
+              <Text color={fieldColor("scheduleMode")}>Schedule: </Text>
+              {MODES.map((mode) => (
+                <Text key={mode}>
+                  {state.field === "scheduleMode" && mode === state.scheduleMode ? (
+                    <Text bold inverse color="cyan">{` ${MODE_LABELS[mode]} `}</Text>
+                  ) : mode === state.scheduleMode ? (
+                    <Text bold color="cyan">{` ${MODE_LABELS[mode]} `}</Text>
+                  ) : (
+                    <Text color="gray">{` ${MODE_LABELS[mode]} `}</Text>
+                  )}
+                </Text>
+              ))}
+              {state.field === "scheduleMode" && (
+                <Text color="gray"> ◂/▸ to change</Text>
+              )}
+            </Box>
+            {state.scheduleMode === "interval" ? (
+              <Box>
+                <Text color={state.field === "scheduleNum" || state.field === "scheduleUnit" ? "cyan" : "gray"}>  every </Text>
+                <TextWithCursor
+                  value={state.scheduleNum || (state.field === "scheduleNum" ? "" : "…")}
+                  cursor={state.cursor}
+                  active={state.field === "scheduleNum"}
+                />
+                <Text> </Text>
+                {UNITS.map((u) => (
+                  <Text key={u}>
+                    {state.field === "scheduleUnit" && u === state.scheduleUnit ? (
+                      <Text bold inverse color="cyan">{` ${UNIT_LABELS[u]} `}</Text>
+                    ) : u === state.scheduleUnit ? (
+                      <Text bold color="cyan">{` ${UNIT_LABELS[u]} `}</Text>
+                    ) : (
+                      <Text color="gray">{` ${UNIT_LABELS[u]} `}</Text>
+                    )}
+                  </Text>
+                ))}
+                {state.field === "scheduleUnit" && (
+                  <Text color="gray"> ◂/▸ to change</Text>
                 )}
-              </Text>
-            ))}
-            {state.field === "scheduleUnit" && (
-              <Text color="gray"> ◂/▸ to change</Text>
+              </Box>
+            ) : (
+              <Box>
+                <Text color={fieldColor("scheduleTime")}>  Time (HH:MM): </Text>
+                <TextWithCursor
+                  value={state.scheduleTime || (state.field === "scheduleTime" ? "" : "…")}
+                  cursor={state.cursor}
+                  active={state.field === "scheduleTime"}
+                />
+              </Box>
             )}
-          </Box>
+          </>
         )}
 
         <ArgsTable rows={argRows} onChange={setArgRows} active={state.field === "args"} onExit={handleArgsExit} />
