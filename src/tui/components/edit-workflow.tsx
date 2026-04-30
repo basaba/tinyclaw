@@ -62,7 +62,9 @@ const INTERVAL_RE = /^every\s+(\d+)\s*(s|sec|seconds?|m|min|minutes?|h|hr|hours?
 
 const DAILY_CRON_RE = /^(\d{1,2})\s+(\d{1,2})\s+\*\s+\*\s+\*$/;
 
-function parseSchedule(schedule: string): { mode: "interval"; num: string; unit: ScheduleUnit } | { mode: "daily"; time: string } | null {
+const NDAY_CRON_RE = /^(\d{1,2})\s+(\d{1,2})\s+\*\/(\d+)\s+\*\s+\*$/;
+
+function parseSchedule(schedule: string): { mode: "interval"; num: string; unit: ScheduleUnit; time?: string } | { mode: "daily"; time: string } | null {
   const m = INTERVAL_RE.exec(schedule.trim());
   if (m) {
     const num = m[1];
@@ -73,6 +75,14 @@ function parseSchedule(schedule: string): { mode: "interval"; num: string; unit:
     else unit = "min";
     return { mode: "interval", num, unit };
   }
+  // "M H */N * *" → every N days at HH:MM
+  const nd = NDAY_CRON_RE.exec(schedule.trim());
+  if (nd) {
+    const minute = nd[1].padStart(2, "0");
+    const hour = nd[2].padStart(2, "0");
+    return { mode: "interval", num: nd[3], unit: "day", time: `${hour}:${minute}` };
+  }
+  // "M H * * *" → daily at HH:MM (also matches every 1 day)
   const cm = DAILY_CRON_RE.exec(schedule.trim());
   if (cm) {
     const minute = cm[1].padStart(2, "0");
@@ -84,9 +94,13 @@ function parseSchedule(schedule: string): { mode: "interval"; num: string; unit:
 
 function getFields(state: FormState): Field[] {
   if (state.useRawSchedule) return ["name", "filePath", "schedule", "args", "submit"];
-  return state.scheduleMode === "interval"
-    ? ["name", "filePath", "scheduleMode", "scheduleNum", "scheduleUnit", "args", "submit"]
-    : ["name", "filePath", "scheduleMode", "scheduleTime", "args", "submit"];
+  if (state.scheduleMode === "interval") {
+    const base: Field[] = ["name", "filePath", "scheduleMode", "scheduleNum", "scheduleUnit"];
+    if (state.scheduleUnit === "day") base.push("scheduleTime");
+    base.push("args", "submit");
+    return base;
+  }
+  return ["name", "filePath", "scheduleMode", "scheduleTime", "args", "submit"];
 }
 
 function getFieldValue(state: FormState): string {
@@ -199,7 +213,7 @@ function buildInitialState(wf: WorkflowEntry): FormState {
       scheduleMode: "interval",
       scheduleNum: parsed.num,
       scheduleUnit: parsed.unit,
-      scheduleTime: "",
+      scheduleTime: parsed.time ?? "",
       rawSchedule: wf.schedule,
       useRawSchedule: false,
       cursor: 0,
@@ -313,6 +327,11 @@ export function EditWorkflow({ client, workflow, availableHeight, onDone }: Prop
           } else if (s.scheduleMode === "daily") {
             const [h, m] = s.scheduleTime.split(":");
             newSchedule = `${parseInt(m || "0", 10)} ${parseInt(h || "0", 10)} * * *`;
+          } else if (s.scheduleUnit === "day") {
+            const [h, m] = s.scheduleTime.split(":");
+            const num = parseInt(s.scheduleNum.trim(), 10);
+            const dayExpr = num === 1 ? "*" : `*/${num}`;
+            newSchedule = `${parseInt(m || "0", 10)} ${parseInt(h || "0", 10)} ${dayExpr} * *`;
           } else {
             newSchedule = `every ${s.scheduleNum.trim()} ${s.scheduleUnit}`;
           }
@@ -481,29 +500,41 @@ export function EditWorkflow({ client, workflow, availableHeight, onDone }: Prop
               )}
             </Box>
             {state.scheduleMode === "interval" ? (
-              <Box>
-                <Text color={state.field === "scheduleNum" || state.field === "scheduleUnit" ? "cyan" : "gray"}>  every </Text>
-                <TextWithCursor
-                  value={state.scheduleNum || (state.field === "scheduleNum" ? "" : "…")}
-                  cursor={state.cursor}
-                  active={state.field === "scheduleNum"}
-                />
-                <Text> </Text>
-                {UNITS.map((u) => (
-                  <Text key={u}>
-                    {state.field === "scheduleUnit" && u === state.scheduleUnit ? (
-                      <Text bold inverse color="cyan">{` ${UNIT_LABELS[u]} `}</Text>
-                    ) : u === state.scheduleUnit ? (
-                      <Text bold color="cyan">{` ${UNIT_LABELS[u]} `}</Text>
-                    ) : (
-                      <Text color="gray">{` ${UNIT_LABELS[u]} `}</Text>
-                    )}
-                  </Text>
-                ))}
-                {state.field === "scheduleUnit" && (
-                  <Text color="gray"> ◂/▸ to change</Text>
+              <>
+                <Box>
+                  <Text color={state.field === "scheduleNum" || state.field === "scheduleUnit" ? "cyan" : "gray"}>  every </Text>
+                  <TextWithCursor
+                    value={state.scheduleNum || (state.field === "scheduleNum" ? "" : "…")}
+                    cursor={state.cursor}
+                    active={state.field === "scheduleNum"}
+                  />
+                  <Text> </Text>
+                  {UNITS.map((u) => (
+                    <Text key={u}>
+                      {state.field === "scheduleUnit" && u === state.scheduleUnit ? (
+                        <Text bold inverse color="cyan">{` ${UNIT_LABELS[u]} `}</Text>
+                      ) : u === state.scheduleUnit ? (
+                        <Text bold color="cyan">{` ${UNIT_LABELS[u]} `}</Text>
+                      ) : (
+                        <Text color="gray">{` ${UNIT_LABELS[u]} `}</Text>
+                      )}
+                    </Text>
+                  ))}
+                  {state.field === "scheduleUnit" && (
+                    <Text color="gray"> ◂/▸ to change</Text>
+                  )}
+                </Box>
+                {state.scheduleUnit === "day" && (
+                  <Box>
+                    <Text color={fieldColor("scheduleTime")}>  at (HH:MM): </Text>
+                    <TextWithCursor
+                      value={state.scheduleTime || (state.field === "scheduleTime" ? "" : "…")}
+                      cursor={state.cursor}
+                      active={state.field === "scheduleTime"}
+                    />
+                  </Box>
                 )}
-              </Box>
+              </>
             ) : (
               <Box>
                 <Text color={fieldColor("scheduleTime")}>  Time (HH:MM): </Text>

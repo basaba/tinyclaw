@@ -32,10 +32,14 @@ const UNIT_LABELS: Record<ScheduleUnit, string> = {
   day: "day",
 };
 
-function getFields(mode: ScheduleMode): Field[] {
-  return mode === "interval"
-    ? ["name", "filePath", "scheduleMode", "scheduleNum", "scheduleUnit", "args", "submit"]
-    : ["name", "filePath", "scheduleMode", "scheduleTime", "args", "submit"];
+function getFields(mode: ScheduleMode, unit: ScheduleUnit): Field[] {
+  if (mode === "interval") {
+    const base: Field[] = ["name", "filePath", "scheduleMode", "scheduleNum", "scheduleUnit"];
+    if (unit === "day") base.push("scheduleTime");
+    base.push("args", "submit");
+    return base;
+  }
+  return ["name", "filePath", "scheduleMode", "scheduleTime", "args", "submit"];
 }
 
 interface FormState {
@@ -72,7 +76,7 @@ function getFieldValue(state: FormState): string {
 
 /** Insert text at cursor, delete at cursor, and move cursor. */
 function reducer(state: FormState, action: Action): FormState {
-  const fields = getFields(state.scheduleMode);
+  const fields = getFields(state.scheduleMode, state.scheduleUnit);
   switch (action.type) {
     case "next_field": {
       const idx = fields.indexOf(state.field);
@@ -174,6 +178,12 @@ function formatSchedule(state: FormState): string {
   if (state.scheduleMode === "daily") {
     const [h, m] = state.scheduleTime.split(":");
     return `${parseInt(m || "0", 10)} ${parseInt(h || "0", 10)} * * *`;
+  }
+  if (state.scheduleUnit === "day") {
+    const [h, m] = state.scheduleTime.split(":");
+    const num = parseInt(state.scheduleNum.trim(), 10);
+    const dayExpr = num === 1 ? "*" : `*/${num}`;
+    return `${parseInt(m || "0", 10)} ${parseInt(h || "0", 10)} ${dayExpr} * *`;
   }
   return `every ${state.scheduleNum.trim()} ${state.scheduleUnit}`;
 }
@@ -314,7 +324,7 @@ export function AddWorkflow({ client, availableHeight, onDone }: Props) {
     );
   }
 
-  const fields = getFields(state.scheduleMode);
+  const fields = getFields(state.scheduleMode, state.scheduleUnit);
   const fieldColor = (f: Field) => (fields.includes(f) && f === state.field ? "cyan" : "gray");
 
   return (
@@ -361,29 +371,41 @@ export function AddWorkflow({ client, availableHeight, onDone }: Props) {
           )}
         </Box>
         {state.scheduleMode === "interval" ? (
-          <Box>
-            <Text color={state.field === "scheduleNum" || state.field === "scheduleUnit" ? "cyan" : "gray"}>  every </Text>
-            <TextWithCursor
-              value={state.scheduleNum || (state.field === "scheduleNum" ? "" : "…")}
-              cursor={state.cursor}
-              active={state.field === "scheduleNum"}
-            />
-            <Text> </Text>
-            {UNITS.map((u) => (
-              <Text key={u}>
-                {state.field === "scheduleUnit" && u === state.scheduleUnit ? (
-                  <Text bold inverse color="cyan">{` ${UNIT_LABELS[u]} `}</Text>
-                ) : u === state.scheduleUnit ? (
-                  <Text bold color="cyan">{` ${UNIT_LABELS[u]} `}</Text>
-                ) : (
-                  <Text color="gray">{` ${UNIT_LABELS[u]} `}</Text>
-                )}
-              </Text>
-            ))}
-            {state.field === "scheduleUnit" && (
-              <Text color="gray"> ◂/▸ to change</Text>
+          <>
+            <Box>
+              <Text color={state.field === "scheduleNum" || state.field === "scheduleUnit" ? "cyan" : "gray"}>  every </Text>
+              <TextWithCursor
+                value={state.scheduleNum || (state.field === "scheduleNum" ? "" : "…")}
+                cursor={state.cursor}
+                active={state.field === "scheduleNum"}
+              />
+              <Text> </Text>
+              {UNITS.map((u) => (
+                <Text key={u}>
+                  {state.field === "scheduleUnit" && u === state.scheduleUnit ? (
+                    <Text bold inverse color="cyan">{` ${UNIT_LABELS[u]} `}</Text>
+                  ) : u === state.scheduleUnit ? (
+                    <Text bold color="cyan">{` ${UNIT_LABELS[u]} `}</Text>
+                  ) : (
+                    <Text color="gray">{` ${UNIT_LABELS[u]} `}</Text>
+                  )}
+                </Text>
+              ))}
+              {state.field === "scheduleUnit" && (
+                <Text color="gray"> ◂/▸ to change</Text>
+              )}
+            </Box>
+            {state.scheduleUnit === "day" && (
+              <Box>
+                <Text color={fieldColor("scheduleTime")}>  at (HH:MM): </Text>
+                <TextWithCursor
+                  value={state.scheduleTime || (state.field === "scheduleTime" ? "" : "…")}
+                  cursor={state.cursor}
+                  active={state.field === "scheduleTime"}
+                />
+              </Box>
             )}
-          </Box>
+          </>
         ) : (
           <Box>
             <Text color={fieldColor("scheduleTime")}>  Time (HH:MM): </Text>
