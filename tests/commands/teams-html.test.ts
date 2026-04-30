@@ -14,9 +14,14 @@ describe("sanitizeForTeams", () => {
     expect(sanitizeForTeams(html)).toBe(html);
   });
 
-  it("keeps tables untouched", () => {
+  it("keeps tables untouched (no thead/tbody)", () => {
     const html = "<table><tr><th>H</th></tr><tr><td>D</td></tr></table>";
     expect(sanitizeForTeams(html)).toBe(html);
+  });
+
+  it("unwraps <thead> and <tbody>", () => {
+    const html = "<table><thead><tr><th>H</th></tr></thead><tbody><tr><td>D</td></tr></tbody></table>";
+    expect(sanitizeForTeams(html)).toBe("<table><tr><th>H</th></tr><tr><td>D</td></tr></table>");
   });
 
   it("keeps <pre><code> blocks", () => {
@@ -249,6 +254,8 @@ const x = 42;
     expect(result).not.toMatch(/<\/?blockquote[\s>]/i);
     expect(result).not.toMatch(/<hr[\s/>]/i);
     expect(result).not.toMatch(/<img[\s]/i);
+    expect(result).not.toMatch(/<\/?thead[\s>]/i);
+    expect(result).not.toMatch(/<\/?tbody[\s>]/i);
   });
 
   it("handles inline HTML in markdown", async () => {
@@ -266,5 +273,15 @@ const x = 42;
     const result = await markdownToTeamsHtml("- [x] Done\n- [ ] Todo");
     expect(result).toContain("☑");
     expect(result).toContain("☐");
+  });
+
+  it("converts tables without thead/tbody", async () => {
+    const md = "| Col1 | Col2 |\n|------|------|\n| a    | b    |";
+    const result = await markdownToTeamsHtml(md);
+    expect(result).toContain("<table>");
+    expect(result).toContain("<th>");
+    expect(result).toContain("<td>");
+    expect(result).not.toMatch(/<thead/i);
+    expect(result).not.toMatch(/<tbody/i);
   });
 });

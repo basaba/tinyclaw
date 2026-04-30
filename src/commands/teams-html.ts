@@ -10,10 +10,11 @@
  *    HTML (covers raw HTML in markdown and --content-type html input).
  *
  * Supported tags: a, b, strong, i, em, u, s, strike, br, ul, ol, li,
- *   span, pre, code, table, thead, tbody, tr, td, th, h1-h6 (converted).
+ *   span, pre, code, table, tr, td, th.
  *
  * Unsupported / stripped: div, p (→ br), h1-h6 (→ bold), img, blockquote,
- *   hr, script, iframe, style, section, article, nav, header, footer, etc.
+ *   hr, script, iframe, style, thead, tbody, tfoot (unwrapped),
+ *   section, article, nav, header, footer, etc.
  */
 
 import { Marked, type MarkedExtension, type Tokens } from "marked";
@@ -36,8 +37,6 @@ const ALLOWED_TAGS = new Set([
   "pre",
   "code",
   "table",
-  "thead",
-  "tbody",
   "tr",
   "td",
   "th",
@@ -69,6 +68,9 @@ const UNWRAP_TAGS = new Set([
   "small",
   "sub",
   "sup",
+  "thead",
+  "tbody",
+  "tfoot",
 ]);
 
 /** Allowed attributes per tag. Everything else is stripped. */
@@ -275,6 +277,25 @@ export function teamsMarkedExtension(): MarkedExtension {
           return `<li>${checkbox}${body}</li>`;
         }
         return `<li>${body}</li>`;
+      },
+
+      // Teams doesn't support <thead>/<tbody>/<tfoot> — emit flat <table><tr> structure
+      table({ header, rows }: Tokens.Table): string {
+        const headerRow = this.tablerow({ text: header.map((cell) => this.tablecell(cell)).join("") } as any);
+        const bodyRows = rows
+          .map((row) => this.tablerow({ text: row.map((cell) => this.tablecell(cell)).join("") } as any))
+          .join("");
+        return `<table>${headerRow}${bodyRows}</table>`;
+      },
+
+      tablerow({ text }: Tokens.TableRow): string {
+        return `<tr>${text}</tr>`;
+      },
+
+      tablecell({ tokens, header }: Tokens.TableCell): string {
+        const content = this.parser.parseInline(tokens);
+        const tag = header ? "th" : "td";
+        return `<${tag}>${content}</${tag}>`;
       },
     },
   };
