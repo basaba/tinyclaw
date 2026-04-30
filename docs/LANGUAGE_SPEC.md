@@ -1974,7 +1974,7 @@ ado.pr.monitor --org ... --project ... --changes-only
 | `--repository <name>` | string | — | Repository filter |
 | `--source-branch <name>` | string | — | Source branch filter |
 | `--target-branch <name>` | string | — | Target branch filter |
-| `--creator <user>` | string | — | PR creator filter |
+| `--creator <user(s)>` | string | — | PR creator filter (comma-separated for multiple) |
 | `--reviewer <user>` | string | — | PR reviewer filter |
 | `--status <string>` | string | `active` | `active\|completed\|abandoned\|all` |
 | `--top <number>` | number | `50` | Max PRs to return |

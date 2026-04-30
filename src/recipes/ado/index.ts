@@ -2,7 +2,7 @@
  * Azure DevOps Recipes
  */
 
-export { fetchAdoPrs, type AdoPrListOptions } from "./pr-list.js";
+export { fetchAdoPrs, normalizeCreators, type AdoPrListOptions } from "./pr-list.js";
 export {
   adoPrMonitor,
   type AdoPrMonitorOptions,

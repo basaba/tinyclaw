@@ -36,7 +36,7 @@ export function createAdoPrMonitorCommand(): LobsterCommand {
           repository: { type: "string", description: "Repository name" },
           "source-branch": { type: "string" },
           "target-branch": { type: "string" },
-          creator: { type: "string" },
+          creator: { type: "string", description: "Filter by PR creator(s), comma-separated for multiple" },
           reviewer: { type: "string" },
           status: { type: "string", description: "active|completed|abandoned|all" },
           top: { type: "number" },
@@ -55,10 +55,12 @@ export function createAdoPrMonitorCommand(): LobsterCommand {
         "Usage:",
         `  ado.pr.monitor --org https://dev.azure.com/myorg --project MyProject`,
         `  ado.pr.monitor --org ... --project ... --status active --target-branch main`,
+        `  ado.pr.monitor --org ... --project ... --creator "alice,bob"`,
         `  ado.pr.monitor --org ... --project ... --changes-only`,
         "",
         "Fetches PRs matching filters, compares against last-known state,",
         "and reports new, removed, and updated PRs.",
+        "--creator accepts comma-separated values to filter by multiple creators.",
         "State is persisted via the Lobster SDK state store (~/.lobster/state/).",
       ].join("\n");
     },
@@ -96,7 +98,7 @@ export function createAdoPrMonitorCommand(): LobsterCommand {
       const tgtBranch = val(args["target-branch"]);
       if (tgtBranch) options.targetBranch = tgtBranch;
       const creator = val(args.creator);
-      if (creator) options.creator = creator;
+      if (creator) options.creator = creator.includes(",") ? creator.split(",").map((c: string) => c.trim()) : creator;
       const reviewer = val(args.reviewer);
       if (reviewer) options.reviewer = reviewer;
       const status = val(args.status);

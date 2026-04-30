@@ -62,7 +62,8 @@ export interface AdoPrListOptions {
   repository?: string;
   sourceBranch?: string;
   targetBranch?: string;
-  creator?: string;
+  /** One or more PR creators to filter by (comma-separated or array). */
+  creator?: string | string[];
   reviewer?: string;
   status?: "active" | "completed" | "abandoned" | "all";
   top?: number;
@@ -72,33 +73,73 @@ export interface AdoPrListOptions {
  * Fetch Azure DevOps PRs matching the given filters.
  * Returns the parsed JSON array from `az repos pr list`.
  */
+/** Normalize creator option into an array (splits comma-separated strings). */
+export function normalizeCreators(
+  creator: string | string[] | undefined,
+): string[] {
+  if (!creator) return [];
+  const raw = Array.isArray(creator) ? creator : [creator];
+  return raw.flatMap((c) => c.split(",")).map((c) => c.trim()).filter(Boolean);
+}
+
+/**
+ * Fetch Azure DevOps PRs matching the given filters.
+ * Returns the parsed JSON array from `az repos pr list`.
+ *
+ * When multiple creators are specified the CLI is called once per creator
+ * and results are deduplicated by `pullRequestId`.
+ */
 export async function fetchAdoPrs(
   options: AdoPrListOptions,
   env?: Record<string, string | undefined>,
 ): Promise<any[]> {
-  const argv = [
+  const creators = normalizeCreators(options.creator);
+
+  // Build base argv (without --creator)
+  const baseArgv = [
     "repos", "pr", "list",
     "--org", options.org,
     "--project", options.project,
     "--output", "json",
   ];
+  if (options.repository) baseArgv.push("--repository", options.repository);
+  if (options.sourceBranch) baseArgv.push("--source-branch", options.sourceBranch);
+  if (options.targetBranch) baseArgv.push("--target-branch", options.targetBranch);
+  if (options.reviewer) baseArgv.push("--reviewer", options.reviewer);
+  if (options.status) baseArgv.push("--status", options.status);
+  if (options.top) baseArgv.push("--top", String(options.top));
 
-  if (options.repository) argv.push("--repository", options.repository);
-  if (options.sourceBranch) argv.push("--source-branch", options.sourceBranch);
-  if (options.targetBranch) argv.push("--target-branch", options.targetBranch);
-  if (options.creator) argv.push("--creator", options.creator);
-  if (options.reviewer) argv.push("--reviewer", options.reviewer);
-  if (options.status) argv.push("--status", options.status);
-  if (options.top) argv.push("--top", String(options.top));
-
-  const { stdout } = await runAz(argv, { env });
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(stdout.trim());
-  } catch {
-    throw new Error(`az returned non-JSON output: ${stdout.trim().slice(0, 200)}`);
+  async function fetchOnce(argv: string[]): Promise<any[]> {
+    const { stdout } = await runAz(argv, { env });
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(stdout.trim());
+    } catch {
+      throw new Error(`az returned non-JSON output: ${stdout.trim().slice(0, 200)}`);
+    }
+    return Array.isArray(parsed) ? parsed : [];
   }
 
-  return Array.isArray(parsed) ? parsed : [];
+  if (creators.length <= 1) {
+    const argv = [...baseArgv];
+    if (creators.length === 1) argv.push("--creator", creators[0]);
+    return fetchOnce(argv);
+  }
+
+  // Multiple creators: fetch in parallel, deduplicate by pullRequestId
+  const batches = await Promise.all(
+    creators.map((c) => fetchOnce([...baseArgv, "--creator", c])),
+  );
+  const seen = new Set<number>();
+  const merged: any[] = [];
+  for (const batch of batches) {
+    for (const pr of batch) {
+      const id = pr?.pullRequestId;
+      if (id != null && !seen.has(id)) {
+        seen.add(id);
+        merged.push(pr);
+      }
+    }
+  }
+  return merged;
 }

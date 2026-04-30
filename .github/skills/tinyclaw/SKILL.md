@@ -91,7 +91,7 @@ ado.pr.monitor --org https://dev.azure.com/myorg --project MyProject
 ado.pr.monitor --org ... --project ... --status active --changes-only
 ```
 
-Required: `--org`, `--project`. Optional: `--repository`, `--source-branch`, `--target-branch`, `--creator`, `--reviewer`, `--status` (active|completed|abandoned|all), `--top`, `--days`, `--changes-only`, `--key`.
+Required: `--org`, `--project`. Optional: `--repository`, `--source-branch`, `--target-branch`, `--creator` (comma-separated for multiple), `--reviewer`, `--status` (active|completed|abandoned|all), `--top`, `--days`, `--changes-only`, `--key`.
 
 Output: array of PR objects. Requires Azure CLI with `azure-devops` extension.
 

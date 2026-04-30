@@ -17,7 +17,7 @@
  *   });
  */
 
-import { fetchAdoPrs, type AdoPrListOptions } from "./pr-list.js";
+import { fetchAdoPrs, normalizeCreators, type AdoPrListOptions } from "./pr-list.js";
 // @ts-ignore — lobster state export is JS-only, no .d.ts yet
 import { diffAndStore } from "@basaba/lobster/state";
 
@@ -133,7 +133,10 @@ function buildKey(options: AdoPrMonitorOptions): string {
   if (options.repository) parts.push(`repo=${options.repository}`);
   if (options.sourceBranch) parts.push(`src=${options.sourceBranch}`);
   if (options.targetBranch) parts.push(`tgt=${options.targetBranch}`);
-  if (options.creator) parts.push(`creator=${options.creator}`);
+  if (options.creator) {
+    const creators = normalizeCreators(options.creator);
+    parts.push(`creator=${creators.sort().join(",")}`);
+  }
   if (options.reviewer) parts.push(`reviewer=${options.reviewer}`);
   if (options.status) parts.push(`status=${options.status}`);
   return parts.join(":");
