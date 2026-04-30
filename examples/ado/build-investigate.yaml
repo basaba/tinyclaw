@@ -17,7 +17,7 @@ cwd: "${workdir}"
 args:
   workdir:
     description: "Working directory for the Copilot investigation step"
-    default: "."
+    default: "${env:KUSTO_REPO_PATH}"
   team:
     description: "Teams team ID to post results to"
   channel:
