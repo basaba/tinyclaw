@@ -3,7 +3,7 @@ import { Box, Text, useInput } from "ink";
 import type { DaemonClient } from "../scheduler/daemon-client.js";
 import type { RunRecord, WorkflowEntry } from "../scheduler/types.js";
 import { getRunsForWorkflow } from "../scheduler/config.js";
-import { shortenPath } from "../utils/file-scanner.js";
+import { basename } from "node:path";
 
 const INTERVAL_RE = /^every\s+(\d+)\s*(s|sec|seconds?|m|min|minutes?|h|hr|hours?|d|day|days?)$/i;
 
@@ -324,7 +324,7 @@ export function WorkflowList({ client, workflows, onAdd, onEdit, onHistory, onVi
                     {formatScheduleDisplay(wf.schedule).padEnd(20)}
                     {nextRunStr.padEnd(14)}
                     {lastRunStr.padEnd(14)}
-                    {shortenPath(wf.filePath)}
+                    {basename(wf.filePath)}
                   </Text>
                 </Box>
               );
