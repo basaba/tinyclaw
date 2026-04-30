@@ -13,14 +13,15 @@ interface Props {
   onDone: () => void;
 }
 
-type Field = "name" | "filePath" | "scheduleMode" | "scheduleNum" | "scheduleUnit" | "scheduleTime" | "args" | "submit";
+type Field = "name" | "filePath" | "scheduleMode" | "scheduleNum" | "scheduleUnit" | "scheduleDow" | "scheduleTime" | "args" | "submit";
 
-const MODES = ["interval", "daily"] as const;
+const MODES = ["interval", "daily", "weekly"] as const;
 type ScheduleMode = (typeof MODES)[number];
 
 const MODE_LABELS: Record<ScheduleMode, string> = {
   interval: "every …",
   daily: "daily at …",
+  weekly: "weekly on …",
 };
 
 const UNITS = ["min", "hour", "day"] as const;
@@ -32,12 +33,18 @@ const UNIT_LABELS: Record<ScheduleUnit, string> = {
   day: "day",
 };
 
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+type DayOfWeek = number; // 0 (Sun) – 6 (Sat)
+
 function getFields(mode: ScheduleMode, unit: ScheduleUnit): Field[] {
   if (mode === "interval") {
     const base: Field[] = ["name", "filePath", "scheduleMode", "scheduleNum", "scheduleUnit"];
     if (unit === "day") base.push("scheduleTime");
     base.push("args", "submit");
     return base;
+  }
+  if (mode === "weekly") {
+    return ["name", "filePath", "scheduleMode", "scheduleDow", "scheduleTime", "args", "submit"];
   }
   return ["name", "filePath", "scheduleMode", "scheduleTime", "args", "submit"];
 }
@@ -49,6 +56,7 @@ interface FormState {
   scheduleMode: ScheduleMode;
   scheduleNum: string;
   scheduleUnit: ScheduleUnit;
+  scheduleDow: DayOfWeek;
   scheduleTime: string; // HH:MM
   cursor: number;
   error: string;
@@ -62,6 +70,7 @@ type Action =
   | { type: "move_cursor"; dir: "left" | "right" | "home" | "end" }
   | { type: "cycle_unit"; dir: 1 | -1 }
   | { type: "cycle_mode"; dir: 1 | -1 }
+  | { type: "cycle_dow"; dir: 1 | -1 }
   | { type: "set_error"; error: string }
   | { type: "set_filepath"; value: string; cursor: number };
 
@@ -70,7 +79,7 @@ function getFieldValue(state: FormState): string {
   const f = state.field;
   if (f === "scheduleNum") return state.scheduleNum;
   if (f === "scheduleTime") return state.scheduleTime;
-  if (f === "submit" || f === "scheduleUnit" || f === "scheduleMode" || f === "args") return "";
+  if (f === "submit" || f === "scheduleUnit" || f === "scheduleMode" || f === "scheduleDow" || f === "args") return "";
   return state[f] as string;
 }
 
@@ -83,7 +92,7 @@ function reducer(state: FormState, action: Action): FormState {
       const next = fields[(idx + 1) % fields.length];
       const val = next === "scheduleNum" ? state.scheduleNum
         : next === "scheduleTime" ? state.scheduleTime
-        : next === "submit" || next === "scheduleUnit" || next === "scheduleMode" || next === "args" ? ""
+        : next === "submit" || next === "scheduleUnit" || next === "scheduleMode" || next === "scheduleDow" || next === "args" ? ""
         : (state[next] as string);
       return { ...state, field: next, cursor: val.length };
     }
@@ -92,13 +101,13 @@ function reducer(state: FormState, action: Action): FormState {
       const prev = fields[(idx - 1 + fields.length) % fields.length];
       const val = prev === "scheduleNum" ? state.scheduleNum
         : prev === "scheduleTime" ? state.scheduleTime
-        : prev === "submit" || prev === "scheduleUnit" || prev === "scheduleMode" || prev === "args" ? ""
+        : prev === "submit" || prev === "scheduleUnit" || prev === "scheduleMode" || prev === "scheduleDow" || prev === "args" ? ""
         : (state[prev] as string);
       return { ...state, field: prev, cursor: val.length };
     }
     case "append": {
       const f = state.field;
-      if (f === "submit" || f === "scheduleUnit" || f === "scheduleMode" || f === "args") return state;
+      if (f === "submit" || f === "scheduleUnit" || f === "scheduleMode" || f === "scheduleDow" || f === "args") return state;
       const cur = getFieldValue(state);
       const pos = state.cursor;
       if (f === "scheduleNum" && !/^\d$/.test(action.char)) return state;
@@ -110,7 +119,7 @@ function reducer(state: FormState, action: Action): FormState {
     }
     case "delete_char": {
       const f = state.field;
-      if (f === "submit" || f === "scheduleUnit" || f === "scheduleMode" || f === "args") return state;
+      if (f === "submit" || f === "scheduleUnit" || f === "scheduleMode" || f === "scheduleDow" || f === "args") return state;
       const cur = getFieldValue(state);
       const pos = state.cursor;
       if (pos === 0) return state;
@@ -137,6 +146,10 @@ function reducer(state: FormState, action: Action): FormState {
       const idx = MODES.indexOf(state.scheduleMode);
       const next = (idx + action.dir + MODES.length) % MODES.length;
       return { ...state, scheduleMode: MODES[next] };
+    }
+    case "cycle_dow": {
+      const next = (state.scheduleDow + action.dir + 7) % 7;
+      return { ...state, scheduleDow: next };
     }
     case "set_error":
       return { ...state, error: action.error };
@@ -169,12 +182,17 @@ const INITIAL_STATE: FormState = {
   scheduleMode: "interval",
   scheduleNum: "",
   scheduleUnit: "min",
+  scheduleDow: 1, // Monday
   scheduleTime: "",
   cursor: 0,
   error: "",
 };
 
 function formatSchedule(state: FormState): string {
+  if (state.scheduleMode === "weekly") {
+    const [h, m] = state.scheduleTime.split(":");
+    return `${parseInt(m || "0", 10)} ${parseInt(h || "0", 10)} * * ${state.scheduleDow}`;
+  }
   if (state.scheduleMode === "daily") {
     const [h, m] = state.scheduleTime.split(":");
     return `${parseInt(m || "0", 10)} ${parseInt(h || "0", 10)} * * *`;
@@ -253,6 +271,17 @@ export function AddWorkflow({ client, availableHeight, onDone }: Props) {
         }
         if (key.rightArrow || key.downArrow) {
           dispatch({ type: "cycle_unit", dir: 1 });
+          return;
+        }
+      }
+
+      if (s.field === "scheduleDow") {
+        if (key.leftArrow || key.upArrow) {
+          dispatch({ type: "cycle_dow", dir: -1 });
+          return;
+        }
+        if (key.rightArrow || key.downArrow) {
+          dispatch({ type: "cycle_dow", dir: 1 });
           return;
         }
       }
@@ -405,6 +434,34 @@ export function AddWorkflow({ client, availableHeight, onDone }: Props) {
                 />
               </Box>
             )}
+          </>
+        ) : state.scheduleMode === "weekly" ? (
+          <>
+            <Box>
+              <Text color={fieldColor("scheduleDow")}>  Day: </Text>
+              {DAYS.map((d, i) => (
+                <Text key={d}>
+                  {state.field === "scheduleDow" && i === state.scheduleDow ? (
+                    <Text bold inverse color="cyan">{` ${d} `}</Text>
+                  ) : i === state.scheduleDow ? (
+                    <Text bold color="cyan">{` ${d} `}</Text>
+                  ) : (
+                    <Text color="gray">{` ${d} `}</Text>
+                  )}
+                </Text>
+              ))}
+              {state.field === "scheduleDow" && (
+                <Text color="gray"> ◂/▸ to change</Text>
+              )}
+            </Box>
+            <Box>
+              <Text color={fieldColor("scheduleTime")}>  Time (HH:MM): </Text>
+              <TextWithCursor
+                value={state.scheduleTime || (state.field === "scheduleTime" ? "" : "…")}
+                cursor={state.cursor}
+                active={state.field === "scheduleTime"}
+              />
+            </Box>
           </>
         ) : (
           <Box>
