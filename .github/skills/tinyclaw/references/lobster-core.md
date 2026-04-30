@@ -140,6 +140,7 @@ Date tokens: `YYYY`, `MM`, `DD`, `HH`, `mm`, `ss` — all UTC, zero-padded.
 | Command | Usage | Description |
 |---------|-------|-------------|
 | `exec` | `exec ls -la` / `exec --shell "echo hi"` / `exec --json node -e '...'` | Run OS command. Flags: `--shell`, `--json`, `--stdin raw\|json\|jsonl`, `--stdin-file raw\|json\|jsonl` (writes to temp file, sets `LOBSTER_STDIN_FILE`) |
+| `emit` | `emit hello world` / `emit --json '{"a":1}' '{"b":2}'` | Emit literal values as stream items. Without `--json`, each arg is a plain string. With `--json`, each arg is parsed as JSON. No args → empty stream. No side effects. |
 | `json` | `... \| json` | Render items as JSON |
 | `table` | `... \| table` | Render as table |
 | `template` | `... \| template --text 'PR #{{number}}: {{title}}'` | Render template per item. Flags: `--text`, `--file` |
@@ -170,7 +171,7 @@ Date tokens: `YYYY`, `MM`, `DD`, `HH`, `mm`, `ss` — all UTC, zero-padded.
 | `state.set` | `<items> \| state.set myKey` | Store input as JSON value |
 | `diff.last` | `<items> \| diff.last --key myKey` | Compare to previous snapshot → `{ changed, before, after }` |
 | `diff.gate` | `<items> \| diff.gate --key myKey` | Like `diff.last` but **halts** if unchanged |
-| `diff.key` | `<items> \| diff.key --key myKey [--field id]` | Tag each item `changed: true/false` by comparing a key field against stored state. Persists seen keys to `~/.lobster/state/<key>.json`. Use with `where changed==true` to act only on new items. |
+| `diff.key` | `<items> \| diff.key --key myKey [--field id]` | Mark each item `changed: true/false` by comparing key field(s) against stored state. `--field` supports multiple fields for composite keys: `--field owner --field repo --field number` or `--field owner,repo,number`. Default field: `id`. |
 | `break` | `break [--message "reason"]` | Halt pipeline immediately. Stdin items pass through as output before halting. In workflows, use as `pipeline:` step with `when:` for conditional early termination — workflow returns `status: "ok"` with output from last completed step. |
 | `gate` | `... \| gate --when empty` / `... \| gate --when "length($) > 10"` | Conditional pipeline halt. Collects items, evaluates condition, halts if true. Built-in: `empty`, `not_empty`. Expression: `$` = items array, `@` = per-element. Items pass through as output. |
 

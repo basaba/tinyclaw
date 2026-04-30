@@ -346,6 +346,21 @@ command exits. The child process can read `LOBSTER_STDIN_FILE` to find the file 
 
 **Side effects:** `local_exec`
 
+#### `emit` — Emit literal values as stream items
+
+```
+emit hello world
+emit --json '{"a":1}' '{"b":2}'
+emit --json '[1,2,3]'
+```
+
+| Arg | Type | Description |
+|-----|------|-------------|
+| `_` (positional) | array | Values to emit |
+| `--json` | boolean | Parse each positional argument as JSON |
+
+Without `--json`, each argument is emitted as a plain string item. With `--json`, each argument is parsed as JSON before being emitted. If no arguments are given, emits nothing (empty stream). No side effects.
+
 #### `json` — Render output as JSON
 
 ```
@@ -532,18 +547,28 @@ steps:
 
 When a break step fires, the workflow returns `status: "ok"` with output from the last completed step before the break. If the break step has `stdin:`, those items become the workflow output instead.
 
-#### `diff.key` — Tag items as new/seen by key field
+#### `diff.key` — Mark items as new/seen by key
 
 ```
-<items> | diff.key --key <stateKey> [--field <fieldName>]
+<items> | diff.key --key <stateKey> [--field <fieldName> ...]
 ```
 
-Compares each item's key field (default: `id`) against a stored set of previously seen values. Each item is emitted with an added `changed` property: `true` if the key is new, `false` if seen before. The current set of keys is then persisted to `~/.lobster/state/<stateKey>.json`.
+Compares each item's key field(s) against stored state. Outputs each item with `changed: true` (new) or `changed: false` (seen before). **Side effects:** `writes_state`.
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `--key` | string | *(required)* | State key to track seen values |
-| `--field` | string | `id` | Field name to use as the unique key |
+| Arg | Type | Default | Description |
+|-----|------|---------|-------------|
+| `--key` | string | — | State key to track seen values (required) |
+| `--field` | string \| string[] | `id` | Field name(s) for the unique key |
+
+`--field` supports multiple fields to form a composite key:
+
+```
+# Array form (multiple --field flags)
+<items> | diff.key --key prs --field owner --field repo --field number
+
+# Comma-separated form
+<items> | diff.key --key prs --field owner,repo,number
+```
 
 **Example:**
 
@@ -551,7 +576,7 @@ Compares each item's key field (default: `id`) against a stored set of previousl
 mail.search --unread | diff.key --key inbox --field id | where changed==true
 ```
 
-This filters to only *new* (unseen) emails. **Side effects:** `writes_state`.
+This filters to only *new* (unseen) emails.
 
 #### `gate` — Conditional pipeline halt
 
