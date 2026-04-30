@@ -94,7 +94,9 @@ export function RunHistory({ client, workflowId, onBack, onSelectRun, onViewFile
             : run.status === "pending-approval" ? "⏳"
             : "🔄";
         const dur = run.durationMs
-          ? `${(run.durationMs / 1000).toFixed(1)}s`
+          ? run.durationMs >= 60_000
+            ? `${(run.durationMs / 60_000).toFixed(1)}m`
+            : `${(run.durationMs / 1000).toFixed(1)}s`
           : "—";
         const time = new Date(run.triggeredAt).toLocaleString();
         return (
