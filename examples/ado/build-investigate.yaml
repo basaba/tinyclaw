@@ -12,6 +12,8 @@
 
 name: ado-build-investigate
 
+cwd: "${workdir}"
+
 args:
   workdir:
     description: "Working directory for the Copilot investigation step"
@@ -67,12 +69,14 @@ steps:
   # 5. Ensure the repo is up to date before Copilot investigates
   - id: git-pull
     run: git pull
-    cwd: "${workdir}"
 
-  # 6. Run agency copilot to investigate failures in the repo context
+  # 6. Reload skills
+  - id: reload-skills
+    run: copilot -p "/skills reload"
+
+  # 7. Run agency copilot to investigate failures in the repo context
   - id: investigate
     pipeline: >
       agency.copilot "/cm-e2e-investigation: Please investigate these failures and suggest root causes and next steps. (Ignore DummyReportCleanupFailure and dont mention it)"
       | teams.send --team-id ${team} --channel-id ${channel} --markdown
     stdin: $failures.json
-    cwd: "${workdir}"
