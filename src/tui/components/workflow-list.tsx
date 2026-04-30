@@ -27,16 +27,29 @@ function formatTime(date: Date): string {
 }
 
 const DAILY_CRON_RE = /^(\d{1,2})\s+(\d{1,2})\s+\*\s+\*\s+\*$/;
+const NDAY_CRON_RE = /^(\d{1,2})\s+(\d{1,2})\s+\*\/(\d+)\s+\*\s+\*$/;
+const WEEKLY_CRON_RE = /^(\d{1,2})\s+(\d{1,2})\s+\*\s+\*\s+([0-6])$/;
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function cronTimeStr(minute: string, hourStr: string): string {
+  const h = parseInt(hourStr, 10);
+  const m = minute.padStart(2, "0");
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 || 12;
+  return `${h12}:${m} ${ampm}`;
+}
 
 function formatScheduleDisplay(schedule: string): string {
-  const cm = DAILY_CRON_RE.exec(schedule.trim());
-  if (cm) {
-    const h = parseInt(cm[2], 10);
-    const m = cm[1].padStart(2, "0");
-    const ampm = h >= 12 ? "PM" : "AM";
-    const h12 = h % 12 || 12;
-    return `daily ${h12}:${m} ${ampm}`;
-  }
+  const s = schedule.trim();
+  const cm = DAILY_CRON_RE.exec(s);
+  if (cm) return `daily ${cronTimeStr(cm[1], cm[2])}`;
+
+  const nd = NDAY_CRON_RE.exec(s);
+  if (nd) return `every ${nd[3]}d ${cronTimeStr(nd[1], nd[2])}`;
+
+  const wk = WEEKLY_CRON_RE.exec(s);
+  if (wk) return `${DAY_NAMES[parseInt(wk[3], 10)]} ${cronTimeStr(wk[1], wk[2])}`;
+
   return schedule;
 }
 
@@ -63,6 +76,41 @@ function formatNextRun(wf: WorkflowEntry, lastRun: RunRecord | null): string {
     const next = new Date(now);
     next.setHours(hour, minute, 0, 0);
     if (next <= now) next.setDate(next.getDate() + 1);
+    return formatNextDate(next);
+  }
+
+  // Every N days cron: M H */N * *
+  const nd = NDAY_CRON_RE.exec(wf.schedule.trim());
+  if (nd) {
+    const minute = parseInt(nd[1], 10);
+    const hour = parseInt(nd[2], 10);
+    const n = parseInt(nd[3], 10);
+    if (lastRun) {
+      const lastTime = new Date(lastRun.completedAt ?? lastRun.triggeredAt).getTime();
+      const nextTime = lastTime + n * 86_400_000;
+      if (nextTime <= Date.now()) return "soon";
+      return formatNextDate(new Date(nextTime));
+    }
+    const now = new Date();
+    const next = new Date(now);
+    next.setHours(hour, minute, 0, 0);
+    if (next <= now) next.setDate(next.getDate() + 1);
+    return formatNextDate(next);
+  }
+
+  // Weekly cron: M H * * DOW
+  const wk = WEEKLY_CRON_RE.exec(wf.schedule.trim());
+  if (wk) {
+    const minute = parseInt(wk[1], 10);
+    const hour = parseInt(wk[2], 10);
+    const dow = parseInt(wk[3], 10);
+    const now = new Date();
+    const next = new Date(now);
+    next.setHours(hour, minute, 0, 0);
+    const currentDow = now.getDay();
+    let daysAhead = dow - currentDow;
+    if (daysAhead < 0 || (daysAhead === 0 && next <= now)) daysAhead += 7;
+    next.setDate(next.getDate() + daysAhead);
     return formatNextDate(next);
   }
 
