@@ -68,13 +68,14 @@ export function App({ client }: AppProps) {
     };
   }, [client, refresh]);
 
-  useInput((input) => {
-    if (view.screen !== "list") return;
+  const handleListInput = useCallback((input: string) => {
     if (input === "q") {
       client.disconnect();
       exit();
     }
-  });
+  }, [client, exit]);
+
+  useInput(handleListInput, { isActive: view.screen === "list" });
 
   const goList = useCallback(() => { refresh(); setView({ screen: "list" }); }, [refresh]);
   const goAdd = useCallback(() => setView({ screen: "add" }), []);

@@ -164,13 +164,14 @@ function reducer(state: FormState, action: Action): FormState {
       if (f === "submit" || f === "scheduleUnit" || f === "scheduleMode" || f === "scheduleDow" || f === "args") return state;
       const cur = getFieldValue(state);
       const pos = state.cursor;
-      if (f === "scheduleNum" && !/^\d$/.test(action.char)) return state;
-      if (f === "scheduleTime" && !/^[\d:]$/.test(action.char)) return state;
+      if (f === "scheduleNum" && !/^\d+$/.test(action.char)) return state;
+      if (f === "scheduleTime" && !/^[\d:]+$/.test(action.char)) return state;
       const updated = cur.slice(0, pos) + action.char + cur.slice(pos);
-      if (f === "scheduleNum") return { ...state, scheduleNum: updated, cursor: pos + 1 };
-      if (f === "scheduleTime") return { ...state, scheduleTime: updated, cursor: pos + 1 };
-      if (f === "schedule") return { ...state, rawSchedule: updated, cursor: pos + 1 };
-      return { ...state, [f]: updated, cursor: pos + 1 };
+      const newCursor = pos + action.char.length;
+      if (f === "scheduleNum") return { ...state, scheduleNum: updated, cursor: newCursor };
+      if (f === "scheduleTime") return { ...state, scheduleTime: updated, cursor: newCursor };
+      if (f === "schedule") return { ...state, rawSchedule: updated, cursor: newCursor };
+      return { ...state, [f]: updated, cursor: newCursor };
     }
     case "delete_char": {
       const f = state.field;
