@@ -793,6 +793,10 @@ Output available as `$fetch.stdout` (raw) and `$fetch.json` (parsed).
 
 #### Nested Workflow: `workflow`
 
+Invokes another workflow file as a nested execution unit. The parent waits for
+the sub-workflow to complete, then exposes its output via the standard step
+output references (`$step.stdout`, `$step.json`).
+
 ```yaml
 - id: sub
   workflow: "./sub-workflow.lobster"
@@ -801,7 +805,63 @@ Output available as `$fetch.stdout` (raw) and `$fetch.json` (parsed).
     param2: $prior.json.key
 ```
 
-Sub-workflows cannot contain approval/input gates. Circular dependencies are detected.
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `workflow` | string | yes | Relative or absolute path to the sub-workflow file (`.yaml` / `.lobster`). Relative paths resolve from the **parent workflow's directory**. |
+| `workflow_args` | object | no | Key-value arguments passed to the sub-workflow. Values substitute `${arg_name}` placeholders and match the sub-workflow's `args:` definitions. Step references (e.g. `$prior.json.key`) are resolved in the parent scope before passing. |
+
+**Full example — parent workflow:**
+
+```yaml
+name: deploy-pipeline
+steps:
+  - id: build
+    run: "npm run build"
+  - id: deploy-staging
+    workflow: "./deploy-env.yaml"
+    workflow_args:
+      environment: "staging"
+      artifact: $build.stdout
+  - id: deploy-prod
+    workflow: "./deploy-env.yaml"
+    workflow_args:
+      environment: "production"
+      artifact: $build.stdout
+    when: $deploy-staging.json.success == true
+```
+
+**Sub-workflow (`deploy-env.yaml`):**
+
+```yaml
+name: deploy-env
+args:
+  environment:
+    description: "Target environment"
+  artifact:
+    description: "Build artifact path"
+steps:
+  - id: push
+    run: "deploy.sh --env ${environment} --artifact ${artifact}"
+```
+
+**Output access:** The parent accesses sub-workflow output like any other step:
+
+| Reference | Resolves to |
+|-----------|-------------|
+| `$step.stdout` | Raw string output of the sub-workflow's last step |
+| `$step.json` | Parsed JSON output (if the sub-workflow emits valid JSON) |
+| `$step.skipped` | Whether the workflow step was skipped via `when:` |
+
+**Constraints & limitations:**
+
+1. Sub-workflows **cannot** contain `approval` or `input` gates — only top-level workflow steps can halt for human input.
+2. Sub-workflows **cannot** be recursive — a workflow cannot invoke itself (circular dependencies are detected).
+3. All common step fields (`when`, `on_error`, `retry`, `timeout_ms`, `env`, `cwd`) apply to the `workflow` step itself.
+4. Step IDs are scoped per workflow — the parent and sub-workflow maintain **separate ID namespaces**.
+5. `workflow` steps **cannot** appear inside `parallel` branches — branches only support `run`/`command` and `pipeline`.
+6. Sub-workflow output is collected from the **last completed step** — intermediate step outputs are not directly accessible from the parent.
+7. The sub-workflow's `env:` and `cwd:` are independent of the parent unless explicitly passed via `workflow_args`.
+8. If a sub-workflow has a required `arg` (no `default:`) and it is not provided in `workflow_args:`, the workflow fails at runtime.
 
 #### Parallel Execution: `parallel`
 

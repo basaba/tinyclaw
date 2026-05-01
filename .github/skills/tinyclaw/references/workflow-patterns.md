@@ -102,6 +102,45 @@ steps:
     stdin: $data.json.items
 ```
 
+## Pattern: Sub-Workflow Composition
+
+Extract reusable logic into a separate workflow file and call it with arguments.
+
+**Main workflow (`deploy.yaml`):**
+
+```yaml
+steps:
+  - id: build
+    run: "npm run build"
+  - id: deploy-staging
+    workflow: "./deploy-env.yaml"
+    workflow_args:
+      environment: "staging"
+      artifact: $build.stdout
+  - id: deploy-prod
+    workflow: "./deploy-env.yaml"
+    workflow_args:
+      environment: "production"
+      artifact: $build.stdout
+    when: $deploy-staging.json.success == true
+```
+
+**Sub-workflow (`deploy-env.yaml`):**
+
+```yaml
+name: deploy-env
+args:
+  environment:
+    description: "Target environment"
+  artifact:
+    description: "Build artifact path"
+steps:
+  - id: push
+    run: "deploy.sh --env ${environment} --artifact ${artifact}"
+```
+
+Use sub-workflows for **genuine reuse** (same logic, different parameters). For one-off sequences, keep steps inline.
+
 ## Best Practices
 
 1. **Use `pipeline:` for data transformation** — chain Lobster commands instead of shell pipes.

@@ -240,6 +240,58 @@ Every step requires a unique `id` and exactly **one** execution mode:
 | Approval | `approval` | String prompt or `{ prompt, items, preview, ... }` |
 | Input | `input` | `{ prompt, responseSchema, defaults }` |
 
+### Sub-Workflows
+
+A step with `workflow:` invokes another workflow file as a nested unit. The parent waits for the sub-workflow to complete, then exposes its output via the usual `$step.stdout` / `$step.json` references.
+
+**Schema:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `workflow` | string | yes | Relative or absolute path to the sub-workflow `.yaml` file. Relative paths resolve from the **parent workflow's directory**. |
+| `workflow_args` | object | no | Key-value arguments passed to the sub-workflow. These substitute `${arg_name}` placeholders in the sub-workflow, matching its `args:` definitions. |
+
+**Example — parent workflow:**
+
+```yaml
+steps:
+  - id: greet
+    workflow: "./greet.yaml"
+    workflow_args:
+      name: "Lobster"
+
+  - id: use-result
+    run: "echo Sub-workflow said: $greet.stdout"
+```
+
+**Example — sub-workflow (`greet.yaml`):**
+
+```yaml
+name: greet
+args:
+  name:
+    description: "Name to greet"
+    default: "World"
+steps:
+  - id: say-hello
+    run: "echo Hello, ${name}!"
+```
+
+**Output access:**
+
+| Reference | Resolves to |
+|-----------|-------------|
+| `$step.stdout` | Raw string output of the sub-workflow's last step |
+| `$step.json` | Parsed JSON output (if the sub-workflow emits JSON) |
+| `$step.skipped` | Whether the sub-workflow step was skipped (via `when:`) |
+
+**Constraints:**
+
+- Sub-workflows **cannot** contain `approval` or `input` gates — only top-level workflow steps can halt for human input.
+- All common step fields (`when`, `on_error`, `retry`, `timeout_ms`, `env`, `cwd`) apply to the `workflow` step.
+- Step IDs must be unique within each workflow; the parent and sub-workflow have separate ID namespaces.
+- Sub-workflows are not recursive — a workflow cannot invoke itself.
+
 ### Common Step Fields
 
 | Field | Type | Default | Description |
