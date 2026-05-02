@@ -48,6 +48,7 @@ steps:
       --creator '${creator}'
       --status active
       | diff.key --key pr-push-review --field pullRequestId,lastMergeSourceCommit
+      | where changed==true
       
   # 2. Copilot review for each pushed PR
   - id: review
