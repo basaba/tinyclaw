@@ -77,6 +77,7 @@ steps:
   # 7. Run agency copilot to investigate failures in the repo context
   - id: investigate
     pipeline: >
-      agency.copilot "/cm-e2e-investigation: Please investigate these failures and suggest root causes and next steps. (Ignore DummyReportCleanupFailure and dont mention it)"
+      agency.copilot "/cm-e2e-investigation: Please investigate these failures and suggest root causes and next steps. (Ignore DummyReportCleanupFailure and dont mention it),
+      Please provide summary and concise report, provide summary on the entire investigation and AIs first, and then the details after"
       | teams.send --team-id ${team} --channel-id ${channel} --markdown
     stdin: $failures.json
