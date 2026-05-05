@@ -155,6 +155,7 @@ Date tokens: `YYYY`, `MM`, `DD`, `HH`, `mm`, `ss` — all UTC, zero-padded.
 | `pick` | `... \| pick id,subject,from` / `... \| pick author=from` / `... \| pick pr.number` | Project fields (comma-separated). Supports renaming (`new=old`) and dot-path access. |
 | `head` | `... \| head --n 5` | Take first N items (default 10) |
 | `tail` | `... \| tail --n 5` | Take last N items (default 10) |
+| `count` | `... \| count` | Count items, outputs `{ count: N }` |
 | `dedupe` | `... \| dedupe --key id` | Remove duplicates (stable, first kept) |
 
 ### Transformation
@@ -175,6 +176,7 @@ Date tokens: `YYYY`, `MM`, `DD`, `HH`, `mm`, `ss` — all UTC, zero-padded.
 | `diff.last` | `<items> \| diff.last --key myKey` | Compare to previous snapshot → `{ changed, before, after }` |
 | `diff.gate` | `<items> \| diff.gate --key myKey` | Like `diff.last` but **halts** if unchanged |
 | `diff.key` | `<items> \| diff.key --key myKey [--field id]` | Mark each item `changed: true/false` by comparing key field(s) against stored state. `--field` supports multiple fields for composite keys: `--field owner --field repo --field number` or `--field owner,repo,number`. Default field: `id`. |
+| `diff.key.exists` | `<items> \| diff.key.exists --key myKey [--field id]` | Like `diff.key` but **read-only** — does not update stored state. Same args and output. |
 | `break` | `break [--message "reason"]` | Halt pipeline immediately. Stdin items pass through as output before halting. In workflows, use as `pipeline:` step with `when:` for conditional early termination — workflow returns `status: "ok"` with output from last completed step. |
 | `gate` | `... \| gate --when empty` / `... \| gate --when "length($) > 10"` | Conditional pipeline halt. Collects items, evaluates condition, halts if true. Built-in: `empty`, `not_empty`. Expression: `$` = items array, `@` = per-element. Items pass through as output. |
 
@@ -239,7 +241,7 @@ Every step requires a unique `id` and exactly **one** execution mode:
 | Pipeline | `pipeline` | Lobster pipeline string. Use `stdin:` to provide input |
 | Nested workflow | `workflow` | Path to sub-workflow. `workflow_args:` for params |
 | Parallel | `parallel` | `{ wait, timeout_ms, branches: [...] }` |
-| Loop | `for_each` | Iterate array or object (single object treated as one-element array). `item_var`, `index_var`, `include_unmatched`, `batch_size`, `steps:`. Iterations where all sub-steps are skipped are excluded from output by default; set `include_unmatched: true` to keep them. |
+| Loop | `for_each` | Iterate array or object (single object treated as one-element array). `item_var`, `index_var`, `include_unmatched`, `batch_size`, `concurrency`, `steps:`. Use `concurrency: N` to run up to N iterations in parallel (results preserve input order; on error, in-flight iterations are aborted). `concurrency` cannot be used with `batch_size`/`pause_ms`. Iterations where all sub-steps are skipped are excluded from output by default; set `include_unmatched: true` to keep them. |
 | Approval | `approval` | String prompt or `{ prompt, items, preview, ... }` |
 | Input | `input` | `{ prompt, responseSchema, defaults }` |
 

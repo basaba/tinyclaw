@@ -444,6 +444,14 @@ Default: 10 items.
 
 Default: 10 items.
 
+#### `count` — Count items
+
+```
+... | count
+```
+
+Outputs a single item: `{ count: <number> }`.
+
 #### `dedupe` — Remove duplicates
 
 ```
@@ -596,6 +604,19 @@ mail.search --unread | diff.key --key inbox --field id | where changed==true
 ```
 
 This filters to only *new* (unseen) emails.
+
+#### `diff.key.exists` — Check items against diff.key state (read-only)
+
+```
+<items> | diff.key.exists --key <stateKey> [--field <fieldName> ...]
+```
+
+Like `diff.key`, but does **not** update the stored state. Outputs each item with `changed: true` (not in state) or `changed: false` (already in state). No side effects.
+
+| Arg | Type | Default | Description |
+|-----|------|---------|-------------|
+| `--key` | string | — | State key to check against (required) |
+| `--field` | string \| string[] | `id` | Field name(s) for the unique key |
 
 #### `gate` — Conditional pipeline halt
 
@@ -916,8 +937,9 @@ steps:
   for_each: $fetch.json        # must resolve to array
   item_var: "item"             # default: "item"
   index_var: "index"           # default: "index"
-  batch_size: 5                # optional: items per batch
-  pause_ms: 100                # optional: delay between batches (ms)
+  batch_size: 5                # optional: items per batch (sequential only)
+  pause_ms: 100                # optional: delay between batches (sequential only)
+  concurrency: 4               # optional: run up to N iterations in parallel
   steps:
     - id: transform
       run: "echo Processing item $index"
@@ -929,8 +951,9 @@ steps:
 | `item_var` | string | `"item"` | Variable name for current item |
 | `index_var` | string | `"index"` | Variable name for 0-based index |
 | `include_unmatched` | boolean | `false` | Keep iterations where all sub-steps were skipped |
-| `batch_size` | number | 1 | Items per batch |
-| `pause_ms` | number | 0 | Delay between batches (ms) |
+| `batch_size` | number | 1 | Items per batch (sequential only, cannot be used with `concurrency`) |
+| `pause_ms` | number | 0 | Delay between batches (sequential only, cannot be used with `concurrency`) |
+| `concurrency` | number | 1 | Max iterations to run in parallel. Results preserve input order. On error, in-flight iterations are aborted. |
 | `steps` | array | — | Sub-steps (no approval/input/nested loops) |
 
 Inside loop: `$item.json` = current item, `$index.json` = iteration index.
