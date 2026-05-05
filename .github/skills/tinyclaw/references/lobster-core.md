@@ -67,12 +67,14 @@ Used by `compute`, `where` (extended), workflow `when`/`condition`.
 | `days_since(d)` / `hours_since(d)` | Time elapsed (null if invalid) |
 | `coalesce(a, b, ...)` | First non-null value |
 | `is_null(v)` / `exists(v)` | Null/existence checks |
+| `iff(cond, a, b)` | Conditional: if `cond` truthy returns `a`, else `b` |
 
 ```
 every(reviewers, @.vote == 0)
 count(items, @.priority > 3)
 days_since(createdAt) < 30
 coalesce(nickname, fullName, "Unknown")
+iff(score > 80, "pass", "fail")
 ```
 
 ---
@@ -149,9 +151,10 @@ Date tokens: `YYYY`, `MM`, `DD`, `HH`, `mm`, `ss` — all UTC, zero-padded.
 
 | Command | Usage | Description |
 |---------|-------|-------------|
-| `where` | `... \| where status=active` / `... \| where minutes>=30` | Filter by predicate. Ops: `=`, `==`, `!=`, `<`, `<=`, `>`, `>=` |
-| `pick` | `... \| pick id,subject,from` | Project fields (comma-separated) |
+| `where` | `... \| where status=active` / `... \| where "x>5 && y<6"` | Filter by predicate. Ops: `=`, `==`, `!=`, `<`, `<=`, `>`, `>=`. Combine with `&&`/`\|\|` (quote the expression). |
+| `pick` | `... \| pick id,subject,from` / `... \| pick author=from` / `... \| pick pr.number` | Project fields (comma-separated). Supports renaming (`new=old`) and dot-path access. |
 | `head` | `... \| head --n 5` | Take first N items (default 10) |
+| `tail` | `... \| tail --n 5` | Take last N items (default 10) |
 | `dedupe` | `... \| dedupe --key id` | Remove duplicates (stable, first kept) |
 
 ### Transformation
