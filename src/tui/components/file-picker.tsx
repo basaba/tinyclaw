@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
-import { scanYamlFiles, fuzzyMatch, fileExists, shortenPath } from "../utils/file-scanner.js";
+import { scanYamlFiles, fuzzyMatch, fileExists, shortenPath, completePathPrefix, isDirectoryCompletion } from "../utils/file-scanner.js";
 
 interface Props {
   value: string;
@@ -34,7 +34,14 @@ export function FilePicker({ value, cursor, active, onChange, onNext, onPrev, on
       setShowSuggestions(false);
       return;
     }
-    const matches = fuzzyMatch(value, allFiles).slice(0, MAX_SUGGESTIONS);
+    const isAbsOrHome = /^[a-zA-Z]:|^[/\\]|^~/.test(value);
+    let matches: string[];
+    if (isAbsOrHome) {
+      // Dynamic path completion for absolute/home-relative paths
+      matches = completePathPrefix(value).slice(0, MAX_SUGGESTIONS);
+    } else {
+      matches = fuzzyMatch(value, allFiles).slice(0, MAX_SUGGESTIONS);
+    }
     setSuggestions(matches);
     setSelectedIdx(0);
     setShowSuggestions(matches.length > 0 && value.length > 0);
@@ -76,6 +83,11 @@ export function FilePicker({ value, cursor, active, onChange, onNext, onPrev, on
       if (key.return) {
         if (showSuggestions && suggestions.length > 0) {
           const picked = suggestions[selectedIdx];
+          if (isDirectoryCompletion(picked)) {
+            // Directory: drill into it, don't finalize
+            onChange(picked, picked.length);
+            return;
+          }
           onChange(picked, picked.length);
           setShowSuggestions(false);
           return;
@@ -92,6 +104,10 @@ export function FilePicker({ value, cursor, active, onChange, onNext, onPrev, on
         // Tab-complete if single match
         if (showSuggestions && suggestions.length === 1) {
           const picked = suggestions[0];
+          if (isDirectoryCompletion(picked)) {
+            onChange(picked, picked.length);
+            return;
+          }
           onChange(picked, picked.length);
           setShowSuggestions(false);
           return;
@@ -149,7 +165,7 @@ export function FilePicker({ value, cursor, active, onChange, onNext, onPrev, on
         <Text color={active ? "cyan" : "gray"}>File: </Text>
         {renderInput()}
         {value.trim() && (
-          <Text> {exists ? <Text color="green">✓</Text> : <Text color="red">✗</Text>}</Text>
+          <Text> {exists ? <Text color="green">✓</Text> : isDirectoryCompletion(value) ? <Text color="yellow">…</Text> : <Text color="red">✗</Text>}</Text>
         )}
       </Box>
       {active && showSuggestions && (
@@ -158,6 +174,7 @@ export function FilePicker({ value, cursor, active, onChange, onNext, onPrev, on
             <Box key={s}>
               <Text color={i === selectedIdx ? "cyan" : "gray"}>
                 {i === selectedIdx ? "❯ " : "  "}
+                {isDirectoryCompletion(s) ? "📁 " : "📄 "}
                 {shortenPath(s)}
               </Text>
             </Box>

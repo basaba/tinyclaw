@@ -1,5 +1,5 @@
 import { readdirSync, statSync, existsSync } from "node:fs";
-import { join, resolve, relative } from "node:path";
+import { join, resolve, relative, dirname, basename } from "node:path";
 import { homedir } from "node:os";
 
 const DEFAULT_MAX_DEPTH = 4;
@@ -144,4 +144,68 @@ export function shortenPath(absPath: string): string {
 
 function isAbsolute(p: string): boolean {
   return /^[/\\]|^[a-zA-Z]:/.test(p);
+}
+
+/**
+ * Dynamically complete YAML files and directories from an absolute or home-relative path prefix.
+ * Directories are returned with a trailing separator so the user can keep drilling down.
+ */
+export function completePathPrefix(prefix: string): string[] {
+  if (!prefix) return [];
+
+  let resolved = prefix;
+  if (prefix.startsWith("~")) {
+    resolved = join(homedir(), prefix.slice(1));
+  }
+  if (!isAbsolute(resolved)) return [];
+
+  let dir: string;
+  let partial: string;
+  try {
+    if (existsSync(resolved) && statSync(resolved).isDirectory()) {
+      dir = resolved;
+      partial = "";
+    } else {
+      dir = dirname(resolved);
+      partial = basename(resolved).toLowerCase();
+    }
+  } catch {
+    dir = dirname(resolved);
+    partial = basename(resolved).toLowerCase();
+  }
+
+  let entries: string[];
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return [];
+  }
+
+  const results: string[] = [];
+  for (const entry of entries) {
+    if (entry.startsWith(".") || entry === "node_modules" || entry === "dist") continue;
+    if (results.length >= 20) break;
+    if (partial && !entry.toLowerCase().startsWith(partial)) continue;
+
+    const full = join(dir, entry);
+    let stat;
+    try {
+      stat = statSync(full);
+    } catch {
+      continue;
+    }
+
+    if (stat.isDirectory()) {
+      results.push(full + "\\");
+    } else if (stat.isFile() && YAML_RE.test(entry)) {
+      results.push(full);
+    }
+  }
+
+  return results;
+}
+
+/** Returns true if the completion value is a directory (ends with separator). */
+export function isDirectoryCompletion(value: string): boolean {
+  return value.endsWith("\\") || value.endsWith("/");
 }
