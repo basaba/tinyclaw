@@ -162,6 +162,8 @@ function extractFromParsedArgs(args: Record<string, unknown>): { prompt: string;
     const flag = key.length === 1 ? `-${key}` : `--${key}`;
     if (typeof value === "boolean") {
       if (value) flags.push(flag);
+    } else if (Array.isArray(value)) {
+      for (const v of value) flags.push(flag, String(v));
     } else if (value != null) {
       flags.push(flag, String(value));
     }
