@@ -41,3 +41,6 @@ temp/
 
 # Lobster state (runtime)
 .lobster-cache/
+
+# Lobster debug files
+.lobster-debug/

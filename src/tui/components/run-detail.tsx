@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import type { RunRecord } from "../scheduler/types.js";
 import type { DaemonClient } from "../scheduler/daemon-client.js";
 import { shortenPath } from "../utils/file-scanner.js";
@@ -215,9 +216,9 @@ export function RunDetail({ run: initialRun, availableHeight, client, liveOutput
     }
 
     if (input === "d" && run.debugSnapshotPath) {
-      spawnSync("npx", ["lobster", "debug", run.debugSnapshotPath], {
+      const cliPath = fileURLToPath(new URL("../../cli.js", import.meta.url));
+      spawnSync(process.execPath, [cliPath, "debug", run.debugSnapshotPath], {
         stdio: "inherit",
-        shell: true,
       });
     }
   });

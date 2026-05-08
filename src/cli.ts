@@ -46,6 +46,21 @@ if (!args.length) {
 } else if (args[0] === "sched") {
   const { handleScheduler } = await import("./commands/scheduler.js");
   await handleScheduler(args.slice(1));
+} else if (args[0] === "debug") {
+  const { readDebugSnapshot, startDebugRepl } = await import("./debug/repl.js");
+  const filePath = args[1];
+  if (!filePath) {
+    console.error("Usage: tinyclaw debug <snapshot-file>");
+    console.error("Load a debug snapshot and start an interactive REPL.");
+    process.exit(2);
+  }
+  try {
+    const snapshot = await readDebugSnapshot(filePath);
+    await startDebugRepl(snapshot, process.stdin, process.stdout);
+  } catch (err: any) {
+    console.error(`Error: ${err?.message ?? String(err)}`);
+    process.exit(1);
+  }
 } else if (args[0] === "daemon") {
   await handleDaemon(args[1]);
 } else {
@@ -59,6 +74,7 @@ Usage:
   tinyclaw                         Launch the TUI (default)
   tinyclaw <file> [options]
   tinyclaw -p '<pipeline>' [options]
+  tinyclaw debug <snapshot-file>   Inspect a debug snapshot interactively
   tinyclaw sched <command> [options]
   tinyclaw help
 
