@@ -98,6 +98,7 @@ export function RunHistory({ client, workflowId, onBack, onSelectRun, onViewFile
             ? `${(run.durationMs / 60_000).toFixed(1)}m`
             : `${(run.durationMs / 1000).toFixed(1)}s`
           : "—";
+        const debugIcon = run.debugSnapshotPath ? "🔍" : "  ";
         const time = new Date(run.triggeredAt).toLocaleString();
         return (
           <Box key={run.id}>
@@ -110,7 +111,8 @@ export function RunHistory({ client, workflowId, onBack, onSelectRun, onViewFile
               {statusIcon.padEnd(10)}
               {run.triggeredBy.padEnd(12)}
               {time.padEnd(26)}
-              {dur}
+              {dur.padEnd(10)}
+              {debugIcon}
             </Text>
           </Box>
         );

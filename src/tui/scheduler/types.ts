@@ -5,6 +5,7 @@ export interface WorkflowEntry {
   schedule: string; // cron expression or "every Xm/h/s"
   enabled: boolean;
   args?: Record<string, unknown>;
+  debug?: boolean;
 }
 
 export interface ScheduleConfig {
@@ -38,6 +39,7 @@ export interface RunRecord {
   logs?: string;
   error?: string;
   approvalInfo?: ApprovalInfo;
+  debugSnapshotPath?: string;
 }
 
 export interface RunHistory {

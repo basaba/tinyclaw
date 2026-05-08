@@ -316,6 +316,7 @@ export class SchedulerEngine extends EventEmitter {
           stdout,
           stderr,
           env: { ...process.env, LOBSTER_LLM_PROVIDER: "copilot" },
+          ...(wf.debug ? { debug: true } : {}),
         },
       });
 
@@ -360,6 +361,14 @@ export class SchedulerEngine extends EventEmitter {
         logs: capturedOutput || undefined,
         error,
       };
+
+      // Extract debug snapshot path from logs if debug was enabled
+      if (wf.debug && capturedOutput) {
+        const snapshotMatch = capturedOutput.match(/Debug snapshot written to:\s*(.+)/);
+        if (snapshotMatch) {
+          patch.debugSnapshotPath = snapshotMatch[1].trim();
+        }
+      }
 
       updateRun(run.id, patch);
       const completed = { ...run, ...patch };

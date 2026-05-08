@@ -14,7 +14,7 @@ interface Props {
   onDone: () => void;
 }
 
-type Field = "name" | "filePath" | "schedule" | "scheduleMode" | "scheduleNum" | "scheduleUnit" | "scheduleDow" | "scheduleTime" | "args" | "submit";
+type Field = "name" | "filePath" | "schedule" | "scheduleMode" | "scheduleNum" | "scheduleUnit" | "scheduleDow" | "scheduleTime" | "debug" | "args" | "submit";
 
 const MODES = ["interval", "daily", "weekly"] as const;
 type ScheduleMode = (typeof MODES)[number];
@@ -48,6 +48,7 @@ interface FormState {
   scheduleTime: string; // HH:MM
   rawSchedule: string;
   useRawSchedule: boolean;
+  debug: boolean;
   cursor: number;
   error: string;
 }
@@ -61,6 +62,7 @@ type Action =
   | { type: "cycle_unit"; dir: 1 | -1 }
   | { type: "cycle_mode"; dir: 1 | -1 }
   | { type: "cycle_dow"; dir: 1 | -1 }
+  | { type: "toggle_debug" }
   | { type: "set_error"; error: string }
   | { type: "set_filepath"; value: string; cursor: number };
 
@@ -113,17 +115,17 @@ function parseSchedule(schedule: string): ParsedSchedule | null {
 }
 
 function getFields(state: FormState): Field[] {
-  if (state.useRawSchedule) return ["name", "filePath", "schedule", "args", "submit"];
+  if (state.useRawSchedule) return ["name", "filePath", "schedule", "debug", "args", "submit"];
   if (state.scheduleMode === "interval") {
     const base: Field[] = ["name", "filePath", "scheduleMode", "scheduleNum", "scheduleUnit"];
     if (state.scheduleUnit === "day") base.push("scheduleTime");
-    base.push("args", "submit");
+    base.push("debug", "args", "submit");
     return base;
   }
   if (state.scheduleMode === "weekly") {
-    return ["name", "filePath", "scheduleMode", "scheduleDow", "scheduleTime", "args", "submit"];
+    return ["name", "filePath", "scheduleMode", "scheduleDow", "scheduleTime", "debug", "args", "submit"];
   }
-  return ["name", "filePath", "scheduleMode", "scheduleTime", "args", "submit"];
+  return ["name", "filePath", "scheduleMode", "scheduleTime", "debug", "args", "submit"];
 }
 
 function getFieldValue(state: FormState): string {
@@ -131,7 +133,7 @@ function getFieldValue(state: FormState): string {
   if (f === "scheduleNum") return state.scheduleNum;
   if (f === "scheduleTime") return state.scheduleTime;
   if (f === "schedule") return state.rawSchedule;
-  if (f === "submit" || f === "scheduleUnit" || f === "scheduleMode" || f === "scheduleDow" || f === "args") return "";
+  if (f === "submit" || f === "scheduleUnit" || f === "scheduleMode" || f === "scheduleDow" || f === "args" || f === "debug") return "";
   return state[f] as string;
 }
 
@@ -145,7 +147,7 @@ function reducer(state: FormState, action: Action): FormState {
       const val = next === "scheduleNum" ? state.scheduleNum
         : next === "scheduleTime" ? state.scheduleTime
         : next === "schedule" ? state.rawSchedule
-        : next === "submit" || next === "scheduleUnit" || next === "scheduleMode" || next === "scheduleDow" || next === "args" ? ""
+        : next === "submit" || next === "scheduleUnit" || next === "scheduleMode" || next === "scheduleDow" || next === "args" || next === "debug" ? ""
         : (state[next] as string);
       return { ...state, field: next, cursor: val.length };
     }
@@ -155,13 +157,13 @@ function reducer(state: FormState, action: Action): FormState {
       const val = prev === "scheduleNum" ? state.scheduleNum
         : prev === "scheduleTime" ? state.scheduleTime
         : prev === "schedule" ? state.rawSchedule
-        : prev === "submit" || prev === "scheduleUnit" || prev === "scheduleMode" || prev === "scheduleDow" || prev === "args" ? ""
+        : prev === "submit" || prev === "scheduleUnit" || prev === "scheduleMode" || prev === "scheduleDow" || prev === "args" || prev === "debug" ? ""
         : (state[prev] as string);
       return { ...state, field: prev, cursor: val.length };
     }
     case "append": {
       const f = state.field;
-      if (f === "submit" || f === "scheduleUnit" || f === "scheduleMode" || f === "scheduleDow" || f === "args") return state;
+      if (f === "submit" || f === "scheduleUnit" || f === "scheduleMode" || f === "scheduleDow" || f === "args" || f === "debug") return state;
       const cur = getFieldValue(state);
       const pos = state.cursor;
       if (f === "scheduleNum" && !/^\d+$/.test(action.char)) return state;
@@ -175,7 +177,7 @@ function reducer(state: FormState, action: Action): FormState {
     }
     case "delete_char": {
       const f = state.field;
-      if (f === "submit" || f === "scheduleUnit" || f === "scheduleMode" || f === "scheduleDow" || f === "args") return state;
+      if (f === "submit" || f === "scheduleUnit" || f === "scheduleMode" || f === "scheduleDow" || f === "args" || f === "debug") return state;
       const cur = getFieldValue(state);
       const pos = state.cursor;
       if (pos === 0) return state;
@@ -208,6 +210,8 @@ function reducer(state: FormState, action: Action): FormState {
       const next = (state.scheduleDow + action.dir + 7) % 7;
       return { ...state, scheduleDow: next };
     }
+    case "toggle_debug":
+      return { ...state, debug: !state.debug };
     case "set_error":
       return { ...state, error: action.error };
     case "set_filepath":
@@ -245,6 +249,7 @@ function buildInitialState(wf: WorkflowEntry): FormState {
       scheduleTime: parsed.time ?? "",
       rawSchedule: wf.schedule,
       useRawSchedule: false,
+      debug: wf.debug ?? false,
       cursor: 0,
       error: "",
     };
@@ -261,6 +266,7 @@ function buildInitialState(wf: WorkflowEntry): FormState {
       scheduleTime: parsed.time,
       rawSchedule: wf.schedule,
       useRawSchedule: false,
+      debug: wf.debug ?? false,
       cursor: 0,
       error: "",
     };
@@ -277,6 +283,7 @@ function buildInitialState(wf: WorkflowEntry): FormState {
       scheduleTime: parsed.time,
       rawSchedule: wf.schedule,
       useRawSchedule: false,
+      debug: wf.debug ?? false,
       cursor: 0,
       error: "",
     };
@@ -292,6 +299,7 @@ function buildInitialState(wf: WorkflowEntry): FormState {
     scheduleTime: "",
     rawSchedule: wf.schedule,
     useRawSchedule: true,
+    debug: wf.debug ?? false,
     cursor: 0,
     error: "",
   };
@@ -318,6 +326,7 @@ export function EditWorkflow({ client, workflow, availableHeight, onDone }: Prop
     if (s.scheduleDow !== init.scheduleDow) return true;
     if (s.scheduleTime !== init.scheduleTime) return true;
     if (s.rawSchedule !== init.rawSchedule) return true;
+    if (s.debug !== init.debug) return true;
     const curArgs = JSON.stringify(rowsToArgs(argRowsRef.current) ?? {});
     const origArgs = JSON.stringify(rowsToArgs(initialArgsRef.current) ?? {});
     return curArgs !== origArgs;
@@ -396,6 +405,10 @@ export function EditWorkflow({ client, workflow, availableHeight, onDone }: Prop
             patch.args = newArgs;
           }
 
+          if (s.debug !== (workflow.debug ?? false)) {
+            patch.debug = s.debug;
+          }
+
           if (Object.keys(patch).length === 0) {
             // Nothing changed
             onDone();
@@ -449,6 +462,22 @@ export function EditWorkflow({ client, workflow, availableHeight, onDone }: Prop
           dispatch({ type: "cycle_mode", dir: 1 });
           return;
         }
+      }
+
+      if (s.field === "debug") {
+        if (input === " " || key.return) {
+          dispatch({ type: "toggle_debug" });
+          return;
+        }
+        if (key.tab && key.shift) {
+          dispatch({ type: "prev_field" });
+          return;
+        }
+        if (key.tab) {
+          dispatch({ type: "next_field" });
+          return;
+        }
+        return;
       }
 
       // Cursor movement within text fields
@@ -638,6 +667,15 @@ export function EditWorkflow({ client, workflow, availableHeight, onDone }: Prop
           </>
         )}
 
+        <Box>
+          <Text color={fieldColor("debug")}>Debug:   </Text>
+          <Text color={state.field === "debug" ? "cyan" : undefined} bold={state.field === "debug"} inverse={state.field === "debug"}>
+            {state.debug ? " [x] enabled " : " [ ] disabled "}
+          </Text>
+          {state.field === "debug" && (
+            <Text color="gray"> space to toggle</Text>
+          )}
+        </Box>
         <ArgsTable rows={argRows} onChange={setArgRows} active={state.field === "args"} onExit={handleArgsExit} />
         {state.error ? (
           <Box>

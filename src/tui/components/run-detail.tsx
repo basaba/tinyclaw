@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
+import { spawnSync } from "node:child_process";
 import type { RunRecord } from "../scheduler/types.js";
 import type { DaemonClient } from "../scheduler/daemon-client.js";
 import { shortenPath } from "../utils/file-scanner.js";
@@ -212,6 +213,13 @@ export function RunDetail({ run: initialRun, availableHeight, client, liveOutput
     if (input === "o" || input === "v") {
       onOpenFile(run.input.filePath);
     }
+
+    if (input === "d" && run.debugSnapshotPath) {
+      spawnSync("npx", ["lobster", "debug", run.debugSnapshotPath], {
+        stdio: "inherit",
+        shell: true,
+      });
+    }
   });
 
   const dur = run.durationMs ? `${(run.durationMs / 1000).toFixed(1)}s` : "—";
@@ -224,7 +232,7 @@ export function RunDetail({ run: initialRun, availableHeight, client, liveOutput
 
   return (
     <Box flexDirection="column">
-      <Text bold>Run Detail — Esc to go back | o: open file</Text>
+      <Text bold>Run Detail — Esc to go back | o: open file{run.debugSnapshotPath ? " | d: debug" : ""}</Text>
 
       <Box marginTop={1} flexDirection="column">
         <Text bold color="gray">── Input ──</Text>
@@ -260,6 +268,12 @@ export function RunDetail({ run: initialRun, availableHeight, client, liveOutput
           <Text color="gray">Duration:  </Text>
           <Text>{dur}</Text>
         </Box>
+        {run.debugSnapshotPath && (
+          <Box>
+            <Text color="gray">Debug:     </Text>
+            <Text color="magenta">{shortenPath(run.debugSnapshotPath)}</Text>
+          </Box>
+        )}
       </Box>
 
       {isPendingApproval && (

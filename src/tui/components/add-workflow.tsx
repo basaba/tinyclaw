@@ -13,7 +13,7 @@ interface Props {
   onDone: () => void;
 }
 
-type Field = "name" | "filePath" | "scheduleMode" | "scheduleNum" | "scheduleUnit" | "scheduleDow" | "scheduleTime" | "args" | "submit";
+type Field = "name" | "filePath" | "scheduleMode" | "scheduleNum" | "scheduleUnit" | "scheduleDow" | "scheduleTime" | "debug" | "args" | "submit";
 
 const MODES = ["interval", "daily", "weekly"] as const;
 type ScheduleMode = (typeof MODES)[number];
@@ -40,13 +40,13 @@ function getFields(mode: ScheduleMode, unit: ScheduleUnit): Field[] {
   if (mode === "interval") {
     const base: Field[] = ["name", "filePath", "scheduleMode", "scheduleNum", "scheduleUnit"];
     if (unit === "day") base.push("scheduleTime");
-    base.push("args", "submit");
+    base.push("debug", "args", "submit");
     return base;
   }
   if (mode === "weekly") {
-    return ["name", "filePath", "scheduleMode", "scheduleDow", "scheduleTime", "args", "submit"];
+    return ["name", "filePath", "scheduleMode", "scheduleDow", "scheduleTime", "debug", "args", "submit"];
   }
-  return ["name", "filePath", "scheduleMode", "scheduleTime", "args", "submit"];
+  return ["name", "filePath", "scheduleMode", "scheduleTime", "debug", "args", "submit"];
 }
 
 interface FormState {
@@ -58,6 +58,7 @@ interface FormState {
   scheduleUnit: ScheduleUnit;
   scheduleDow: DayOfWeek;
   scheduleTime: string; // HH:MM
+  debug: boolean;
   cursor: number;
   error: string;
 }
@@ -71,6 +72,7 @@ type Action =
   | { type: "cycle_unit"; dir: 1 | -1 }
   | { type: "cycle_mode"; dir: 1 | -1 }
   | { type: "cycle_dow"; dir: 1 | -1 }
+  | { type: "toggle_debug" }
   | { type: "set_error"; error: string }
   | { type: "set_filepath"; value: string; cursor: number };
 
@@ -79,7 +81,7 @@ function getFieldValue(state: FormState): string {
   const f = state.field;
   if (f === "scheduleNum") return state.scheduleNum;
   if (f === "scheduleTime") return state.scheduleTime;
-  if (f === "submit" || f === "scheduleUnit" || f === "scheduleMode" || f === "scheduleDow" || f === "args") return "";
+  if (f === "submit" || f === "scheduleUnit" || f === "scheduleMode" || f === "scheduleDow" || f === "args" || f === "debug") return "";
   return state[f] as string;
 }
 
@@ -92,7 +94,7 @@ function reducer(state: FormState, action: Action): FormState {
       const next = fields[(idx + 1) % fields.length];
       const val = next === "scheduleNum" ? state.scheduleNum
         : next === "scheduleTime" ? state.scheduleTime
-        : next === "submit" || next === "scheduleUnit" || next === "scheduleMode" || next === "scheduleDow" || next === "args" ? ""
+        : next === "submit" || next === "scheduleUnit" || next === "scheduleMode" || next === "scheduleDow" || next === "args" || next === "debug" ? ""
         : (state[next] as string);
       return { ...state, field: next, cursor: val.length };
     }
@@ -101,13 +103,13 @@ function reducer(state: FormState, action: Action): FormState {
       const prev = fields[(idx - 1 + fields.length) % fields.length];
       const val = prev === "scheduleNum" ? state.scheduleNum
         : prev === "scheduleTime" ? state.scheduleTime
-        : prev === "submit" || prev === "scheduleUnit" || prev === "scheduleMode" || prev === "scheduleDow" || prev === "args" ? ""
+        : prev === "submit" || prev === "scheduleUnit" || prev === "scheduleMode" || prev === "scheduleDow" || prev === "args" || prev === "debug" ? ""
         : (state[prev] as string);
       return { ...state, field: prev, cursor: val.length };
     }
     case "append": {
       const f = state.field;
-      if (f === "submit" || f === "scheduleUnit" || f === "scheduleMode" || f === "scheduleDow" || f === "args") return state;
+      if (f === "submit" || f === "scheduleUnit" || f === "scheduleMode" || f === "scheduleDow" || f === "args" || f === "debug") return state;
       const cur = getFieldValue(state);
       const pos = state.cursor;
       if (f === "scheduleNum" && !/^\d+$/.test(action.char)) return state;
@@ -120,7 +122,7 @@ function reducer(state: FormState, action: Action): FormState {
     }
     case "delete_char": {
       const f = state.field;
-      if (f === "submit" || f === "scheduleUnit" || f === "scheduleMode" || f === "scheduleDow" || f === "args") return state;
+      if (f === "submit" || f === "scheduleUnit" || f === "scheduleMode" || f === "scheduleDow" || f === "args" || f === "debug") return state;
       const cur = getFieldValue(state);
       const pos = state.cursor;
       if (pos === 0) return state;
@@ -152,6 +154,8 @@ function reducer(state: FormState, action: Action): FormState {
       const next = (state.scheduleDow + action.dir + 7) % 7;
       return { ...state, scheduleDow: next };
     }
+    case "toggle_debug":
+      return { ...state, debug: !state.debug };
     case "set_error":
       return { ...state, error: action.error };
     case "set_filepath":
@@ -185,6 +189,7 @@ const INITIAL_STATE: FormState = {
   scheduleUnit: "min",
   scheduleDow: 1, // Monday
   scheduleTime: "",
+  debug: false,
   cursor: 0,
   error: "",
 };
@@ -219,7 +224,7 @@ export function AddWorkflow({ client, availableHeight, onDone }: Props) {
 
   const hasChanges = useCallback(() => {
     const s = stateRef.current;
-    return !!(s.name.trim() || s.filePath.trim() || s.scheduleNum.trim() || s.scheduleTime.trim() || argRowsRef.current.length > 0);
+    return !!(s.name.trim() || s.filePath.trim() || s.scheduleNum.trim() || s.scheduleTime.trim() || s.debug || argRowsRef.current.length > 0);
   }, []);
 
   const handleInput = useCallback(
@@ -252,6 +257,7 @@ export function AddWorkflow({ client, availableHeight, onDone }: Props) {
               schedule: formatSchedule(s),
               enabled: true,
               ...(wfArgs ? { args: wfArgs } : {}),
+              ...(s.debug ? { debug: true } : {}),
             })
             .then(onDone)
             .catch(() => onDone());
@@ -296,6 +302,22 @@ export function AddWorkflow({ client, availableHeight, onDone }: Props) {
           dispatch({ type: "cycle_mode", dir: 1 });
           return;
         }
+      }
+
+      if (s.field === "debug") {
+        if (input === " " || key.return) {
+          dispatch({ type: "toggle_debug" });
+          return;
+        }
+        if (key.tab && key.shift) {
+          dispatch({ type: "prev_field" });
+          return;
+        }
+        if (key.tab) {
+          dispatch({ type: "next_field" });
+          return;
+        }
+        return;
       }
 
       // Cursor movement within text fields
@@ -474,6 +496,15 @@ export function AddWorkflow({ client, availableHeight, onDone }: Props) {
             />
           </Box>
         )}
+        <Box>
+          <Text color={fieldColor("debug")}>Debug:   </Text>
+          <Text color={state.field === "debug" ? "cyan" : undefined} bold={state.field === "debug"} inverse={state.field === "debug"}>
+            {state.debug ? " [x] enabled " : " [ ] disabled "}
+          </Text>
+          {state.field === "debug" && (
+            <Text color="gray"> space to toggle</Text>
+          )}
+        </Box>
         <ArgsTable rows={argRows} onChange={setArgRows} active={state.field === "args"} onExit={handleArgsExit} />
         {state.error ? (
           <Box>
