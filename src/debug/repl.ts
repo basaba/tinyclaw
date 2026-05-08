@@ -142,6 +142,79 @@ export async function readDebugSnapshot(filePath: string): Promise<DebugSnapshot
   return data as DebugSnapshot;
 }
 
+function buildCompleter(snapshot: DebugSnapshot): readline.Completer {
+  const dotCommands = ['.steps', '.args', '.env', '.help', '.exit', '.quit'];
+  const stepIds = Object.keys(snapshot.steps);
+  const argNames = Object.keys(snapshot.args);
+  const envKeys = Object.keys(snapshot.env);
+
+  return (line: string): [string[], string] => {
+    const trimmed = line.trimStart();
+
+    // Dot commands
+    if (trimmed.startsWith('.')) {
+      const hits = dotCommands.filter((c) => c.startsWith(trimmed));
+      return [hits, trimmed];
+    }
+
+    // ${env:...} completion
+    const envPrefix = trimmed.match(/^\$\{env:([A-Za-z0-9_-]*)$/);
+    if (envPrefix) {
+      const partial = envPrefix[1];
+      const hits = envKeys
+        .filter((k) => k.startsWith(partial))
+        .map((k) => `\${env:${k}}`);
+      return [hits, trimmed];
+    }
+
+    // ${arg} completion
+    const argPrefix = trimmed.match(/^\$\{([A-Za-z0-9_-]*)$/);
+    if (argPrefix) {
+      const partial = argPrefix[1];
+      const hits = argNames
+        .filter((k) => k.startsWith(partial))
+        .map((k) => `\${${k}}`);
+      return [hits, trimmed];
+    }
+
+    // $step.field completion
+    const fieldPrefix = trimmed.match(/^\$([A-Za-z0-9_-]+)\.(.*)$/);
+    if (fieldPrefix) {
+      const [, stepId, partialField] = fieldPrefix;
+      if (!(stepId in snapshot.steps)) return [[], trimmed];
+      const result = snapshot.steps[stepId];
+      const parts = partialField.split('.');
+      // Navigate to the parent object
+      let current: unknown = result;
+      const resolvedParts = parts.slice(0, -1);
+      for (const p of resolvedParts) {
+        if (current == null || typeof current !== 'object') return [[], trimmed];
+        current = (current as Record<string, unknown>)[p];
+      }
+      if (current == null || typeof current !== 'object') return [[], trimmed];
+      const lastPart = parts[parts.length - 1];
+      const keys = Object.keys(current as object);
+      const prefix = `$${stepId}.${resolvedParts.length ? resolvedParts.join('.') + '.' : ''}`;
+      const hits = keys
+        .filter((k) => k.startsWith(lastPart))
+        .map((k) => `${prefix}${k}`);
+      return [hits, trimmed];
+    }
+
+    // $step completion (bare)
+    const stepPrefix = trimmed.match(/^\$([A-Za-z0-9_-]*)$/);
+    if (stepPrefix) {
+      const partial = stepPrefix[1];
+      const hits = stepIds
+        .filter((id) => id.startsWith(partial))
+        .map((id) => `$${id}`);
+      return [hits, trimmed];
+    }
+
+    return [[], trimmed];
+  };
+}
+
 export async function startDebugRepl(
   snapshot: DebugSnapshot,
   input: NodeJS.ReadableStream,
@@ -152,6 +225,7 @@ export async function startDebugRepl(
     output: output as any,
     prompt: 'debug> ',
     terminal: true,
+    completer: buildCompleter(snapshot),
   });
 
   // Ensure terminal cursor is visible (may be hidden by TUI frameworks)
