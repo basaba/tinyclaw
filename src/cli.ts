@@ -234,6 +234,7 @@ async function run(runArgs: string[]): Promise<void> {
   let pipeline: string | undefined;
   let argsJson: Record<string, unknown> | undefined;
   let dryRun = false;
+  let debug = false;
   let pluginsDir: string | undefined;
 
   for (let i = 0; i < runArgs.length; i++) {
@@ -242,6 +243,8 @@ async function run(runArgs: string[]): Promise<void> {
       pipeline = runArgs[++i];
     } else if (arg === "--dry-run") {
       dryRun = true;
+    } else if (arg === "--debug") {
+      debug = true;
     } else if (arg === "--args-json") {
       // On Windows, shells may split JSON across multiple argv entries.
       // Collect and rejoin until we get valid JSON.
@@ -312,6 +315,7 @@ async function run(runArgs: string[]): Promise<void> {
         stdout,
         stderr,
         dryRun,
+        debug,
       };
 
       let result: any = await runToolRequest({ filePath, args: argsJson, ctx: toolCtx });
