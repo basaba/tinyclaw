@@ -61,7 +61,7 @@ export function createCopilotCommand(
         "Piped input is prepended to the prompt.",
       ].join("\n");
     },
-    async run({ input, args }: { input: AsyncIterable<unknown>; args: Record<string, unknown> }) {
+    async run({ input, args, ctx }: { input: AsyncIterable<unknown>; args: Record<string, unknown>; ctx?: { cwd?: string } }) {
       await ensureStarted();
       const client = getClient();
 
@@ -89,8 +89,9 @@ export function createCopilotCommand(
 
       const systemPrompt = typeof args.system === "string" ? args.system : undefined;
       const model = typeof args.model === "string" ? args.model : undefined;
+      const cwd = ctx?.cwd;
 
-      const response = await client.reason(fullPrompt, undefined, systemPrompt, { model });
+      const response = await client.reason(fullPrompt, undefined, systemPrompt, { model, cwd });
 
       return { output: asStream([response]) };
     },

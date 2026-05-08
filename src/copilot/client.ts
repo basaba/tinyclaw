@@ -57,6 +57,7 @@ export class CopilotBridgeClient {
     options?: {
       model?: string;
       reasoningEffort?: "low" | "medium" | "high" | "xhigh";
+      cwd?: string;
     },
   ): Promise<string> {
     if (!this.client) {
@@ -66,7 +67,7 @@ export class CopilotBridgeClient {
     const model = options?.model ?? this.config.model;
     const reasoningEffort = options?.reasoningEffort ?? this.config.reasoningEffort;
     const enableConfigDiscovery = this.config.enableConfigDiscovery ?? true;
-    const workingDirectory = this.config.workingDirectory ?? process.cwd();
+    const workingDirectory = options?.cwd ?? this.config.workingDirectory ?? process.cwd();
 
     const session = await this.client.createSession({
       onPermissionRequest: approveAll,

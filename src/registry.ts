@@ -2,6 +2,7 @@ import { createCopilotCommand, type LobsterCommand } from "./commands/copilot.js
 import { createMcpCallCommand } from "./commands/mcp.js";
 import { createAdoPrMonitorCommand } from "./commands/ado-pr-monitor.js";
 import { createTeamsSendCommand } from "./commands/teams.js";
+import { createTeamsMessagesCommand, createTeamsRepliesCommand, createTeamsReplyCommand } from "./commands/teams-read.js";
 import { createFormatMd2HtmlCommand } from "./commands/format.js";
 import { createAgencyCopilotCommand } from "./commands/agency-copilot.js";
 import {
@@ -53,6 +54,9 @@ export async function buildRegistry(
     createMcpCallCommand(opts.getMcpServers),
     createAdoPrMonitorCommand(),
     createTeamsSendCommand(opts.getMcpServers),
+    createTeamsMessagesCommand(opts.getMcpServers),
+    createTeamsRepliesCommand(opts.getMcpServers),
+    createTeamsReplyCommand(opts.getMcpServers),
     createMailSendCommand(opts.getMcpServers),
     createMailSearchCommand(opts.getMcpServers),
     createMailReadCommand(opts.getMcpServers),
