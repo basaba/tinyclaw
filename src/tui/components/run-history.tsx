@@ -12,9 +12,15 @@ interface Props {
 }
 
 export function RunHistory({ client, workflowId, onBack, onSelectRun, onViewFile }: Props) {
+  const PAGE_SIZE = 15;
   const [runs, setRuns] = useState<RunRecord[]>([]);
   const [cursor, setCursor] = useState(0);
+  const [page, setPage] = useState(0);
   const [confirmClear, setConfirmClear] = useState(false);
+
+  const totalPages = Math.max(1, Math.ceil(runs.length / PAGE_SIZE));
+  const pageStart = page * PAGE_SIZE;
+  const pageRuns = runs.slice(pageStart, pageStart + PAGE_SIZE);
 
   const refresh = () => client.getHistory(workflowId).then(setRuns).catch(() => {});
 
@@ -32,7 +38,7 @@ export function RunHistory({ client, workflowId, onBack, onSelectRun, onViewFile
   useInput((input, key) => {
     if (confirmClear) {
       if (input === "y") {
-        client.clearHistory(workflowId).then(() => { setRuns([]); setCursor(0); }).catch(() => {});
+        client.clearHistory(workflowId).then(() => { setRuns([]); setCursor(0); setPage(0); }).catch(() => {});
       }
       setConfirmClear(false);
       return;
@@ -43,16 +49,22 @@ export function RunHistory({ client, workflowId, onBack, onSelectRun, onViewFile
       return;
     }
     if (key.upArrow) setCursor((c) => Math.max(0, c - 1));
-    if (key.downArrow) setCursor((c) => Math.min(runs.length - 1, c + 1));
-    if (key.return && runs[cursor]) {
-      onSelectRun(runs[cursor], workflowId);
+    if (key.downArrow) setCursor((c) => Math.min(pageRuns.length - 1, c + 1));
+    if (key.leftArrow || input === "[") {
+      setPage((p) => { const np = Math.max(0, p - 1); setCursor(0); return np; });
+    }
+    if (key.rightArrow || input === "]") {
+      setPage((p) => { const np = Math.min(totalPages - 1, p + 1); setCursor(0); return np; });
+    }
+    if (key.return && pageRuns[cursor]) {
+      onSelectRun(pageRuns[cursor], workflowId);
     }
     if (key.delete || input === "d") {
-      const run = runs[cursor];
+      const run = pageRuns[cursor];
       if (run && run.status !== "running") {
         client.deleteRun(run.id).then(() => {
           refresh();
-          setCursor((c) => Math.min(c, runs.length - 2));
+          setCursor((c) => Math.min(c, pageRuns.length - 2));
         }).catch(() => {});
       }
     }
@@ -75,7 +87,7 @@ export function RunHistory({ client, workflowId, onBack, onSelectRun, onViewFile
 
   return (
     <Box flexDirection="column">
-      <Text bold>Run History ({runs.length} runs) — Esc to go back</Text>
+      <Text bold>Run History ({runs.length} runs) — Page {page + 1}/{totalPages} — Esc to go back</Text>
       <Box marginTop={1}>
         <Text bold>
           {"  "}
@@ -85,7 +97,7 @@ export function RunHistory({ client, workflowId, onBack, onSelectRun, onViewFile
           {"Duration"}
         </Text>
       </Box>
-      {runs.map((run, i) => {
+      {pageRuns.map((run, i) => {
         const selected = i === cursor;
         const statusIcon =
           run.status === "success" ? "✅"
@@ -117,6 +129,9 @@ export function RunHistory({ client, workflowId, onBack, onSelectRun, onViewFile
           </Box>
         );
       })}
+      {totalPages > 1 && (
+        <Text color="gray">← / → or [ / ] to change page</Text>
+      )}
       {confirmClear && (
         <Text color="red" bold>Clear all history? Press y to confirm, any other key to cancel</Text>
       )}
