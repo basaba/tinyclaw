@@ -63,6 +63,9 @@ if (!args.length) {
   }
 } else if (args[0] === "daemon") {
   await handleDaemon(args[1]);
+} else if (args[0] === "ui") {
+  const { startUi } = await import("./ui/launcher.js");
+  await startUi();
 } else {
   run(args);
 }
@@ -80,6 +83,7 @@ Usage:
 
 Commands:
   tui                      Launch the workflow scheduler TUI (connects to daemon)
+  ui                       Launch the desktop GUI app (Electron)
   sched                    Scheduler management CLI (non-interactive)
   sched help               Show all scheduler subcommands
   daemon start             Start the scheduler daemon in the background
