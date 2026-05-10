@@ -1,4 +1,12 @@
 import * as readline from 'node:readline';
+import { PassThrough } from 'node:stream';
+
+// lobster/core exports these at runtime but lacks .d.ts declarations
+const lobsterCore: Promise<{
+  parsePipeline: (input: string) => any[];
+  runPipeline: (opts: any) => Promise<{ items: any[]; rendered: boolean; halted: boolean }>;
+  createDefaultRegistry: () => { get: (name: string) => any; list: () => string[] };
+}> = import('@basaba/lobster/core') as any;
 
 export interface DebugSnapshot {
   runId: string;
@@ -37,10 +45,122 @@ function stepSummary(id: string, result: WorkflowStepResult): string {
   return `${id} — ok`;
 }
 
-export function evaluateExpression(
+function getByPath(obj: any, path: string): any {
+  const parts = path.split('.').filter(Boolean);
+  let cur: any = obj;
+  for (const p of parts) {
+    if (cur == null) return undefined;
+    cur = cur[p];
+  }
+  return cur;
+}
+
+// ── Source expression resolution ─────────────────────────────────────
+
+function resolveSource(expr: string, snapshot: DebugSnapshot): { value: unknown } | { error: string } {
+  const trimmed = expr.trim();
+
+  // ${env:VAR}
+  const envMatch = trimmed.match(/^\$\{env:([A-Za-z0-9_-]+)\}$/);
+  if (envMatch) {
+    const key = envMatch[1];
+    return key in snapshot.env ? { value: snapshot.env[key] } : { error: `Environment variable not found: ${key}` };
+  }
+
+  // ${argName}
+  const argMatch = trimmed.match(/^\$\{([A-Za-z0-9_-]+)\}$/);
+  if (argMatch) {
+    const key = argMatch[1];
+    return key in snapshot.args ? { value: snapshot.args[key] } : { error: `Argument not found: ${key}` };
+  }
+
+  // $stepId.field.path
+  const refMatch = trimmed.match(/^\$([A-Za-z0-9_-]+)\.(.+)$/);
+  if (refMatch) {
+    const [, stepId, fieldPath] = refMatch;
+    if (!(stepId in snapshot.steps)) return { error: `Unknown step: ${stepId}` };
+    const result = snapshot.steps[stepId];
+    const value = getByPath(result, fieldPath);
+    return { value };
+  }
+
+  // $stepId (bare)
+  const bareMatch = trimmed.match(/^\$([A-Za-z0-9_-]+)$/);
+  if (bareMatch) {
+    const id = bareMatch[1];
+    if (id in snapshot.steps) return { value: snapshot.steps[id] };
+    return { error: `Unknown step: ${id}` };
+  }
+
+  return { error: `Cannot resolve source: ${trimmed}` };
+}
+
+// ── Pipeline execution via lobster SDK ───────────────────────────────
+
+function splitFirstPipe(input: string): { source: string; pipelineText: string } | null {
+  let inSingle = false;
+  let inDouble = false;
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+    if (ch === "'" && !inDouble) { inSingle = !inSingle; continue; }
+    if (ch === '"' && !inSingle) { inDouble = !inDouble; continue; }
+    if (ch === '|' && !inSingle && !inDouble) {
+      return {
+        source: input.slice(0, i).trim(),
+        pipelineText: input.slice(i + 1).trim(),
+      };
+    }
+  }
+  return null;
+}
+
+async function runPipelineExpression(
+  source: unknown,
+  pipelineText: string,
+): Promise<{ output: string } | { error: string }> {
+  try {
+    const { parsePipeline, runPipeline, createDefaultRegistry } = await lobsterCore;
+    const pipeline = parsePipeline(pipelineText);
+    const registry = createDefaultRegistry();
+
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+
+    // Convert source to async iterable input
+    const inputData = Array.isArray(source) ? source : [source];
+    async function* toInput() {
+      for (const item of inputData) yield item;
+    }
+
+    const result = await runPipeline({
+      pipeline,
+      registry,
+      stdin: process.stdin,
+      stdout,
+      stderr,
+      env: process.env,
+      mode: 'tool',
+      input: toInput(),
+    });
+
+    stdout.end();
+    stderr.end();
+
+    const items = result.items;
+    if (items.length === 0) return { output: '(empty)' };
+    if (items.length === 1) return { output: formatValue(items[0]) };
+    return { output: formatValue(items) };
+  } catch (e: any) {
+    return { error: `Pipeline error: ${e.message}` };
+  }
+}
+
+// ── Main evaluator ───────────────────────────────────────────────────
+
+export async function evaluateExpression(
   input: string,
   snapshot: DebugSnapshot,
-): { output: string } | { error: string } | { exit: true } {
+): Promise<{ output: string } | { error: string } | { exit: true }> {
   const trimmed = input.trim();
   if (!trimmed) return { output: '' };
 
@@ -55,13 +175,8 @@ export function evaluateExpression(
     return { output: lines.length ? lines.join('\n') : '(no steps)' };
   }
 
-  if (trimmed === '.args') {
-    return { output: formatValue(snapshot.args) };
-  }
-
-  if (trimmed === '.env') {
-    return { output: formatValue(snapshot.env) };
-  }
+  if (trimmed === '.args') return { output: formatValue(snapshot.args) };
+  if (trimmed === '.env') return { output: formatValue(snapshot.env) };
 
   if (trimmed === '.help') {
     return {
@@ -76,60 +191,38 @@ export function evaluateExpression(
         '  .env               — dump workflow env',
         '  .help              — show this help',
         '  .exit / .quit      — exit the REPL',
+        '',
+        'Pipeline support (uses lobster SDK — all lobster commands available):',
+        '  $step.json | where field=value    — filter items',
+        '  $step.json | sort --key name      — sort items',
+        '  $step.json | pick id,name         — project fields',
+        '  $step.json | head --n 5           — first N items',
+        '  $step.json | tail --n 5           — last N items',
+        '  $step.json | count                — count items',
+        '  $step.json | groupBy --key status — group by field',
+        '  $step.json | dedupe --key id      — deduplicate',
+        '  $step.json | compute field=expr   — add computed fields',
+        '',
+        '  Chains:  $prs.json | where status=active | sort --key date | head --n 3',
       ].join('\n'),
     };
   }
 
-  // ${env:VAR} — env variable
-  const envMatch = trimmed.match(/^\$\{env:([A-Za-z0-9_-]+)\}$/);
-  if (envMatch) {
-    const key = envMatch[1];
-    if (key in snapshot.env) {
-      return { output: snapshot.env[key] };
-    }
-    return { error: `Environment variable not found: ${key}` };
+  // Check for pipeline (source | commands...)
+  const pipelineSplit = splitFirstPipe(trimmed);
+
+  if (pipelineSplit) {
+    const sourceResult = resolveSource(pipelineSplit.source, snapshot);
+    if ('error' in sourceResult) return sourceResult;
+    return runPipelineExpression(sourceResult.value, pipelineSplit.pipelineText);
   }
 
-  // ${argName} — arg value
-  const argMatch = trimmed.match(/^\$\{([A-Za-z0-9_-]+)\}$/);
-  if (argMatch) {
-    const key = argMatch[1];
-    if (key in snapshot.args) {
-      return { output: formatValue(snapshot.args[key]) };
-    }
-    return { error: `Argument not found: ${key}` };
+  // Single expression (no pipeline)
+  const result = resolveSource(trimmed, snapshot);
+  if ('error' in result) {
+    return { error: `${result.error}. Type .help for usage.` };
   }
-
-  // $stepId.field — step ref
-  const refMatch = trimmed.match(/^\$([A-Za-z0-9_-]+)\.(.+)$/);
-  if (refMatch) {
-    const [, stepId, fieldPath] = refMatch;
-    if (!(stepId in snapshot.steps)) {
-      return { error: `Unknown step: ${stepId}` };
-    }
-    const result = snapshot.steps[stepId];
-    const parts = fieldPath.split('.');
-    let current: unknown = result;
-    for (const part of parts) {
-      if (current == null || typeof current !== 'object') {
-        return { error: `Cannot access '${part}' on ${typeof current}` };
-      }
-      current = (current as Record<string, unknown>)[part];
-    }
-    return { output: formatValue(current) };
-  }
-
-  // $stepId (bare) — full step result
-  const bareMatch = trimmed.match(/^\$([A-Za-z0-9_-]+)$/);
-  if (bareMatch) {
-    const id = bareMatch[1];
-    if (id in snapshot.steps) {
-      return { output: formatValue(snapshot.steps[id]) };
-    }
-    return { error: `Unknown step: ${id}` };
-  }
-
-  return { error: `Unrecognized expression: ${trimmed}. Type .help for usage.` };
+  return { output: formatValue(result.value) };
 }
 
 export async function readDebugSnapshot(filePath: string): Promise<DebugSnapshot> {
@@ -142,7 +235,27 @@ export async function readDebugSnapshot(filePath: string): Promise<DebugSnapshot
   return data as DebugSnapshot;
 }
 
-function buildCompleter(snapshot: DebugSnapshot): readline.Completer {
+// ── Autocomplete ─────────────────────────────────────────────────────
+
+let cachedCommandNames: string[] | null = null;
+
+async function getLobsterCommandNames(): Promise<string[]> {
+  if (cachedCommandNames) return cachedCommandNames;
+  try {
+    const { createDefaultRegistry } = await lobsterCore;
+    const registry = createDefaultRegistry();
+    cachedCommandNames = registry.list();
+    return cachedCommandNames;
+  } catch {
+    cachedCommandNames = [
+      'where', 'count', 'head', 'tail', 'sort', 'pick', 'groupBy',
+      'dedupe', 'compute', 'map', 'emit', 'table', 'json',
+    ];
+    return cachedCommandNames;
+  }
+}
+
+function buildCompleter(snapshot: DebugSnapshot, pipeCommands: string[]): readline.Completer {
   const dotCommands = ['.steps', '.args', '.env', '.help', '.exit', '.quit'];
   const stepIds = Object.keys(snapshot.steps);
   const argNames = Object.keys(snapshot.args);
@@ -150,6 +263,19 @@ function buildCompleter(snapshot: DebugSnapshot): readline.Completer {
 
   return (line: string): [string[], string] => {
     const trimmed = line.trimStart();
+
+    // After a pipe: complete pipeline command names
+    const pipeIdx = trimmed.lastIndexOf('|');
+    if (pipeIdx >= 0) {
+      const afterPipe = trimmed.slice(pipeIdx + 1).trimStart();
+      if (!afterPipe.includes(' ')) {
+        const hits = pipeCommands
+          .filter((c) => c.startsWith(afterPipe))
+          .map((c) => trimmed.slice(0, pipeIdx + 1) + ' ' + c);
+        return [hits, trimmed];
+      }
+      return [[], trimmed];
+    }
 
     // Dot commands
     if (trimmed.startsWith('.')) {
@@ -184,7 +310,6 @@ function buildCompleter(snapshot: DebugSnapshot): readline.Completer {
       if (!(stepId in snapshot.steps)) return [[], trimmed];
       const result = snapshot.steps[stepId];
       const parts = partialField.split('.');
-      // Navigate to the parent object
       let current: unknown = result;
       const resolvedParts = parts.slice(0, -1);
       for (const p of resolvedParts) {
@@ -220,12 +345,14 @@ export async function startDebugRepl(
   input: NodeJS.ReadableStream,
   output: NodeJS.WritableStream,
 ): Promise<void> {
+  const pipeCommands = await getLobsterCommandNames();
+
   const rl = readline.createInterface({
     input: input as any,
     output: output as any,
     prompt: 'debug> ',
     terminal: true,
-    completer: buildCompleter(snapshot),
+    completer: buildCompleter(snapshot, pipeCommands),
   });
 
   // Ensure terminal cursor is visible (may be hidden by TUI frameworks)
@@ -237,8 +364,8 @@ export async function startDebugRepl(
   rl.prompt();
 
   return new Promise<void>((resolve) => {
-    rl.on('line', (line) => {
-      const result = evaluateExpression(line, snapshot);
+    rl.on('line', async (line) => {
+      const result = await evaluateExpression(line, snapshot);
       if ('exit' in result) {
         rl.close();
         return;
@@ -256,3 +383,4 @@ export async function startDebugRepl(
     });
   });
 }
+
