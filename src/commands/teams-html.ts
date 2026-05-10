@@ -151,10 +151,14 @@ export function sanitizeForTeams(html: string): string {
     return cleanAttrs ? `<${tag} ${cleanAttrs}>` : `<${tag}>`;
   });
 
-  // 9. Collapse excessive <br> runs (more than 2 in a row)
+  // 10. Escape backslashes — Teams API interprets them as escape sequences
+  // (e.g. \U in C:\Users triggers "Unrecognized escape sequence")
+  html = escapeBackslashes(html);
+
+  // 11. Collapse excessive <br> runs (more than 2 in a row)
   html = html.replace(/(<br\s*\/?>[\s]*){3,}/gi, "<br><br>");
 
-  // 10. Trim leading/trailing whitespace and <br>s
+  // 12. Trim leading/trailing whitespace and <br>s
   html = html.replace(/^(\s|<br\s*\/?>)+/, "");
   html = html.replace(/(\s|<br\s*\/?>)+$/, "");
 
@@ -202,6 +206,16 @@ function isValidHref(href: string): boolean {
 
 function escapeAttr(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/**
+ * Escape literal backslashes in text content (outside HTML tags) so the
+ * Teams API doesn't interpret them as escape sequences.
+ * Replaces `\` with `&#92;` only in text nodes, leaving tag markup intact.
+ */
+function escapeBackslashes(html: string): string {
+  // Split into tag vs text segments, only escape in text segments
+  return html.replace(/([^<>]+)/g, (text) => text.replace(/\\/g, "&#92;"));
 }
 
 // ─── Custom marked renderer ───────────────────────────────────────────
