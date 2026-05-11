@@ -588,3 +588,20 @@ pre, code {
   color: var(--accent, #4ea1ff);
   text-decoration: underline;
 }
+
+/* ── Args table editor ────────────────────────────────────── */
+
+.args-table th,
+.args-table td {
+  padding: 6px 8px;
+  vertical-align: top;
+}
+
+.args-table .form-input {
+  width: 100%;
+}
+
+.mode-toggle {
+  display: inline-flex;
+  gap: 4px;
+}
