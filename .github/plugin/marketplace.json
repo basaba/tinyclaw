@@ -1,0 +1,26 @@
+{
+  "name": "tinyclaw",
+  "metadata": {
+    "description": "TinyClaw — Lobster workflow runner for GitHub Copilot CLI.",
+    "version": "0.1.2"
+  },
+  "owner": {
+    "name": "basaba",
+    "url": "https://github.com/basaba"
+  },
+  "plugins": [
+    {
+      "name": "tinyclaw",
+      "source": ".",
+      "description": "Expert on the Lobster workflow language and its TinyClaw Copilot integration — write workflows, debug pipelines, and understand system semantics.",
+      "version": "0.1.2",
+      "author": {
+        "name": "basaba",
+        "url": "https://github.com/basaba"
+      },
+      "skills": ["./skills/tinyclaw"],
+      "keywords": ["lobster", "workflow", "tinyclaw", "copilot", "mcp", "pipeline"],
+      "repository": "https://github.com/basaba/tinyclaw"
+    }
+  ]
+}
