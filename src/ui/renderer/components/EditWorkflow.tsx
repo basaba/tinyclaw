@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import type { WorkflowEntry } from "../types";
+import { ScheduleEditor } from "./ScheduleEditor";
 
 interface Props {
   workflow: WorkflowEntry;
@@ -198,7 +199,7 @@ export function EditWorkflow({ workflow, onDone }: Props) {
 
         <div className="form-group">
           <label>Schedule</label>
-          <input className="form-input mono" value={schedule} onChange={(e) => setSchedule(e.target.value)} />
+          <ScheduleEditor value={schedule} onChange={setSchedule} />
         </div>
 
         <div className="form-group">
