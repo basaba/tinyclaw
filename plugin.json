@@ -1,0 +1,12 @@
+{
+  "name": "tinyclaw",
+  "description": "Expert on the Lobster workflow language and its TinyClaw Copilot integration — write workflows, debug pipelines, and understand system semantics.",
+  "version": "0.1.2",
+  "author": {
+    "name": "basaba",
+    "url": "https://github.com/basaba"
+  },
+  "license": "MIT",
+  "repository": "https://github.com/basaba/tinyclaw",
+  "keywords": ["lobster", "workflow", "tinyclaw", "copilot", "mcp", "pipeline"]
+}
