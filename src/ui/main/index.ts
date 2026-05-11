@@ -124,6 +124,7 @@ function registerIpcHandlers(): void {
     const child = spawn(tinyClawBin, ["debug", snapshotPath], {
       stdio: ["pipe", "pipe", "pipe"],
       shell: false,
+      windowsHide: true,
     });
 
     ptyProcesses.set(ptyId, child);

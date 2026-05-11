@@ -29,7 +29,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@basaba/lobster": "^2026.508.3",
+    "@basaba/lobster": "^2026.511.2",
     "@dagrejs/dagre": "^3.0.0",
     "@github/copilot-sdk": "^0.2.2",
     "@modelcontextprotocol/sdk": "^1.29.0",

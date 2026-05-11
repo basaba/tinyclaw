@@ -26,6 +26,7 @@ export async function startUi(): Promise<void> {
   const child = spawn(electronPath, [mainScript], {
     stdio: "inherit",
     detached: false,
+    windowsHide: true,
   });
 
   child.on("exit", (code) => {

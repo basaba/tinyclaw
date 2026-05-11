@@ -24,6 +24,7 @@ function runAz(
         child = spawn(shellOverride, ["-NoProfile", "-Command", `& az ${escaped}`], {
           env: opts.env as NodeJS.ProcessEnv,
           stdio: ["ignore", "pipe", "pipe"],
+          windowsHide: true,
         });
       } else {
         const quoted = argv.map((a) => `"${a}"`).join(" ");
@@ -31,12 +32,14 @@ function runAz(
           env: opts.env as NodeJS.ProcessEnv,
           stdio: ["ignore", "pipe", "pipe"],
           shell: true,
+          windowsHide: true,
         });
       }
     } else {
       child = spawn("az", argv, {
         env: opts.env as NodeJS.ProcessEnv,
         stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true,
       });
     }
 
