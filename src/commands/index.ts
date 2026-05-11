@@ -6,4 +6,5 @@ export { createTeamsMessagesCommand, createTeamsRepliesCommand, createTeamsReply
 export { createMailSendCommand, createMailSearchCommand, createMailReadCommand } from "./mail.js";
 export { createFormatMd2HtmlCommand } from "./format.js";
 export { createAgencyCopilotCommand } from "./agency-copilot.js";
+export { createKustoQueryCommand } from "./kusto.js";
 

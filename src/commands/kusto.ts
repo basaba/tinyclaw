@@ -1,39 +1,27 @@
 /**
- * tinyclaw plugin — `kusto.query`
+ * `kusto.query` — Run a KQL query against an Azure Data Explorer (Kusto) cluster.
  *
- * Run a KQL query against an Azure Data Explorer (Kusto) cluster from any
- * Lobster pipeline. Output rows can be piped into `copilot`, `teams.send`,
- * `mail.send`, etc.
- *
- * Setup:
- *   1. Copy this file to your plugins directory:
- *        ~/.config/tinyclaw/plugins/kusto-query.js
- *      (or set LOBSTER_PLUGINS / pass --plugins <dir>)
- *   2. Install the SDK in that directory:
- *        cd ~/.config/tinyclaw/plugins
- *        npm init -y && npm pkg set type=module
- *        npm install azure-kusto-data
- *
- * Usage:
- *   kusto.query --cluster https://help.kusto.windows.net \
- *               --database Samples \
+ * Usage in workflows:
+ *   kusto.query --cluster https://help.kusto.windows.net --database Samples \
  *               --query "StormEvents | take 5"
  *
  *   echo "StormEvents | count" | kusto.query --cluster ... --database Samples
  *
  *   kusto.query ... | copilot --prompt "Summarize"
  *
- * Auth (in priority order):
- *   --managed-identity [--client-id <id>]            system or user MI
+ * Auth (priority order):
+ *   --managed-identity [--client-id <id>]            system or user-assigned MI
  *   --client-id ... --client-secret ... --tenant ... AAD app key
  *   (default)                                        local `az login` token
  */
 
-// @ts-check
+import {
+  Client as KustoClient,
+  KustoConnectionStringBuilder,
+} from "azure-kusto-data";
+import type { LobsterCommand } from "./copilot.js";
 
-import { Client, KustoConnectionStringBuilder } from "azure-kusto-data";
-
-function asStream(items) {
+function asStream(items: unknown[]): AsyncIterable<unknown> {
   return {
     async *[Symbol.asyncIterator]() {
       for (const item of items) yield item;
@@ -41,9 +29,10 @@ function asStream(items) {
   };
 }
 
-async function collectInputAsText(input) {
-  const parts = [];
-  if (!input) return "";
+async function collectInputAsText(
+  input: AsyncIterable<unknown>,
+): Promise<string> {
+  const parts: string[] = [];
   for await (const item of input) {
     if (typeof item === "string") parts.push(item);
     else if (item != null) parts.push(JSON.stringify(item));
@@ -51,16 +40,27 @@ async function collectInputAsText(input) {
   return parts.join("\n").trim();
 }
 
-function buildConnectionString(args) {
+function buildConnectionString(
+  args: Record<string, unknown>,
+): KustoConnectionStringBuilder {
   const cluster = String(args.cluster ?? "").trim();
   if (!cluster) throw new Error("kusto.query: --cluster is required");
 
-  const clientId = args["client-id"];
-  const clientSecret = args["client-secret"];
-  const tenant = args.tenant ?? args["tenant-id"];
+  const clientId =
+    typeof args["client-id"] === "string" ? (args["client-id"] as string) : "";
+  const clientSecret =
+    typeof args["client-secret"] === "string"
+      ? (args["client-secret"] as string)
+      : "";
+  const tenant =
+    typeof args.tenant === "string"
+      ? (args.tenant as string)
+      : typeof args["tenant-id"] === "string"
+        ? (args["tenant-id"] as string)
+        : "";
 
   if (args["managed-identity"]) {
-    return typeof clientId === "string" && clientId
+    return clientId
       ? KustoConnectionStringBuilder.withUserManagedIdentity(cluster, clientId)
       : KustoConnectionStringBuilder.withSystemManagedIdentity(cluster);
   }
@@ -68,19 +68,45 @@ function buildConnectionString(args) {
   if (clientId && clientSecret && tenant) {
     return KustoConnectionStringBuilder.withAadApplicationKeyAuthentication(
       cluster,
-      String(clientId),
-      String(clientSecret),
-      String(tenant),
+      clientId,
+      clientSecret,
+      tenant,
     );
   }
 
   return KustoConnectionStringBuilder.withAzLoginIdentity(cluster);
 }
 
-export function createCommand() {
+/** Minimal interface for the bits of the Kusto client we use. */
+export interface KustoQueryClient {
+  execute(
+    database: string,
+    query: string,
+  ): Promise<{
+    primaryResults?: Array<{
+      toJSON(): {
+        columns?: Array<{ name?: string; ColumnName?: string }>;
+        data?: unknown[];
+      };
+    }>;
+  }>;
+  close?(): Promise<void> | void;
+}
+
+export type KustoClientFactory = (
+  args: Record<string, unknown>,
+) => KustoQueryClient;
+
+const defaultClientFactory: KustoClientFactory = (args) => {
+  const kcsb = buildConnectionString(args);
+  return new KustoClient(kcsb) as unknown as KustoQueryClient;
+};
+
+export function createKustoQueryCommand(
+  clientFactory: KustoClientFactory = defaultClientFactory,
+): LobsterCommand {
   return {
     name: "kusto.query",
-
     meta: {
       description:
         "Run a KQL query against an Azure Data Explorer (Kusto) cluster",
@@ -119,7 +145,6 @@ export function createCommand() {
       },
       sideEffects: ["network"],
     },
-
     help() {
       return [
         "kusto.query — run a KQL query against an Azure Data Explorer cluster",
@@ -143,8 +168,13 @@ export function createCommand() {
         "  --format table  single item: { columns: [...], rows: [[...], ...] }",
       ].join("\n");
     },
-
-    async run({ input, args }) {
+    async run({
+      input,
+      args,
+    }: {
+      input: AsyncIterable<unknown>;
+      args: Record<string, unknown>;
+    }) {
       const piped = await collectInputAsText(input);
       const query = String(args.query ?? piped ?? "").trim();
       if (!query) {
@@ -154,8 +184,7 @@ export function createCommand() {
       const database = String(args.database ?? "").trim();
       if (!database) throw new Error("kusto.query: --database is required");
 
-      const kcsb = buildConnectionString(args);
-      const client = new Client(kcsb);
+      const client = clientFactory(args);
 
       let response;
       try {
@@ -165,7 +194,7 @@ export function createCommand() {
           try {
             await client.close();
           } catch {
-            /* ignore */
+            /* ignore close errors */
           }
         }
       }
@@ -174,22 +203,26 @@ export function createCommand() {
       if (!primary) return { output: asStream([]) };
 
       const json = primary.toJSON();
-      const columns = (json.columns ?? []).map((c) => c.name ?? c.ColumnName);
-      const rawRows = json.data ?? [];
+      const columns = (json.columns ?? []).map(
+        (c) => c.name ?? c.ColumnName ?? "",
+      );
+      const rawRows = (json.data ?? []) as unknown[];
 
       const format = args.format === "table" ? "table" : "rows";
       if (format === "table") {
         const rows = rawRows.map((r) =>
-          Array.isArray(r) ? r : columns.map((c) => r[c]),
+          Array.isArray(r)
+            ? r
+            : columns.map((c) => (r as Record<string, unknown>)[c]),
         );
         return { output: asStream([{ columns, rows }]) };
       }
 
       const rows = rawRows.map((r) => {
         if (!Array.isArray(r)) return r;
-        const obj = {};
+        const obj: Record<string, unknown> = {};
         columns.forEach((c, i) => {
-          obj[c] = r[i];
+          obj[c] = (r as unknown[])[i];
         });
         return obj;
       });
@@ -197,5 +230,3 @@ export function createCommand() {
     },
   };
 }
-
-export default createCommand;

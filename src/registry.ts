@@ -5,6 +5,7 @@ import { createTeamsSendCommand } from "./commands/teams.js";
 import { createTeamsMessagesCommand, createTeamsRepliesCommand, createTeamsReplyCommand } from "./commands/teams-read.js";
 import { createFormatMd2HtmlCommand } from "./commands/format.js";
 import { createAgencyCopilotCommand } from "./commands/agency-copilot.js";
+import { createKustoQueryCommand } from "./commands/kusto.js";
 import {
   createMailSendCommand,
   createMailSearchCommand,
@@ -63,6 +64,7 @@ export async function buildRegistry(
     createMailReplyCommand(opts.getMcpServers),
     createFormatMd2HtmlCommand(),
     createAgencyCopilotCommand(),
+    createKustoQueryCommand(),
     ...(opts.extraCommands ?? []),
     ...pluginCommands,
   ];
