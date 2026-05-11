@@ -9,10 +9,9 @@
  *
  *   kusto.query ... | copilot --prompt "Summarize"
  *
- * Auth (priority order):
- *   --managed-identity [--client-id <id>]            system or user-assigned MI
- *   --client-id ... --client-secret ... --tenant ... AAD app key
- *   (default)                                        local `az login` token
+ * Auth:
+ *   Uses the local `az login` cached token (AzCli identity). Run `az login`
+ *   first; the underlying SDK does not handle interactive sign-in itself.
  */
 
 import {
@@ -45,35 +44,6 @@ function buildConnectionString(
 ): KustoConnectionStringBuilder {
   const cluster = String(args.cluster ?? "").trim();
   if (!cluster) throw new Error("kusto.query: --cluster is required");
-
-  const clientId =
-    typeof args["client-id"] === "string" ? (args["client-id"] as string) : "";
-  const clientSecret =
-    typeof args["client-secret"] === "string"
-      ? (args["client-secret"] as string)
-      : "";
-  const tenant =
-    typeof args.tenant === "string"
-      ? (args.tenant as string)
-      : typeof args["tenant-id"] === "string"
-        ? (args["tenant-id"] as string)
-        : "";
-
-  if (args["managed-identity"]) {
-    return clientId
-      ? KustoConnectionStringBuilder.withUserManagedIdentity(cluster, clientId)
-      : KustoConnectionStringBuilder.withSystemManagedIdentity(cluster);
-  }
-
-  if (clientId && clientSecret && tenant) {
-    return KustoConnectionStringBuilder.withAadApplicationKeyAuthentication(
-      cluster,
-      clientId,
-      clientSecret,
-      tenant,
-    );
-  }
-
   return KustoConnectionStringBuilder.withAzLoginIdentity(cluster);
 }
 
@@ -123,17 +93,6 @@ export function createKustoQueryCommand(
             type: "string",
             description: "KQL query (or pipe one in via stdin)",
           },
-          "client-id": { type: "string", description: "AAD app client id" },
-          "client-secret": {
-            type: "string",
-            description: "AAD app client secret",
-          },
-          tenant: { type: "string", description: "AAD tenant id" },
-          "managed-identity": {
-            type: "boolean",
-            description:
-              "Use managed identity (system, or user via --client-id)",
-          },
           format: {
             type: "string",
             enum: ["rows", "table"],
@@ -158,10 +117,8 @@ export function createKustoQueryCommand(
         "",
         '  kusto.query ... | copilot --prompt "Summarize" | teams.send --self',
         "",
-        "Auth (in priority order):",
-        "  --managed-identity [--client-id <id>]              system / user MI",
-        "  --client-id ... --client-secret ... --tenant ...   AAD app",
-        "  (default)                                          local 'az login' identity",
+        "Auth:",
+        "  Uses your local 'az login' cached token. Run `az login` first.",
         "",
         "Output:",
         "  --format rows   (default) one stream item per row, as a plain object",
