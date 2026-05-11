@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect, useRef } from "react";
 import type { WorkflowEntry } from "../types";
 
 interface Props {
@@ -15,6 +15,75 @@ interface Props {
 
 function basename(p: string): string {
   return p.replace(/\\/g, "/").split("/").pop() || p;
+}
+
+function MoreMenu({
+  wf,
+  onHistory,
+  onToggle,
+  onViewYaml,
+  onViewGraph,
+  onRemove,
+}: {
+  wf: WorkflowEntry;
+  onHistory: (id: string) => void;
+  onToggle: (id: string) => void;
+  onViewYaml: (filePath: string) => void;
+  onViewGraph: (filePath: string) => void;
+  onRemove: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const item = (label: string, fn: () => void, danger = false) => (
+    <button
+      className={`menu-item${danger ? " menu-item-danger" : ""}`}
+      onClick={() => {
+        setOpen(false);
+        fn();
+      }}
+    >
+      {label}
+    </button>
+  );
+
+  return (
+    <div className="more-menu" ref={ref}>
+      <button
+        className="btn btn-sm"
+        onClick={() => setOpen((v) => !v)}
+        title="More actions"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        ⋯
+      </button>
+      {open && (
+        <div className="menu-dropdown" role="menu">
+          {item("History", () => onHistory(wf.id))}
+          {item(wf.enabled ? "Disable" : "Enable", () => onToggle(wf.id))}
+          {item("View YAML", () => onViewYaml(wf.filePath))}
+          {item("View Graph", () => onViewGraph(wf.filePath))}
+          {item(
+            "Remove",
+            () => {
+              if (confirm(`Remove workflow "${wf.name}"?`)) onRemove(wf.id);
+            },
+            true
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function WorkflowList({
@@ -52,7 +121,15 @@ export function WorkflowList({
         <tbody>
           {workflows.map((wf) => (
             <tr key={wf.id}>
-              <td style={{ fontWeight: 600 }}>{wf.name}</td>
+              <td style={{ fontWeight: 600 }}>
+                <button
+                  className="link-button"
+                  onClick={() => onHistory(wf.id)}
+                  title="View history"
+                >
+                  {wf.name}
+                </button>
+              </td>
               <td style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>
                 {basename(wf.filePath)}
               </td>
@@ -62,36 +139,23 @@ export function WorkflowList({
                   {wf.enabled ? "● Enabled" : "○ Disabled"}
                 </span>
               </td>
-              <td>{wf.debug ? "🔍" : "—"}</td>
+              <td>{wf.debug ? "Debug" : "—"}</td>
               <td>
                 <div style={{ display: "flex", gap: 4 }}>
-                  <button className="btn btn-sm" onClick={() => onRunNow(wf.id)} title="Run now">
-                    ▶
+                  <button className="btn btn-sm" onClick={() => onRunNow(wf.id)}>
+                    Run
                   </button>
-                  <button className="btn btn-sm" onClick={() => onToggle(wf.id)} title="Toggle">
-                    {wf.enabled ? "⏸" : "⏵"}
+                  <button className="btn btn-sm" onClick={() => onEdit(wf.id)}>
+                    Edit
                   </button>
-                  <button className="btn btn-sm" onClick={() => onHistory(wf.id)} title="History">
-                    📋
-                  </button>
-                  <button className="btn btn-sm" onClick={() => onEdit(wf.id)} title="Edit">
-                    ✏️
-                  </button>
-                  <button className="btn btn-sm" onClick={() => onViewYaml(wf.filePath)} title="View YAML">
-                    📄
-                  </button>
-                  <button className="btn btn-sm" onClick={() => onViewGraph(wf.filePath)} title="View Graph">
-                    🔀
-                  </button>
-                  <button
-                    className="btn btn-sm btn-danger"
-                    onClick={() => {
-                      if (confirm(`Remove workflow "${wf.name}"?`)) onRemove(wf.id);
-                    }}
-                    title="Remove"
-                  >
-                    🗑
-                  </button>
+                  <MoreMenu
+                    wf={wf}
+                    onHistory={onHistory}
+                    onToggle={onToggle}
+                    onViewYaml={onViewYaml}
+                    onViewGraph={onViewGraph}
+                    onRemove={onRemove}
+                  />
                 </div>
               </td>
             </tr>

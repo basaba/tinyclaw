@@ -526,3 +526,65 @@ pre, code {
 .graph-edge polygon {
   fill: var(--text-muted);
 }
+
+/* ── More menu (dropdown) ─────────────────────────────────── */
+
+.more-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.menu-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 140px;
+  background: var(--bg-elevated, #1e1e1e);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+  padding: 4px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+}
+
+.menu-item {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  text-align: left;
+  padding: 6px 10px;
+  font-size: 13px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.menu-item:hover {
+  background: var(--bg-hover);
+}
+
+.menu-item-danger {
+  color: var(--error);
+}
+
+.menu-item-danger:hover {
+  background: rgba(239, 83, 80, 0.15);
+}
+
+.link-button {
+  appearance: none;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.link-button:hover {
+  color: var(--accent, #4ea1ff);
+  text-decoration: underline;
+}
