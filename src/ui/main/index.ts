@@ -149,12 +149,14 @@ function registerIpcHandlers(): void {
     const { spawn } = await import("node:child_process");
     const ptyId = ++ptyCounter;
 
-    // Use the current node + tinyclaw CLI
-    const tinyClawBin = process.platform === "win32" ? "tinyclaw.cmd" : "tinyclaw";
-    const child = spawn(tinyClawBin, ["debug", snapshotPath], {
+    // Run the bundled CLI directly via the current binary.
+    // In Electron, ELECTRON_RUN_AS_NODE makes process.execPath behave as Node.
+    const cliPath = join(__dirname, "..", "..", "cli.js");
+    const child = spawn(process.execPath, [cliPath, "debug", snapshotPath], {
       stdio: ["pipe", "pipe", "pipe"],
       shell: false,
       windowsHide: true,
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
     });
 
     ptyProcesses.set(ptyId, child);

@@ -97,8 +97,8 @@ export async function startWebServer(opts: WebServerOptions = {}): Promise<http.
       return;
     }
 
-    const tinyClawBin = process.platform === "win32" ? "tinyclaw.cmd" : "tinyclaw";
-    const child = spawn(tinyClawBin, ["debug", snapshotPath], {
+    const cliPath = pathResolve(__dirname, "..", "..", "cli.js");
+    const child = spawn(process.execPath, [cliPath, "debug", snapshotPath], {
       stdio: ["pipe", "pipe", "pipe"],
       shell: false,
       windowsHide: true,
