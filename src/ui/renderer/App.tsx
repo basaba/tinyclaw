@@ -108,9 +108,6 @@ export function App() {
       <main className="app-content">
         {renderView()}
       </main>
-      <footer className="app-footer">
-        TinyClaw Desktop — Lobster Workflow Manager
-      </footer>
     </div>
   );
 }

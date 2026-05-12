@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import type { WorkflowEntry } from "../types";
 import { ScheduleEditor } from "./ScheduleEditor";
 import { ArgsEditor } from "./ArgsEditor";
+import { FileEditorModal } from "./FileEditorModal";
 
 interface Props {
   onDone: () => void;
@@ -16,6 +17,7 @@ export function AddWorkflow({ onDone }: Props) {
   const [debug, setDebug] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [fileEditorOpen, setFileEditorOpen] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,12 +70,24 @@ export function AddWorkflow({ onDone }: Props) {
 
         <div className="form-group">
           <label>File Path</label>
-          <input
-            className="form-input mono"
-            value={filePath}
-            onChange={(e) => setFilePath(e.target.value)}
-            placeholder="C:\path\to\workflow.yaml"
-          />
+          <div style={{ display: "flex", gap: 6 }}>
+            <input
+              className="form-input mono"
+              value={filePath}
+              onChange={(e) => setFilePath(e.target.value)}
+              placeholder="C:\path\to\workflow.yaml"
+              style={{ flex: 1 }}
+            />
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setFileEditorOpen(true)}
+              disabled={!filePath.trim()}
+              title="View or edit the workflow file"
+            >
+              View / Edit
+            </button>
+          </div>
         </div>
 
         <div className="form-group">
@@ -112,6 +126,13 @@ export function AddWorkflow({ onDone }: Props) {
           <button type="button" className="btn" onClick={onDone}>Cancel</button>
         </div>
       </form>
+
+      {fileEditorOpen && (
+        <FileEditorModal
+          filePath={filePath.trim()}
+          onClose={() => setFileEditorOpen(false)}
+        />
+      )}
     </div>
   );
 }

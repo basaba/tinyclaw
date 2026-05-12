@@ -110,6 +110,10 @@ function registerIpcHandlers(): void {
     const fs = await import("node:fs/promises");
     return fs.readFile(filePath, "utf-8");
   });
+  ipcMain.handle("write-file", async (_, filePath: string, content: string) => {
+    const fs = await import("node:fs/promises");
+    await fs.writeFile(filePath, content, "utf-8");
+  });
 
   // Debug REPL — spawn child process
   let ptyCounter = 0;

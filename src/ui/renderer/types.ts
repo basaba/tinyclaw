@@ -57,6 +57,7 @@ export interface TinyClawAPI {
   listApprovals(): Promise<RunRecord[]>;
   resolveApproval(runId: string, approved: boolean): Promise<void>;
   readFile(filePath: string): Promise<string>;
+  writeFile(filePath: string, content: string): Promise<void>;
   onEvent(callback: (event: DaemonEventKind) => void): () => void;
   onChange(callback: () => void): () => void;
   openDebugRepl(snapshotPath: string): Promise<number>;

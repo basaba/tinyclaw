@@ -19,6 +19,7 @@ const api = {
   listApprovals: () => ipcRenderer.invoke("list-approvals"),
   resolveApproval: (runId, approved) => ipcRenderer.invoke("resolve-approval", runId, approved),
   readFile: (fp) => ipcRenderer.invoke("read-file", fp),
+  writeFile: (fp, content) => ipcRenderer.invoke("write-file", fp, content),
 
   onEvent: (cb) => {
     const handler = (_, event) => cb(event);
