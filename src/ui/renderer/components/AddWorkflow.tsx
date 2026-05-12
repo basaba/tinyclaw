@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import type { WorkflowEntry } from "../types";
 import { ScheduleEditor } from "./ScheduleEditor";
+import { ArgsEditor } from "./ArgsEditor";
 
 interface Props {
   onDone: () => void;
@@ -10,7 +11,8 @@ export function AddWorkflow({ onDone }: Props) {
   const [name, setName] = useState("");
   const [filePath, setFilePath] = useState("");
   const [schedule, setSchedule] = useState("");
-  const [argsText, setArgsText] = useState("");
+  const [args, setArgs] = useState<Record<string, unknown> | undefined>();
+  const [argsError, setArgsError] = useState<string | undefined>();
   const [debug, setDebug] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -21,16 +23,11 @@ export function AddWorkflow({ onDone }: Props) {
       setError("Name and file path are required");
       return;
     }
-
-    let args: Record<string, unknown> | undefined;
-    if (argsText.trim()) {
-      try {
-        args = JSON.parse(argsText);
-      } catch {
-        setError("Args must be valid JSON");
-        return;
-      }
+    if (argsError) {
+      setError(argsError);
+      return;
     }
+    setError("");
 
     const workflow: WorkflowEntry = {
       id: name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-"),
@@ -57,7 +54,7 @@ export function AddWorkflow({ onDone }: Props) {
       <button className="back-link" onClick={onDone}>← Back</button>
       <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 20 }}>Add Workflow</h2>
 
-      <form onSubmit={handleSubmit} style={{ maxWidth: 500 }}>
+      <form onSubmit={handleSubmit} style={{ maxWidth: 700 }}>
         <div className="form-group">
           <label>Name</label>
           <input
@@ -85,12 +82,13 @@ export function AddWorkflow({ onDone }: Props) {
         </div>
 
         <div className="form-group">
-          <label>Args (JSON, optional)</label>
-          <textarea
-            className="form-input mono"
-            value={argsText}
-            onChange={(e) => setArgsText(e.target.value)}
-            placeholder='{"key": "value"}'
+          <label>Args</label>
+          <ArgsEditor
+            initialArgs={undefined}
+            onChange={({ args, error }) => {
+              setArgs(args);
+              setArgsError(error);
+            }}
           />
         </div>
 
