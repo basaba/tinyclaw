@@ -12,7 +12,7 @@
  *   POST /api/list-dir        -> { dirPath } -> { entries, parent, cwd }
  *   POST /api/home-dir        -> {} -> { home }
  *   WS   /ws                  -> { type:"event"|"change", event? }
- *   WS   /pty/<snapshotPath>  -> bidirectional debug REPL stream
+ *   WS   /pty?runId=<id>      -> bidirectional debug REPL stream
  */
 import http from "node:http";
 import { readFile, stat, readdir } from "node:fs/promises";
@@ -76,11 +76,24 @@ export async function startWebServer(opts: WebServerOptions = {}): Promise<http.
 
   // ── WebSocket: PTY (debug REPL) ───────────────────────────────────
   const wssPty = new WebSocketServer({ noServer: true });
-  wssPty.on("connection", (ws, req) => {
+  wssPty.on("connection", async (ws, req) => {
     const url = new URL(req.url ?? "/", "http://localhost");
-    const snapshotPath = url.searchParams.get("path");
+    const runId = url.searchParams.get("runId");
+    if (!runId) {
+      ws.close(1008, "missing runId");
+      return;
+    }
+
+    let snapshotPath: string | undefined;
+    try {
+      const run = await client.getRun(runId);
+      snapshotPath = run?.debugSnapshotPath;
+    } catch (err) {
+      ws.close(1011, "failed to look up run");
+      return;
+    }
     if (!snapshotPath) {
-      ws.close(1008, "missing path");
+      ws.close(1008, "run has no debug snapshot");
       return;
     }
 
@@ -95,7 +108,7 @@ export async function startWebServer(opts: WebServerOptions = {}): Promise<http.
     child.stderr?.on("data", (data: Buffer) => safeSend(ws, data.toString()));
     child.on("exit", () => {
       safeSend(ws, "\r\n[Process exited]\r\n");
-      ws.close();
+      try { ws.close(); } catch {}
     });
 
     ws.on("message", (msg) => {

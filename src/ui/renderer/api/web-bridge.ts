@@ -10,6 +10,7 @@ import type { TinyClawAPI, DaemonEventKind } from "../types";
 interface DebugReplCallbacks {
   ws: WebSocket;
   callbacks: Set<(data: string) => void>;
+  sendQueue: string[];
 }
 
 export function installWebBridge(): void {
@@ -101,21 +102,36 @@ export function installWebBridge(): void {
       return () => { changeCallbacks.delete(cb); };
     },
 
-    openDebugRepl: async (snapshotPath: string) => {
+    openDebugRepl: async (_snapshotPath: string, runId?: string) => {
+      if (!runId) throw new Error("Web mode requires runId for debug REPL");
       const ptyId = ++ptyCounter;
       const proto = location.protocol === "https:" ? "wss" : "ws";
-      const ws = new WebSocket(`${proto}://${location.host}/pty?path=${encodeURIComponent(snapshotPath)}`);
+      const ws = new WebSocket(`${proto}://${location.host}/pty?runId=${encodeURIComponent(runId)}`);
+      ws.binaryType = "arraybuffer";
+      const decoder = new TextDecoder("utf-8");
       const callbacks = new Set<(data: string) => void>();
+      const sendQueue: string[] = [];
+      ws.addEventListener("open", () => {
+        for (const m of sendQueue) ws.send(m);
+        sendQueue.length = 0;
+      });
       ws.addEventListener("message", (msg) => {
-        const text = typeof msg.data === "string" ? msg.data : "";
+        let text = "";
+        if (typeof msg.data === "string") text = msg.data;
+        else if (msg.data instanceof ArrayBuffer) text = decoder.decode(msg.data);
         for (const cb of callbacks) cb(text);
       });
-      ptyMap.set(ptyId, { ws, callbacks });
+      ws.addEventListener("close", () => {
+        for (const cb of callbacks) cb("\r\n[Connection closed]\r\n");
+      });
+      ptyMap.set(ptyId, { ws, callbacks, sendQueue });
       return ptyId;
     },
     writeDebugRepl: (ptyId, data) => {
       const e = ptyMap.get(ptyId);
-      if (e && e.ws.readyState === WebSocket.OPEN) e.ws.send(data);
+      if (!e) return;
+      if (e.ws.readyState === WebSocket.OPEN) e.ws.send(data);
+      else if (e.ws.readyState === WebSocket.CONNECTING) e.sendQueue.push(data);
     },
     onDebugReplData: (ptyId, cb) => {
       const e = ptyMap.get(ptyId);

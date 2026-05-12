@@ -67,7 +67,7 @@ export interface TinyClawAPI {
   homeDir(): Promise<{ home: string }>;
   onEvent(callback: (event: DaemonEventKind) => void): () => void;
   onChange(callback: () => void): () => void;
-  openDebugRepl(snapshotPath: string): Promise<number>;
+  openDebugRepl(snapshotPath: string, runId?: string): Promise<number>;
   writeDebugRepl(ptyId: number, data: string): void;
   onDebugReplData(ptyId: number, callback: (data: string) => void): () => void;
   closeDebugRepl(ptyId: number): void;

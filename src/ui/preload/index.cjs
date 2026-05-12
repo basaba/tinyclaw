@@ -35,7 +35,7 @@ const api = {
     return () => ipcRenderer.removeListener("daemon-change", handler);
   },
 
-  openDebugRepl: (path) => ipcRenderer.invoke("open-debug-repl", path),
+  openDebugRepl: (path, runId) => ipcRenderer.invoke("open-debug-repl", path, runId),
   writeDebugRepl: (id, data) => ipcRenderer.send("write-debug-repl", id, data),
   onDebugReplData: (id, cb) => {
     const ch = `pty-data-${id}`;

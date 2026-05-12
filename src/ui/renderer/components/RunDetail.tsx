@@ -158,7 +158,7 @@ export function RunDetail({ run: initialRun, liveOutput, onBack, onOpenFile }: P
       )}
 
       {activeTab === "debug" && run.debugSnapshotPath && showDebug && (
-        <DebugRepl snapshotPath={run.debugSnapshotPath} />
+        <DebugRepl snapshotPath={run.debugSnapshotPath} runId={run.id} />
       )}
 
       <div className="toolbar" style={{ marginTop: 16 }}>

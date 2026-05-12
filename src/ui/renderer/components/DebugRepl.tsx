@@ -2,9 +2,10 @@ import React, { useEffect, useRef, useState } from "react";
 
 interface Props {
   snapshotPath: string;
+  runId?: string;
 }
 
-export function DebugRepl({ snapshotPath }: Props) {
+export function DebugRepl({ snapshotPath, runId }: Props) {
   const termRef = useRef<HTMLDivElement>(null);
   const [ptyId, setPtyId] = useState<number | null>(null);
   const [error, setError] = useState("");
@@ -44,7 +45,7 @@ export function DebugRepl({ snapshotPath }: Props) {
         }
 
         // Start the debug REPL process
-        const id = await window.api.openDebugRepl(snapshotPath);
+        const id = await window.api.openDebugRepl(snapshotPath, runId);
         if (destroyed) {
           window.api.closeDebugRepl(id);
           return;
@@ -85,7 +86,7 @@ export function DebugRepl({ snapshotPath }: Props) {
       destroyed = true;
       cleanup?.();
     };
-  }, [snapshotPath]);
+  }, [snapshotPath, runId]);
 
   if (error) {
     return (
