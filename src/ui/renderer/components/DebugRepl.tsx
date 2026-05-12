@@ -34,14 +34,26 @@ export function DebugRepl({ snapshotPath, runId }: Props) {
           fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace",
           fontSize: 13,
           cursorBlink: true,
+          scrollback: 10000,
+          convertEol: true,
         });
 
         const fitAddon = new FitAddon();
         term.loadAddon(fitAddon);
 
+        const safeFit = () => {
+          const el = termRef.current;
+          if (!el) return;
+          // Skip when hidden or zero-sized — fit() with zero dims produces a
+          // broken viewport that goes blank once content arrives.
+          if (el.clientWidth <= 0 || el.clientHeight <= 0) return;
+          try { fitAddon.fit(); } catch {/* ignore transient layout issues */}
+        };
+
         if (termRef.current) {
           term.open(termRef.current);
-          fitAddon.fit();
+          // Defer initial fit to next frame so the container has real dims.
+          requestAnimationFrame(safeFit);
           termInstanceRef.current = term;
         }
 
@@ -53,23 +65,35 @@ export function DebugRepl({ snapshotPath, runId }: Props) {
         }
         setPtyId(id);
 
-        // Pipe output from process to terminal
-        const unsubData = window.api.onDebugReplData(id, (data: string) => {
-          term.write(data);
-        });
+        // Pipe output from process to terminal — chunk huge bursts so the
+        // renderer doesn't choke and leave the viewport blank.
+        const MAX_CHUNK = 64 * 1024;
+        const writeChunked = (data: string) => {
+          if (data.length <= MAX_CHUNK) {
+            term.write(data);
+            return;
+          }
+          for (let i = 0; i < data.length; i += MAX_CHUNK) {
+            term.write(data.slice(i, i + MAX_CHUNK));
+          }
+        };
+        const unsubData = window.api.onDebugReplData(id, writeChunked);
 
         // Pipe input from terminal to process
         const inputDisposable = term.onData((data: string) => {
           window.api.writeDebugRepl(id, data);
         });
 
-        // Handle resize
+        // Handle resize — debounce so rapid layout shifts don't thrash fit().
+        let resizeTimer: ReturnType<typeof setTimeout> | null = null;
         const resizeObserver = new ResizeObserver(() => {
-          fitAddon.fit();
+          if (resizeTimer) clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(safeFit, 50);
         });
         if (termRef.current) resizeObserver.observe(termRef.current);
 
         cleanup = () => {
+          if (resizeTimer) clearTimeout(resizeTimer);
           inputDisposable.dispose();
           unsubData();
           resizeObserver.disconnect();
