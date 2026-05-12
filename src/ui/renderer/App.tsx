@@ -54,6 +54,7 @@ export function App() {
             onRemove={(id) => window.api.removeWorkflow(id).then(refresh)}
             onViewYaml={goYaml}
             onViewGraph={goGraph}
+            onSelectRun={(run, fromId) => goRunDetail(run, fromId)}
           />
         );
       case "add":
