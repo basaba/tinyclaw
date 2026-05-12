@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import "@xterm/xterm/css/xterm.css";
 
 interface Props {
   snapshotPath: string;
