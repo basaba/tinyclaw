@@ -2,7 +2,7 @@
  * Electron main process — manages BrowserWindow, reuses the existing
  * TinyClaw DaemonClient, and exposes IPC handlers for the renderer.
  */
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, dialog } from "electron";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DaemonClient } from "../../tui/scheduler/daemon-client.js";
@@ -113,6 +113,30 @@ function registerIpcHandlers(): void {
   ipcMain.handle("write-file", async (_, filePath: string, content: string) => {
     const fs = await import("node:fs/promises");
     await fs.writeFile(filePath, content, "utf-8");
+  });
+  ipcMain.handle("pick-file", async (_, options?: { defaultPath?: string }) => {
+    if (!mainWindow) return null;
+    let defaultPath = options?.defaultPath;
+    if (defaultPath) {
+      const path = await import("node:path");
+      const fs = await import("node:fs/promises");
+      try {
+        const stat = await fs.stat(defaultPath);
+        if (stat.isFile()) defaultPath = path.dirname(defaultPath);
+      } catch {
+        defaultPath = undefined;
+      }
+    }
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ["openFile"],
+      defaultPath,
+      filters: [
+        { name: "Workflow", extensions: ["yaml", "yml"] },
+        { name: "All Files", extensions: ["*"] },
+      ],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return result.filePaths[0];
   });
 
   // Debug REPL — spawn child process

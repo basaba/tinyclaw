@@ -20,6 +20,7 @@ const api = {
   resolveApproval: (runId, approved) => ipcRenderer.invoke("resolve-approval", runId, approved),
   readFile: (fp) => ipcRenderer.invoke("read-file", fp),
   writeFile: (fp, content) => ipcRenderer.invoke("write-file", fp, content),
+  pickFile: (opts) => ipcRenderer.invoke("pick-file", opts),
 
   onEvent: (cb) => {
     const handler = (_, event) => cb(event);

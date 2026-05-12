@@ -75,6 +75,17 @@ export function EditWorkflow({ workflow, onDone }: Props) {
             <button
               type="button"
               className="btn btn-sm"
+              onClick={async () => {
+                const picked = await window.api.pickFile({ defaultPath: filePath || undefined });
+                if (picked) setFilePath(picked);
+              }}
+              title="Browse for a workflow file"
+            >
+              Browse…
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm"
               onClick={() => setFileEditorOpen(true)}
               disabled={!filePath.trim()}
               title="View or edit the workflow file"
