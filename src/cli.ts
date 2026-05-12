@@ -66,6 +66,21 @@ if (!args.length) {
 } else if (args[0] === "ui") {
   const { startUi } = await import("./ui/launcher.js");
   await startUi();
+} else if (args[0] === "web") {
+  const { startWeb } = await import("./ui/web/launcher.js");
+  const subArgs = args.slice(1);
+  let port: number | undefined;
+  let host: string | undefined;
+  for (let i = 0; i < subArgs.length; i++) {
+    const a = subArgs[i];
+    if ((a === "--port" || a === "-p") && subArgs[i + 1]) { port = Number(subArgs[++i]); }
+    else if ((a === "--host" || a === "-h") && subArgs[i + 1]) { host = subArgs[++i]; }
+    else if (a === "--help") {
+      console.log("Usage: tinyclaw web [--port 7777] [--host 127.0.0.1]");
+      process.exit(0);
+    }
+  }
+  await startWeb({ port, host });
 } else {
   run(args);
 }
@@ -84,6 +99,7 @@ Usage:
 Commands:
   tui                      Launch the workflow scheduler TUI (connects to daemon)
   ui                       Launch the desktop GUI app (Electron)
+  web [--port N] [--host H] Launch the web UI server (default 127.0.0.1:7777)
   sched                    Scheduler management CLI (non-interactive)
   sched help               Show all scheduler subcommands
   daemon start             Start the scheduler daemon in the background

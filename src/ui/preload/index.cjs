@@ -21,6 +21,8 @@ const api = {
   readFile: (fp) => ipcRenderer.invoke("read-file", fp),
   writeFile: (fp, content) => ipcRenderer.invoke("write-file", fp, content),
   pickFile: (opts) => ipcRenderer.invoke("pick-file", opts),
+  listDir: (dirPath) => ipcRenderer.invoke("list-dir", dirPath),
+  homeDir: () => ipcRenderer.invoke("home-dir"),
 
   onEvent: (cb) => {
     const handler = (_, event) => cb(event);

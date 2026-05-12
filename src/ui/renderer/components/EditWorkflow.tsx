@@ -3,6 +3,7 @@ import type { WorkflowEntry } from "../types";
 import { ScheduleEditor } from "./ScheduleEditor";
 import { ArgsEditor } from "./ArgsEditor";
 import { FileEditorModal } from "./FileEditorModal";
+import { pickFile } from "../api/picker";
 
 interface Props {
   workflow: WorkflowEntry;
@@ -76,7 +77,7 @@ export function EditWorkflow({ workflow, onDone }: Props) {
               type="button"
               className="btn btn-sm"
               onClick={async () => {
-                const picked = await window.api.pickFile({ defaultPath: filePath || undefined });
+                const picked = await pickFile({ defaultPath: filePath || undefined });
                 if (picked) setFilePath(picked);
               }}
               title="Browse for a workflow file"
