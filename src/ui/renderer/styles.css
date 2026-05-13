@@ -271,22 +271,18 @@ textarea.form-input {
 }
 
 .badge-success {
-  background: rgba(76, 175, 80, 0.15);
   color: var(--success);
 }
 
 .badge-error {
-  background: rgba(239, 83, 80, 0.15);
   color: var(--error);
 }
 
 .badge-running {
-  background: rgba(0, 210, 255, 0.15);
   color: var(--accent);
 }
 
 .badge-pending {
-  background: rgba(255, 152, 0, 0.15);
   color: var(--warning);
 }
 

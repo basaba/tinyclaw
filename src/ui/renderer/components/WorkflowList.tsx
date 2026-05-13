@@ -63,9 +63,6 @@ function LastRunCell({ run, onClick }: { run: RunRecord | null | undefined; onCl
         style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
       >
         <span className={STATUS_CLASS[run.status]}>{STATUS_LABEL[run.status]}</span>
-        {when && (
-          <span style={{ fontSize: 12, color: "var(--muted)" }}>{formatRelativeTime(when)}</span>
-        )}
       </button>
     </td>
   );
