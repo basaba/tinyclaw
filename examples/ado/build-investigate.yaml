@@ -36,10 +36,14 @@ steps:
       --project One
       --output json
 
-  # 2. Check if this build was already investigated — skip all remaining steps if so
+  # 2. Check if this build was already investigated — skip if so
   - id: check-new
-    pipeline: "diff.gate --key ado-build-investigate:273080"
-    stdin: $latest-build.json.0.id
+    pipeline: "diff.key.exists --key ado-build-investigate:273080 --field id"
+    stdin: $latest-build.json
+
+  - id: guard-seen
+    pipeline: "where changed==true | gate --when empty"
+    stdin: $check-new.json
 
   # 3. Fetch test runs associated with the build
   #    Note: api-version is passed via --url-parameters to avoid & in the URL
@@ -81,3 +85,8 @@ steps:
       Please provide executive summary first (keep it brief), and then the details after"
       | teams.send --team-id ${team} --channel-id ${channel} --markdown
     stdin: $failures.json
+
+  # 8. Mark this build as investigated
+  - id: mark-seen
+    pipeline: "diff.key.set --key ado-build-investigate:273080 --field id"
+    stdin: $latest-build.json
