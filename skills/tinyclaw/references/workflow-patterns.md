@@ -149,6 +149,7 @@ Use sub-workflows for **genuine reuse** (same logic, different parameters). For 
 4. **Add `retry:` for network calls** — especially API calls and MCP tool invocations.
 5. **Use `--dry-run` first** to validate workflows before executing.
 6. **Prefer `diff.gate` for monitors** — avoids duplicate notifications.
+7. **Use `diff.key.exists` + `diff.key.set` for two-phase check-then-commit** — check what's new first (`diff.key.exists`), process only new items, then commit state (`diff.key.set`) after successful processing. This avoids marking items as seen when processing fails.
 7. **Keep pipelines flat** — avoid unnecessary nesting of workflows/sub-workflows.
 8. **Use `on_error: continue`** for non-critical steps that shouldn't block the workflow.
 9. **Use `break` with `when:` for early termination** — guard steps that halt the workflow when a condition is met (e.g. empty data).

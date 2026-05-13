@@ -151,7 +151,7 @@ Date tokens: `YYYY`, `MM`, `DD`, `HH`, `mm`, `ss` — all UTC, zero-padded.
 
 | Command | Usage | Description |
 |---------|-------|-------------|
-| `where` | `... \| where status=active` / `... \| where "x>5 && y<6"` | Filter by predicate. Ops: `=`, `==`, `!=`, `<`, `<=`, `>`, `>=`. Combine with `&&`/`\|\|` (quote the expression). |
+| `where` | `... \| where status=active` / `... \| where "x>5 && y<6"` / `... \| where '(status==queued \|\| status==rejected) && changed==true'` | Filter by predicate. Uses the full expression engine. Ops: `=`, `==`, `!=`, `<`, `<=`, `>`, `>=`. Combine with `&&`/`\|\|` (quote the expression). Parentheses supported for grouping. Bare RHS identifiers treated as strings (`status==queued`); use `$.field` for property-to-property comparison. Functions: `contains()`, `starts_with()`, `length()`, etc. |
 | `pick` | `... \| pick id,subject,from` / `... \| pick author=from` / `... \| pick pr.number` | Project fields (comma-separated). Supports renaming (`new=old`) and dot-path access. |
 | `head` | `... \| head --n 5` | Take first N items (default 10) |
 | `tail` | `... \| tail --n 5` | Take last N items (default 10) |
@@ -177,6 +177,7 @@ Date tokens: `YYYY`, `MM`, `DD`, `HH`, `mm`, `ss` — all UTC, zero-padded.
 | `diff.gate` | `<items> \| diff.gate --key myKey` | Like `diff.last` but **halts** if unchanged |
 | `diff.key` | `<items> \| diff.key --key myKey [--field id]` | Mark each item `changed: true/false` by comparing key field(s) against stored state. `--field` supports multiple fields for composite keys: `--field owner --field repo --field number` or `--field owner,repo,number`. Default field: `id`. |
 | `diff.key.exists` | `<items> \| diff.key.exists --key myKey [--field id]` | Like `diff.key` but **read-only** — does not update stored state. Same args and output. |
+| `diff.key.set` | `<items> \| diff.key.set --key myKey [--field id]` | Like `diff.key` but **write-only** — stores item keys into state without adding `changed` to output. Items pass through unchanged. Use with `diff.key.exists` for two-phase check-then-commit patterns. |
 | `break` | `break [--message "reason"]` | Halt pipeline immediately. Stdin items pass through as output before halting. In workflows, use as `pipeline:` step with `when:` for conditional early termination — workflow returns `status: "ok"` with output from last completed step. |
 | `gate` | `... \| gate --when empty` / `... \| gate --when "length($) > 10"` | Conditional pipeline halt. Collects items, evaluates condition, halts if true. Built-in: `empty`, `not_empty`. Expression: `$` = items array, `@` = per-element. Items pass through as output. |
 

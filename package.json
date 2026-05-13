@@ -31,10 +31,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@basaba/lobster": "^2026.511.2",
+    "@basaba/lobster": "^2026.513.1",
     "@dagrejs/dagre": "^3.0.0",
     "@github/copilot-sdk": "^0.2.2",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "1.29.0",
     "@monaco-editor/react": "^4.7.0",
     "@types/ws": "^8.18.1",
     "@xterm/addon-fit": "^0.10.0",
