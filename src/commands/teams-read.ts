@@ -414,7 +414,21 @@ export function createTeamsReplyCommand(
         throw new Error(`teams.reply: ${errMsg}`);
       }
 
-      return { output: asStream(result.content as unknown[]) };
+      let parsed: Record<string, unknown> = {};
+      for (const item of result.content as any[]) {
+        if (item?.type === "text" && typeof item.text === "string") {
+          try {
+            const obj = JSON.parse(item.text);
+            if (typeof obj === "object" && obj !== null) {
+              Object.assign(parsed, obj);
+            }
+          } catch {
+            // Not JSON — skip
+          }
+        }
+      }
+
+      return { output: asStream([parsed]) };
     },
   };
 }

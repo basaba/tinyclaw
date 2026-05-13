@@ -185,7 +185,23 @@ export function createTeamsSendCommand(
         throw new Error(`teams.send (${toolName}): ${errMsg}`);
       }
 
-      return { output: asStream(result.content as unknown[]) };
+      // Parse MCP response into a clean object.
+      // The first content item typically contains a JSON string with id, chatId, etc.
+      let parsed: Record<string, unknown> = {};
+      for (const item of result.content as any[]) {
+        if (item?.type === "text" && typeof item.text === "string") {
+          try {
+            const obj = JSON.parse(item.text);
+            if (typeof obj === "object" && obj !== null) {
+              Object.assign(parsed, obj);
+            }
+          } catch {
+            // Not JSON — skip (e.g. correlation ID line)
+          }
+        }
+      }
+
+      return { output: asStream([parsed]) };
     },
   };
 }
