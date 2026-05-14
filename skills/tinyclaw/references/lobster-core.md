@@ -142,7 +142,7 @@ Date tokens: `YYYY`, `MM`, `DD`, `HH`, `mm`, `ss` — all UTC, zero-padded.
 | Command | Usage | Description |
 |---------|-------|-------------|
 | `exec` | `exec ls -la` / `exec --shell "echo hi"` / `exec --json node -e '...'` | Run OS command. Flags: `--shell`, `--json`, `--stdin raw\|json\|jsonl`, `--stdin-file raw\|json\|jsonl` (writes to temp file, sets `LOBSTER_STDIN_FILE`) |
-| `emit` | `emit hello world` / `emit --json '{"a":1}' '{"b":2}'` | Emit literal values as stream items. Without `--json`, each arg is a plain string. With `--json`, each arg is parsed as JSON. No args → empty stream. No side effects. |
+| `emit` | `emit hello world` / `emit --json '{"a":1}' '{"b":2}'` | Emit literal values as stream items. Without `--json`, each arg is a plain string. With `--json`, each arg is parsed as JSON. No args → passes through input items (identity/passthrough). No side effects. |
 | `json` | `... \| json` | Render items as JSON |
 | `table` | `... \| table` | Render as table |
 | `template` | `... \| template --text 'PR #{{number}}: {{title}}'` | Render template per item. Flags: `--text`, `--file` |
@@ -332,10 +332,13 @@ when: "($a.json.x == 1 || $b.json.y == 2) && $c.json.z > 0"
 when: length($data.json.items) > 0
 when: some($data.json.items, item, $item.status == "ready")
 when: every($data.json.scores, s, $s.value >= 80)
+when: ${mode} == active                           # workflow arg reference
+when: $source.json.msg == ${expected}              # step ref + arg ref
 ```
 
 **Operators:** `==`, `!=`, `<`, `<=`, `>`, `>=`, `&&`, `||`, `!`, `()`.  
-**Functions:** `length($ref.field)` → number (array/string length), `some($ref.field, var, predicate)` → boolean, `every($ref.field, var, predicate)` → boolean. Iterator variable is referenced with `$` prefix (e.g. `$item.field`). Empty/null arrays: `every([])` → `true`, `some([])` → `false`.
+**Functions:** `length($ref.field)` → number (array/string length), `some($ref.field, var, predicate)` → boolean, `every($ref.field, var, predicate)` → boolean. Iterator variable is referenced with `$` prefix (e.g. `$item.field`). Empty/null arrays: `every([])` → `true`, `some([])` → `false`.  
+**Arg references:** `${arg_name}` resolves to the workflow argument value at evaluation time. Undefined args resolve to `undefined` (falsy in comparisons).
 
 Skipped steps produce `{ id, skipped: true }` — no `stdout`/`json`.
 
