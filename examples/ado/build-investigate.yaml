@@ -32,8 +32,6 @@ steps:
       --top 1
       --result failed
       --status completed
-      --org https://dev.azure.com/msazure
-      --project One
       --output json
 
   # 2. Check if this build was already investigated — skip if so
