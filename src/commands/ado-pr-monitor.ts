@@ -44,7 +44,7 @@ export function createAdoPrMonitorCommand(): LobsterCommand {
           "changes-only": { type: "boolean" },
           key: { type: "string" },
         },
-        required: ["org", "project"],
+        required: [],
       },
       sideEffects: ["network", "filesystem"],
     },
@@ -86,9 +86,6 @@ export function createAdoPrMonitorCommand(): LobsterCommand {
 
       const org = val(args.org) ?? "";
       const project = val(args.project) ?? "";
-      if (!org || !project) {
-        throw new Error("ado.pr.monitor requires --org and --project");
-      }
 
       const options: AdoPrMonitorOptions = { org, project };
       const repo = val(args.repository);
