@@ -20,15 +20,23 @@ args:
     default: "${env:KUSTO_REPO_PATH}"
   team:
     description: "Teams team ID to post results to"
+    default: "${env:TEAMS_KUSTOCM_TEAM_ID}"
   channel:
     description: "Teams channel ID to post results to"
+    default: "${env:TEAMS_DRI_LOG_CHANNEL_ID}"
+  build_id:
+    description: "Build id of devCM"
+    default: "${env:ADO_DEVCM_BUILD_DEF_ID}"
+  ado_resource_id:
+    description: "AAD resource id of ado app"
+    default: "${env:ADO_RESOURCE_ID}"
 
 steps:
   # 1. Get the latest failed build for the pipeline
   - id: latest-build
     run: >
       az pipelines build list
-      --definition-ids 273080
+      --definition-ids ${build_id}
       --top 1
       --result failed
       --status completed
@@ -36,7 +44,7 @@ steps:
 
   # 2. Check if this build was already investigated — skip if so
   - id: check-new
-    pipeline: "diff.key.exists --key ado-build-investigate:273080 --field id"
+    pipeline: "diff.key.exists --key ado-build-investigate:${build_id} --field id"
     stdin: $latest-build.json
 
   - id: guard-seen
@@ -51,7 +59,7 @@ steps:
       az rest --method get
       --url https://dev.azure.com/msazure/One/_apis/test/runs?buildUri=vstfs:///Build/Build/$latest-build.json.0.id
       --url-parameters api-version=7.1
-      --resource 499b84ac-1321-427f-aa17-267ca6975798
+      --resource ${ado_resource_id}
       --output json
 
   # 4.  For each test run with failures, fetch and trim failed test results
@@ -64,7 +72,7 @@ steps:
           az rest --method get
           --url https://dev.azure.com/msazure/One/_apis/test/runs/$item.json.id/results?outcomes=Failed
           --url-parameters api-version=7.1
-          --resource 499b84ac-1321-427f-aa17-267ca6975798
+          --resource ${ado_resource_id}
           --output json
 
     
@@ -86,5 +94,5 @@ steps:
 
   # 8. Mark this build as investigated
   - id: mark-seen
-    pipeline: "diff.key.set --key ado-build-investigate:273080 --field id"
+    pipeline: "diff.key.set --key ado-build-investigate:${build_id} --field id"
     stdin: $latest-build.json
