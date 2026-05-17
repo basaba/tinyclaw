@@ -5,8 +5,9 @@
  * caches it locally with a configurable TTL, and falls back to the cached or
  * bundled manifest when offline.
  */
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { homedir } from "node:os";
+import { fileURLToPath } from "node:url";
 import {
   existsSync,
   mkdirSync,
@@ -55,6 +56,18 @@ const CACHE_FILE = join(CACHE_DIR, "gallery-manifest.json");
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
 /**
+ * Path to the bundled manifest shipped with the package.
+ * Resolves to `<pkg>/gallery/manifest.json` relative to this source file.
+ */
+const BUNDLED_MANIFEST = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "gallery",
+  "manifest.json",
+);
+
+/**
  * Base URL for fetching gallery assets from the repo.
  * Override with `TINYCLAW_GALLERY_URL` env var for testing.
  */
@@ -99,13 +112,26 @@ function writeCache(manifest: GalleryManifest): void {
 }
 
 /**
+ * Read the bundled manifest shipped with the package.
+ */
+function readBundled(): GalleryManifest | null {
+  try {
+    const raw = readFileSync(BUNDLED_MANIFEST, "utf8");
+    return JSON.parse(raw) as GalleryManifest;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Fetch the gallery manifest.
  *
  * Resolution order:
  * 1. Local cache (if within TTL)
  * 2. Remote fetch from GitHub
  * 3. Stale cache (if remote fails)
- * 4. Bundled manifest (fallback)
+ * 4. Bundled manifest (shipped with package)
+ * 5. Empty manifest (last resort)
  */
 export async function fetchManifest(): Promise<GalleryManifest> {
   // 1. Fresh cache
@@ -131,7 +157,11 @@ export async function fetchManifest(): Promise<GalleryManifest> {
   const stale = readCache();
   if (stale) return stale;
 
-  // 4. Bundled manifest (empty)
+  // 4. Bundled manifest (shipped with the package)
+  const bundled = readBundled();
+  if (bundled) return bundled;
+
+  // 5. Empty manifest (last resort)
   return { version: 1, samples: [] };
 }
 
