@@ -677,3 +677,188 @@ pre, code {
   overflow: auto;
   padding: 0;
 }
+
+/* ── Gallery ─────────────────────────────────────────────────── */
+
+.gallery-view {
+  padding: 12px 0;
+}
+
+.gallery-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.gallery-header h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.gallery-search {
+  flex: 1;
+  max-width: 300px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.gallery-search:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
+.gallery-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.gallery-message.success {
+  background: rgba(76, 175, 80, 0.15);
+  color: var(--success);
+}
+
+.gallery-message.error {
+  background: rgba(239, 83, 80, 0.15);
+  color: var(--error);
+}
+
+.gallery-message button {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  margin-left: auto;
+}
+
+.gallery-loading,
+.gallery-empty {
+  color: var(--text-muted);
+  padding: 24px 0;
+  text-align: center;
+}
+
+.gallery-category {
+  margin-bottom: 20px;
+}
+
+.category-title {
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: capitalize;
+  color: var(--text-secondary);
+  margin: 0 0 8px 0;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.gallery-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gallery-card:hover {
+  border-color: var(--accent-dim);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.card-badge.installed {
+  font-size: 11px;
+  color: var(--success);
+}
+
+.card-description {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.card-args {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.card-tags .tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--bg-tertiary);
+  color: var(--accent);
+}
+
+.btn-install {
+  margin-top: 4px;
+  padding: 4px 12px;
+  border: 1px solid var(--accent-dim);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.btn-install:hover {
+  background: var(--accent-dim);
+  color: white;
+}
+
+.btn-install:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-back {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.btn-back:hover {
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}

@@ -11,6 +11,7 @@ import { GraphView } from "./components/graph-view.js";
 import { RunHistory } from "./components/run-history.js";
 import { RunDetail } from "./components/run-detail.js";
 import { StatusBar } from "./components/status-bar.js";
+import { Gallery } from "./components/gallery.js";
 
 interface AppProps {
   client: DaemonClient;
@@ -100,6 +101,7 @@ export function App({ client }: AppProps) {
     (filePath: string) => setView({ screen: "graph-view", filePath }),
     [],
   );
+  const goGallery = useCallback(() => setView({ screen: "gallery" }), []);
 
   // Available height for content area: total rows - padding(2) - header+margin(2) - statusbar(1)
   const contentHeight = Math.max(10, termSize.rows - 5);
@@ -126,6 +128,7 @@ export function App({ client }: AppProps) {
             onViewOutput={goRunDetail}
             onViewYaml={goYamlView}
             onViewGraph={goGraphView}
+            onGallery={goGallery}
             onRefresh={refresh}
           />
         )}
@@ -186,6 +189,10 @@ export function App({ client }: AppProps) {
 
         {view.screen === "graph-view" && (
           <GraphView filePath={view.filePath} availableHeight={contentHeight} onBack={goList} />
+        )}
+
+        {view.screen === "gallery" && (
+          <Gallery availableHeight={contentHeight} onBack={goList} />
         )}
       </Box>
 

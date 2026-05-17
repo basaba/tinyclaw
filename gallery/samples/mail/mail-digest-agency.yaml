@@ -1,0 +1,28 @@
+# Email digest via Agency Copilot
+#
+# Uses the `agency.copilot` command — a passthrough wrapper for the
+# Agency Copilot CLI. Piped input is automatically written to a temp file
+# via exec --stdin-file and referenced in the prompt as $LOBSTER_STDIN_FILE.
+#
+# Flow:
+#   1. Search unread inbox emails (last 24 hours), pick key fields
+#   2. Pipe data to agency.copilot (auto-written to temp file)
+#   3. Agency copilot reads the data file and summarizes
+#   4. Send markdown digest to Teams (self)
+#
+# Prerequisites:
+#   - Agency CLI installed (`agency copilot` available on PATH)
+#   - Authenticated via agency / Entra ID
+#
+# Usage:
+#   tinyclaw examples/mail/mail-digest-agency.yaml
+
+name: mail-digest-agency
+description: Summarize unread emails using agency copilot
+
+steps:
+  - id: digest
+    pipeline: >
+      mail.search --since 1d --folder inbox --top 20
+      | pick from,subject,date,preview
+      | agency.copilot "Summarise as a concise bullet-point digest grouped by sender."

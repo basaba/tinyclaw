@@ -12,6 +12,7 @@ interface Props {
   onRemove: (id: string) => void;
   onViewYaml: (filePath: string) => void;
   onViewGraph: (filePath: string) => void;
+  onGallery?: () => void;
   onSelectRun?: (run: RunRecord, fromWorkflowId: string) => void;
   refreshSignal?: unknown;
 }
@@ -138,7 +139,7 @@ function MoreMenu({
 }
 
 export function WorkflowList({
-  workflows, onAdd, onEdit, onHistory, onRunNow, onToggle, onRemove, onViewYaml, onViewGraph, onSelectRun, refreshSignal,
+  workflows, onAdd, onEdit, onHistory, onRunNow, onToggle, onRemove, onViewYaml, onViewGraph, onGallery, onSelectRun, refreshSignal,
 }: Props) {
   const [lastRuns, setLastRuns] = useState<Record<string, RunRecord | null>>({});
 
@@ -169,6 +170,7 @@ export function WorkflowList({
         <span className="icon">🦞</span>
         <span className="message">No workflows configured</span>
         <button className="btn btn-primary" onClick={onAdd}>+ Add Workflow</button>
+        {onGallery && <button className="btn" onClick={onGallery} style={{marginTop: 8}}>📦 Browse Sample Gallery</button>}
       </div>
     );
   }
@@ -179,6 +181,7 @@ export function WorkflowList({
         <h2 style={{ fontSize: 16, fontWeight: 600 }}>Workflows</h2>
         <div className="spacer" />
         <button className="btn btn-primary" onClick={onAdd}>+ Add Workflow</button>
+        {onGallery && <button className="btn" onClick={onGallery}>📦 Samples</button>}
       </div>
 
       <table className="table">

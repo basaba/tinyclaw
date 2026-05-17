@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "samples": [
+    {
+      "id": "approval-demo",
+      "name": "Approval Gate Demo",
+      "description": "Demo workflow showcasing the approval gate feature — drafts a stakeholder update, pauses for review before sending",
+      "category": "general",
+      "file": "samples/general/approval-demo.yaml",
+      "args": [],
+      "tags": ["approval", "demo", "teams"]
+    },
+    {
+      "id": "mcp-docs-search",
+      "name": "MCP Docs Search",
+      "description": "Search Microsoft Learn docs via MCP (no LLM)",
+      "category": "general",
+      "file": "samples/general/mcp-docs-search.yaml",
+      "args": [],
+      "tags": ["mcp", "docs", "search"]
+    },
+    {
+      "id": "sub-workflow-demo",
+      "name": "Sub-Workflow Demo",
+      "description": "Demonstrates calling a sub-workflow with arguments",
+      "category": "general",
+      "file": "samples/general/sub-workflow-demo.yaml",
+      "args": [],
+      "tags": ["demo", "sub-workflow", "composition"]
+    },
+    {
+      "id": "ado-pr-monitor",
+      "name": "ADO PR Monitor",
+      "description": "Monitor Azure DevOps pull requests and report changes",
+      "category": "ado",
+      "file": "samples/ado/pr-monitor.yaml",
+      "args": ["org", "project", "repository", "targetBranch", "sourceBranch", "creator", "reviewer", "status", "top", "days"],
+      "tags": ["azure-devops", "pull-request", "monitoring"]
+    },
+    {
+      "id": "ado-pr-push-review",
+      "name": "PR Push Review",
+      "description": "Monitor PRs for new pushes and trigger Copilot review",
+      "category": "ado",
+      "file": "samples/ado/pr-push-review.yaml",
+      "args": ["cwd", "org", "project", "repository", "branch", "creator"],
+      "tags": ["azure-devops", "pull-request", "review", "copilot"]
+    },
+    {
+      "id": "ado-pr-adversarial-review",
+      "name": "PR Adversarial Review",
+      "description": "Run adversarial reviewer on recent PRs by an author and email results",
+      "category": "ado",
+      "file": "samples/ado/pr-adversarial-review.yaml",
+      "args": ["org", "project", "repository", "repoPath", "creator", "status", "days", "mailTo"],
+      "tags": ["azure-devops", "pull-request", "review", "email"]
+    },
+    {
+      "id": "ado-build-investigate",
+      "name": "Build Investigate",
+      "description": "Investigate Azure DevOps build test failures with Copilot",
+      "category": "ado",
+      "file": "samples/ado/build-investigate.yaml",
+      "args": ["workdir", "team", "channel", "build_id", "ado_resource_id"],
+      "tags": ["azure-devops", "build", "investigation", "testing"]
+    },
+    {
+      "id": "mail-triage-reply",
+      "name": "Mail Triage & Reply",
+      "description": "Triage unread emails — decide if reply needed, draft responses, get approval",
+      "category": "mail",
+      "file": "samples/mail/mail-triage-reply.yaml",
+      "args": [],
+      "tags": ["email", "triage", "reply", "approval"]
+    },
+    {
+      "id": "mail-investigate",
+      "name": "Mail Investigate",
+      "description": "Investigate issues from flagged emails and reply with findings",
+      "category": "mail",
+      "file": "samples/mail/mail-investigate.yaml",
+      "args": ["cwd", "sender"],
+      "tags": ["email", "investigation"]
+    },
+    {
+      "id": "mail-tracker",
+      "name": "Mail Tracker",
+      "description": "Track unread emails — summarize new ones and send to Teams",
+      "category": "mail",
+      "file": "samples/mail/mail-tracker.yaml",
+      "args": [],
+      "tags": ["email", "tracking", "teams", "summary"]
+    },
+    {
+      "id": "mail-digest-agency",
+      "name": "Mail Digest (Agency)",
+      "description": "Summarize unread emails using agency copilot and send Teams digest",
+      "category": "mail",
+      "file": "samples/mail/mail-digest-agency.yaml",
+      "args": [],
+      "tags": ["email", "digest", "copilot", "teams"]
+    },
+    {
+      "id": "mail-send-self",
+      "name": "Mail Send Self",
+      "description": "Send a test email to yourself",
+      "category": "mail",
+      "file": "samples/mail/mail-send-self.yaml",
+      "args": [],
+      "tags": ["email", "test"]
+    },
+    {
+      "id": "daily-diary",
+      "name": "Daily Diary",
+      "description": "Daily diary — summarize emails and Teams chats into a markdown file",
+      "category": "diary",
+      "file": "samples/diary/daily-diary.yaml",
+      "args": ["output_dir"],
+      "tags": ["diary", "summary", "email", "teams", "markdown"]
+    }
+  ]
+}

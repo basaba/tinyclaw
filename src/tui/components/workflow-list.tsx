@@ -156,10 +156,11 @@ interface Props {
   onViewOutput: (run: RunRecord, fromWorkflowId: string) => void;
   onViewYaml: (filePath: string) => void;
   onViewGraph: (filePath: string) => void;
+  onGallery?: () => void;
   onRefresh: () => void;
 }
 
-export function WorkflowList({ client, workflows, onAdd, onEdit, onHistory, onViewOutput, onViewYaml, onViewGraph, onRefresh }: Props) {
+export function WorkflowList({ client, workflows, onAdd, onEdit, onHistory, onViewOutput, onViewYaml, onViewGraph, onGallery, onRefresh }: Props) {
   const [cursor, setCursor] = useState(0);
   const [pane, setPane] = useState<"workflows" | "approvals">("workflows");
   const [approvalCursor, setApprovalCursor] = useState(0);
@@ -268,6 +269,9 @@ export function WorkflowList({ client, workflows, onAdd, onEdit, onHistory, onVi
     }
     if (input === "g") {
       onViewGraph(wf.filePath);
+    }
+    if (input === "s" && onGallery) {
+      onGallery();
     }
   });
 

@@ -1,0 +1,11 @@
+# Sub-workflow: greet a person
+# Accepts: name (string)
+name: greet
+description: Simple sub-workflow that greets someone
+args:
+  name:
+    description: "Name to greet"
+    default: "World"
+steps:
+  - id: say-hello
+    run: "echo Hello, ${name}!"

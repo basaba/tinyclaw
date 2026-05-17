@@ -1,0 +1,68 @@
+# Email investigation workflow
+#
+# Monitors your inbox for emails containing the @@@investigate mnemonic.
+# When found, reads the email body, sends it to Agency Copilot for
+# investigation, and replies with the results.
+#
+# Deduplication:
+#   Uses diff.key with conversationId to ensure each conversation thread
+#   is only investigated once, even if multiple emails arrive in the same thread.
+#
+# Flow:
+#   1. Search inbox for emails from self
+#   2. Client-side filter for @@@investigate in preview
+#   3. diff.key by conversationId — only process new conversation threads
+#   4. For each new thread: read full body → copilot investigates → reply
+#
+# State:
+#   Stores processed conversation IDs in ~/.lobster/state/mail-investigate.json
+#
+# Prerequisites:
+#   - Agency CLI with mail MCP (`agency mcp mail`)
+#   - Agency Copilot (`agency copilot`)
+#   - Authenticated via agency / Entra ID
+#
+# Usage:
+#   tinyclaw examples/mail/mail-investigate.yaml
+#   Schedule: every 5 min in the TUI
+
+name: mail-investigate
+description: Investigate issues from @@@investigate emails and reply with findings
+
+args:
+  cwd:
+    description: "Working directory for the workflow"
+    default: "${env:KUSTO_REPO_PATH}"
+  sender:
+    description: "Sender email address to filter on"
+
+cwd: "${cwd}"
+
+steps:
+
+  # 1. Fetch recent emails from self, filter for @@@investigate, deduplicate
+  - id: new-threads
+    pipeline: >
+      mail.search --folder inbox --top 50 --order-by newest --search 'from:${sender}'
+      | compute _flag='contains(preview, "@@@investigate")'
+      | where _flag==true
+      | diff.key --key mail-investigate --field conversationId
+      | where changed==true
+
+  # 2. For each new thread: read body, investigate, reply
+  - id: investigate
+    for_each: $new-threads.json
+    steps:
+      # Read full body and investigate with copilot
+      - id: analysis
+        pipeline: >
+          mail.read --id $item.json.id
+          | copilot "Investigate the issue described below.
+          Provide a clear, structured analysis with:
+          1. Problem summary
+          2. Likely root cause(s)
+          3. Recommended next steps or resolution
+          4. Any relevant context or references
+
+          Be thorough but concise. Format your response clearly."
+          | mail.reply --id $item.json.id --markdown

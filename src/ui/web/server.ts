@@ -189,6 +189,25 @@ async function invokeApi(client: DaemonClient, method: string, args: unknown[]):
     }
     case "listDir":         return listDir((args[0] as { dirPath?: string })?.dirPath);
     case "homeDir":         return { home: homedir() };
+    case "galleryList": {
+      const { fetchManifest } = await import("../../gallery/manifest.js");
+      const manifest = await fetchManifest();
+      const { isSampleInstalled } = await import("../../gallery/installer.js");
+      const samples = manifest.samples.map((s) => ({
+        ...s,
+        installed: isSampleInstalled(s),
+      }));
+      return { samples };
+    }
+    case "galleryInstall": {
+      const { installSample } = await import("../../gallery/installer.js");
+      const { fetchManifest } = await import("../../gallery/manifest.js");
+      const manifest = await fetchManifest();
+      const sample = manifest.samples.find((s) => s.id === args[0]);
+      if (!sample) throw new Error(`Sample not found: ${args[0]}`);
+      const overwrite = args[1] === true;
+      return installSample(sample, overwrite);
+    }
     default:
       throw new Error(`Unknown API method: ${method}`);
   }

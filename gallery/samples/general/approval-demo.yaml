@@ -1,0 +1,47 @@
+# Approval Gate Demo
+#
+# Demonstrates the approval feature in tinyclaw workflows.
+# Copilot drafts a stakeholder update from sample PR data, then the
+# workflow pauses at an approval gate for you to review before sending.
+#
+# Flow:
+#   1. Inline sample PR data (no external dependencies)
+#   2. Copilot drafts a stakeholder update from the PR info
+#   3. ⏸  Approval gate — review the draft before it's sent
+#   4. On approve → send to Teams; on reject → workflow stops
+#
+# Usage:
+#   tinyclaw examples/approval-demo.yaml
+#   tinyclaw examples/approval-demo.yaml --dry-run
+
+name: approval-demo
+description: Demo workflow showcasing the approval gate feature
+
+steps:
+  # 1. Copilot drafts a stakeholder update from sample PR data.
+  #    The approval gate is on this same step — the workflow pauses
+  #    and shows you the Copilot output before continuing.
+  - id: draft
+    pipeline: >
+      copilot --prompt "You are a release manager. Using the sample PR data below,
+      draft a concise stakeholder update suitable for a Teams message.
+
+      Format:
+        📋 Weekly PR Summary
+        For each PR show: PR number, title, author, status, reviewers.
+        End with a one-line overall status note.
+
+      Sample PR data:
+      [
+        {\"id\": 4521, \"title\": \"Fix token refresh race condition\", \"author\": \"alice\", \"status\": \"active\", \"reviewers\": [\"bob\", \"carol\"], \"repository\": \"auth-service\"},
+        {\"id\": 4519, \"title\": \"Add retry logic to ingestion pipeline\", \"author\": \"dave\", \"status\": \"completed\", \"reviewers\": [\"eve\"], \"repository\": \"data-pipeline\"},
+        {\"id\": 4525, \"title\": \"Upgrade Node.js to v20 LTS\", \"author\": \"frank\", \"status\": \"active\", \"reviewers\": [\"alice\", \"dave\"], \"repository\": \"platform-infra\"}
+      ]"
+    approval: "Review the stakeholder update above. Approve to send via Teams, or reject to discard."
+
+  # 2. Only runs if the approval was granted
+  - id: send
+    when: $draft.approved == true
+    pipeline: >
+      teams.send --self --markdown
+    stdin: $draft.json

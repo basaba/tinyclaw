@@ -1,0 +1,9 @@
+# Search Microsoft Learn docs via MCP (no LLM)
+name: mcp-docs-search
+steps:
+  - id: search
+    pipeline: "agency.mcp.call --server msft-learn --tool microsoft_docs_search --args '{\"query\": \"Azure Functions\", \"top\": 1}'"
+
+  - id: summarize
+    stdin: "$search.stdout"
+    pipeline: "copilot --prompt 'Summarize the following Microsoft Learn search results in a few bullet points. Be concise.'"

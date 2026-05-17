@@ -1,0 +1,63 @@
+# Daily diary workflow
+#
+# Uses Agency Copilot (which has mail + Teams MCPs) to scan today's
+# emails and Teams chats, then summarize into a diary markdown file.
+#
+# Output: one file per day, e.g. ~/diary/2026-04-28.md
+#
+# Schedule: once daily (e.g. 18:00) in the TUI
+#
+# Prerequisites:
+#   - Agency CLI with mail MCP (`agency mcp mail`)
+#   - Agency CLI with Teams MCP (`agency mcp teams`)
+#   - Agency Copilot (`agency copilot`)
+#   - Authenticated via agency / Entra ID
+#
+# Usage:
+#   tinyclaw examples/diary/daily-diary.yaml
+#   tinyclaw examples/diary/daily-diary.yaml --set output_dir=~/work-diary
+
+name: daily-diary
+description: Daily diary — summarize emails and Teams chats into a markdown file
+
+args:
+  output_dir:
+    description: "Directory to write diary files to"
+    default: "~/diary"
+
+steps:
+
+  - id: diary
+    pipeline: >
+      agency.copilot "You are a personal diary assistant. Today's date can be determined from the emails.
+
+      Do the following:
+      1. Search my inbox emails from the last 24 hours (use the mail MCP)
+      2. Search my sent emails from the last 24 hours (use the mail MCP, sentitems folder)
+      3. Search my recent Teams chat messages (use the Teams MCP)
+
+      Then write a diary entry in markdown with these sections:
+
+      ## 📅 Daily Diary — <today's date>
+
+      ### 📬 Email Activity
+      Summarize key email threads — what topics came up, who I interacted with,
+      any action items or decisions. Group by thread/topic.
+
+      ### 💬 Teams Conversations
+      Summarize key chat conversations — topics discussed, decisions made,
+      notable interactions. Group by conversation/topic.
+
+      ### 📝 Day Summary
+      A brief 2-3 sentence overview of the day — main themes,
+      key accomplishments, and anything notable.
+
+      ### ✅ Action Items
+      List clear action items or follow-ups from emails and chats.
+
+      Be concise but comprehensive. Use a warm, personal diary tone.
+      Skip trivial/automated emails (calendar invites, notifications, etc).
+      Focus on meaningful interactions and work.
+
+      Finally, save the diary to ${output_dir}/<today-date-YYYY-MM-DD>.md (create the directory if it doesn't exist).
+      Output ONLY the markdown diary content, nothing else." --mcp workiq --yolo
