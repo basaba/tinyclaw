@@ -17,19 +17,19 @@ cwd: "${workdir}"
 args:
   workdir:
     description: "Working directory for the Copilot investigation step"
-    default: "${env:KUSTO_REPO_PATH}"
+    default: "${config:KUSTO_REPO_PATH}"
   team:
     description: "Teams team ID to post results to"
-    default: "${env:TEAMS_KUSTOCM_TEAM_ID}"
+    default: "${config:TEAMS_KUSTOCM_TEAM_ID}"
   channel:
     description: "Teams channel ID to post results to"
-    default: "${env:TEAMS_DRI_LOG_CHANNEL_ID}"
+    default: "${config:TEAMS_DRI_LOG_CHANNEL_ID}"
   build_id:
     description: "Build id of devCM"
-    default: "${env:ADO_DEVCM_BUILD_DEF_ID}"
+    default: "${config:ADO_DEVCM_BUILD_DEF_ID}"
   ado_resource_id:
     description: "AAD resource id of ado app"
-    default: "${env:ADO_RESOURCE_ID}"
+    default: "${config:ADO_RESOURCE_ID}"
 
 steps:
   # 1. Get the latest failed build for the pipeline
