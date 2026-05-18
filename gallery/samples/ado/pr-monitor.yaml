@@ -37,13 +37,10 @@ args:
     default: "Azure-Kusto-Service"
   targetBranch:
     description: "Target branch filter"
-    default: null
   creator:
     description: "PR creator filter"
-    default: null
   reviewer:
     description: "PR reviewer filter"
-    default: null
   status:
     description: "PR status filter (active/completed/abandoned/all)"
     default: "active"

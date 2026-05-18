@@ -47,6 +47,15 @@
       "tags": ["azure-devops", "pull-request", "monitoring"]
     },
     {
+      "id": "ado-pr-ping-for-reivew",
+      "name": "Ping PR reviewers",
+      "description": "Ping for pull request reviewers when ADO requires asks for reviwer/re-reivew",
+      "category": "ado",
+      "file": "samples/ado/pr-ping-for-review.yaml",
+      "args": ["repo", "targetBranch", "creator_email", "ado_resource", "team_id", "channel_id"],
+      "tags": ["azure-devops", "pull-request", "monitoring"]
+    },
+    {
       "id": "mail-tracker",
       "name": "Mail Tracker",
       "description": "Track unread emails — summarize new ones and send to Teams",

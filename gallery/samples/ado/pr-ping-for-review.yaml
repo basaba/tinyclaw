@@ -1,0 +1,97 @@
+# notify-reviewer-approval.yaml — TinyClaw workflow
+#
+# Monitors active PRs targeting devCM and notifies (Teams self-message) when
+# the reviewer-approval policy is unsatisfied. Uses diff.key for notify-once
+# per PR+commit semantics (re-notifies when a new push resets votes).
+#
+# Run:       tinyclaw notify-reviewer-approval.yaml
+# Dry-run:   tinyclaw notify-reviewer-approval.yaml --dry-run
+# Schedule:  tinyclaw sched add --name notify-reviewer-approval \
+#              --file notify-reviewer-approval.yaml \
+#              --schedule 'every 10m'
+
+name: "Ping for pull request reviewers"
+description: >
+  Checks active PRs with unsatisfied reviewer-approval policies
+  and sends a notification  in Teams. Notifies once per PR+commit — re-notifies
+  only when a new push resets reviewer votes.
+
+args:
+  repo:
+    description: "Repository name"
+    default: "Azure-Kusto-Service"
+  creator_email:
+    description: "PR creators email filter, comma separated"
+  targetBranch:
+    description: "Target branch filter"
+  ado_resource:
+    description: "Azure DevOps resource ID for token acquisition"
+    default: "499b84ac-1321-427f-aa17-267ca6975798"
+  team_id:
+    description: "Teams team ID to send the notification to"
+  channel_id:
+    description: "Teams channel ID to send the notification to"
+
+
+steps:
+  # ── Fetch active PRs, deduplicate by PR+commit 
+  - id: changed_prs
+    pipeline: >
+      ado.pr.monitor
+      --repository "${repo}"
+      --creator "${creator_email}"
+      --target-branch "${targetBranch}"
+      --status active
+      --days 30
+      | where isDraft==false
+      | diff.key.exists --key notify-reviewer-approval --field pullRequestId,lastMergeSourceCommit
+      | where changed==true
+
+  # ── Check reviewer policy for each changed PR 
+  - id: check_policies
+    for_each: $changed_prs.json
+    concurrency: 10
+    steps:
+      - id: policies
+        run: "az repos pr policy list --id $item.json.pullRequestId -o json"
+        retry:
+          max: 2
+          delay_ms: 2000
+
+      # Find unsatisfied "Required reviewers" policies
+      - id: policiescheck
+        pipeline: >
+          compute policyType='$.configuration.type.displayName'
+          | where policyType=="Required reviewers"
+          | tail --n 1
+          | where 'status==queued || status==rejected || status==waiting'
+          | pick status, policyType
+          | count
+          | compute shouldNotify='iff(count>0, true, false)'
+        stdin: $policies.json
+
+  #── Collect PRs needing approval and skip already notified ones
+  - id: needs_approval
+    pipeline: >
+      where policiescheck.shouldNotify==true
+      | pick item.title, item.pullRequestId, item.lastMergeSourceCommit, item.createdBy
+      | diff.key.exists --key notify-reviewer-approval --field pullRequestId,lastMergeSourceCommit
+      | where changed==true
+    stdin: $check_policies.json
+
+  # ── Stop if no PRs need approval
+  - id: guard_no_alerts
+    pipeline: "gate --when empty"
+    stdin: $needs_approval.json
+
+  # ── Send Teams self-notification
+  - id: notify
+    pipeline: >
+      template --text '- [{{pullRequestId}}](https://dev.azure.com/msazure/One/_git/${repo}/pullrequest/{{pullRequestId}}) **{{createdBy}}**: {{title}}'
+      | teams.send --team-id ${team_id} --channel-id ${channel_id} --markdown
+    stdin: $needs_approval.json
+
+  - id: update-state
+    pipeline: >
+      diff.key.set --key notify-reviewer-approval --field pullRequestId,lastMergeSourceCommit
+    stdin: $needs_approval.json
