@@ -85,3 +85,89 @@ describe("isSampleInstalled", () => {
     expect(isSampleInstalled(SAMPLE)).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// parseArgsDefaults
+// ---------------------------------------------------------------------------
+
+import { parseArgsDefaults } from "../../src/gallery/installer.js";
+
+describe("parseArgsDefaults", () => {
+  it("extracts defaults from structured args block", () => {
+    const yaml = `name: test
+args:
+  org:
+    description: "Azure DevOps org"
+    default: "https://dev.azure.com/myorg"
+  project:
+    description: "Project name"
+  status:
+    description: "Filter"
+    default: "active"
+  top:
+    description: "Max results"
+    default: "50"
+
+steps:
+  - id: step1
+    run: echo hello
+`;
+    const result = parseArgsDefaults(yaml);
+    expect(result).toEqual({
+      org: "https://dev.azure.com/myorg",
+      project: "",
+      status: "active",
+      top: "50",
+    });
+  });
+
+  it("handles null defaults (treats as empty)", () => {
+    const yaml = `args:
+  branch:
+    description: "Branch"
+    default: null
+  name:
+    description: "Name"
+    default: "main"
+`;
+    const result = parseArgsDefaults(yaml);
+    expect(result.branch).toBe("");
+    expect(result.name).toBe("main");
+  });
+
+  it("handles quoted values", () => {
+    const yaml = `args:
+  msg:
+    description: "Message"
+    default: "hello world"
+  path:
+    description: "Path"
+    default: '/usr/local'
+`;
+    const result = parseArgsDefaults(yaml);
+    expect(result.msg).toBe("hello world");
+    expect(result.path).toBe("/usr/local");
+  });
+
+  it("returns empty object if no args block", () => {
+    const yaml = `name: test
+steps:
+  - id: step1
+    run: echo hello
+`;
+    expect(parseArgsDefaults(yaml)).toEqual({});
+  });
+
+  it("handles simple scalar args (shorthand)", () => {
+    const yaml = `args:
+  name: World
+  greeting: Hello
+steps:
+  - id: greet
+    run: echo hello
+`;
+    const result = parseArgsDefaults(yaml);
+    expect(result.name).toBe("World");
+    expect(result.greeting).toBe("Hello");
+  });
+});

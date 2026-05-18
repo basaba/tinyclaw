@@ -210,7 +210,9 @@ async function invokeApi(client: DaemonClient, method: string, args: unknown[]):
       // Register the workflow with the daemon so it appears in the list
       if (result.success) {
         const argsMap: Record<string, unknown> = {};
-        for (const a of sample.args) argsMap[a] = "";
+        if (result.argDefaults) {
+          for (const [k, v] of Object.entries(result.argDefaults)) argsMap[k] = v;
+        }
         try {
           await client.addWorkflow({
             id: sample.id,

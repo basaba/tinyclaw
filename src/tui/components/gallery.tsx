@@ -66,7 +66,9 @@ export function Gallery({ availableHeight, client, onBack }: Props) {
         // Register with daemon so it appears in the workflow list
         try {
           const argsMap: Record<string, unknown> = {};
-          for (const a of sample.args) argsMap[a] = "";
+          if (result.argDefaults) {
+            for (const [k, v] of Object.entries(result.argDefaults)) argsMap[k] = v;
+          }
           await client.addWorkflow({
             id: sample.id,
             name: sample.name,
