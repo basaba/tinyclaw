@@ -26,7 +26,9 @@ export async function startUi(): Promise<void> {
   const child = spawn(electronPath, [mainScript], {
     stdio: "inherit",
     detached: false,
-    windowsHide: true,
+    // windowsHide must be false for Electron — on Windows, SW_HIDE in
+    // STARTUPINFO suppresses the first GUI window of the spawned process.
+    windowsHide: false,
   });
 
   child.on("exit", (code) => {
