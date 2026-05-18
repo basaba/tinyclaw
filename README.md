@@ -115,6 +115,14 @@ Run a pipeline string:
 tinyclaw -p "llm.invoke --provider copilot --prompt 'Hello'"
 ```
 
+## skill
+
+TinyClaw includes a GitHub Copilot CLI skill that helps you write, debug, and understand Lobster workflows directly in your terminal. Once installed, Copilot gains expert knowledge of Lobster syntax, pipeline patterns, and TinyClaw commands.
+In copilot cli run this:
+
+```bash
+/plugin install basaba/tinyclaw
+```
 
 ## Sample Gallery
 
