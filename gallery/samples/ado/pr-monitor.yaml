@@ -12,7 +12,6 @@
 #   project     (required) Project name
 #   repository  (optional) Repository name filter
 #   targetBranch(optional) Target branch filter (e.g. "main")
-#   sourceBranch(optional) Source branch filter
 #   creator     (optional) PR creator filter
 #   reviewer    (optional) PR reviewer filter
 #   status      (optional) "active" | "completed" | "abandoned" | "all" (default: active)
@@ -33,20 +32,11 @@ name: ado-pr-monitor
 description: Monitor Azure DevOps PRs and report changes
 
 args:
-  org:
-    description: "Azure DevOps org URL (e.g. https://dev.azure.com/myorg)"
-    default: "https://dev.azure.com/msazure"
-  project:
-    description: "Project name"
-    default: null
   repository:
-    description: "Azure-Kusto-Service"
-    default: null
+    description: "Repository"
+    default: "Azure-Kusto-Service"
   targetBranch:
     description: "Target branch filter"
-    default: null
-  sourceBranch:
-    description: "Source branch filter"
     default: null
   creator:
     description: "PR creator filter"
@@ -59,25 +49,22 @@ args:
     default: "active"
   top:
     description: "Max PRs to return"
-    default: "50"
+    default: "20"
   days:
     description: "Only include PRs created within the last N days"
-    default: null
+    default: "30"
 
 steps:
   - id: monitor
     pipeline: >
       ado.pr.monitor
-      --org "${org}"
-      --project "${project}"
       --status "${status}"
       --top "${top}"
       --repository "${repository}"
       --target-branch "${targetBranch}"
-      --source-branch "${sourceBranch}"
       --creator "${creator}"
       --reviewer "${reviewer}"
       --days "${days}"
       | where changed==true
       | copilot --prompt "Summarize these PRs"
-      | teams.send --self
+      | teams.send --self --markdown

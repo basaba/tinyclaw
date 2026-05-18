@@ -32,7 +32,7 @@ description: Investigate issues from @@@investigate emails and reply with findin
 args:
   cwd:
     description: "Working directory for the workflow"
-    default: "${env:KUSTO_REPO_PATH}"
+    default: "."
   sender:
     description: "Sender email address to filter on"
 

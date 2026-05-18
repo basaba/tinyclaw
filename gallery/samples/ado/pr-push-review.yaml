@@ -14,13 +14,7 @@
 args:
   cwd:
     description: "Working directory for the workflow"
-    default: "${env:KUSTO_REPO_PATH}"
-  org:
-    description: "Azure DevOps organization URL (e.g. https://dev.azure.com/msazure)"
-    default: "${env:ADO_ORG}"
-  project:
-    description: "Azure DevOps project name (e.g. One)"
-    default: "${env:ADO_PROJECT}"
+    default: "."
   repository:
     description: "Azure DevOps repository name"
     default: "${env:ADO_REPO}"
@@ -41,8 +35,6 @@ steps:
   - id: prlist
     pipeline: >
       ado.pr.monitor
-      --org '${org}'
-      --project '${project}'
       --repository '${repository}'
       --target-branch '${branch}'
       --creator '${creator}'

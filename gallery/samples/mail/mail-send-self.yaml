@@ -1,5 +1,0 @@
-name: mail-send-self
-steps:
-  - id: send
-    pipeline: >
-      mail.send --to 'joedoe@contoso.com' --subject 'Test from tinyclaw' --body 'Hello from tinyclaw! This is a test email.'
