@@ -77,10 +77,30 @@ npm link
 
 ## Quick Start
 
-Launch the TUI:
+Launch the TUI (terminal UI):
 
 ```bash
 tinyclaw
+```
+
+Launch the Web UI:
+
+```bash
+tinyclaw web
+```
+
+This starts a web server at `http://127.0.0.1:7777`. Open it in your browser for a full dashboard with workflow management, run history, and the sample gallery.
+
+Options:
+```bash
+tinyclaw web --port 8080        # Custom port
+tinyclaw web --host 0.0.0.0     # Listen on all interfaces
+```
+
+Launch the desktop UI (Electron):
+
+```bash
+tinyclaw ui
 ```
 
 Run a workflow file:
