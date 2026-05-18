@@ -63,6 +63,7 @@ steps:
   # ── Retrigger policies per PR ─────────────────────────────────────────────
   - id: process_prs
     for_each: $fetch_prs.json
+    concurrency: 5
     steps:
       - id: fetch_policies
         run: "az repos pr policy list --id $item.json.pullRequestId -o json"
