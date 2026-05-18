@@ -136,7 +136,7 @@ export function Gallery({ onBack }: Props) {
               {filtered
                 .filter((s) => s.category === cat)
                 .map((sample) => (
-                  <div key={sample.id} className="gallery-card">
+                  <div key={sample.id} className="gallery-card" onDoubleClick={() => handleView(sample.id)}>
                     <div className="card-header">
                       <span className="card-name">{sample.name}</span>
                       {sample.installed && (

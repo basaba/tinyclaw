@@ -3,7 +3,7 @@
   "samples": [
     {
       "id": "ado-pr-monitor",
-      "name": "ADO PR Monitor",
+      "name": "PR Monitor",
       "description": "Monitor Azure DevOps PRs and report changes",
       "category": "ado",
       "file": "samples/ado/pr-monitor.yaml",
@@ -12,7 +12,7 @@
     },
     {
       "id": "ado-pr-push-review",
-      "name": "PR Push Review",
+      "name": "PR Auto Reviewer",
       "description": "Monitor PRs for new pushes and trigger Copilot review",
       "category": "ado",
       "file": "samples/ado/pr-push-review.yaml",
@@ -21,7 +21,7 @@
     },
     {
       "id": "ado-pr-adversarial-review",
-      "name": "PR Adversarial Review",
+      "name": "PR Adversarial Reviewer",
       "description": "Run adversarial reviewer on recent PRs by an author and email results",
       "category": "ado",
       "file": "samples/ado/pr-adversarial-review.yaml",
@@ -48,7 +48,7 @@
     },
     {
       "id": "mail-investigate",
-      "name": "Mail Investigate",
+      "name": "Trigger Copilot via Mail",
       "description": "Investigate issues from @@@investigate emails and reply with findings",
       "category": "mail",
       "file": "samples/mail/mail-investigate.yaml",

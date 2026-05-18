@@ -903,7 +903,7 @@ pre, code {
   background: var(--bg-primary);
   border: 1px solid var(--border);
   border-radius: 8px;
-  width: min(90vw, 720px);
+  width: min(95vw, 960px);
   height: 80vh;
   display: flex;
   flex-direction: column;
