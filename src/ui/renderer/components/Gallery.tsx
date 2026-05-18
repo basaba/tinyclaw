@@ -144,11 +144,7 @@ export function Gallery({ onBack }: Props) {
                       )}
                     </div>
                     <p className="card-description">{sample.description}</p>
-                    {sample.args.length > 0 && (
-                      <div className="card-args">
-                        Args: {sample.args.join(", ")}
-                      </div>
-                    )}
+
                     <div className="card-tags">
                       {sample.tags.map((t) => (
                         <span key={t} className="tag">
