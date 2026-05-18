@@ -68,8 +68,8 @@ function runAz(
 }
 
 export interface AdoPrListOptions {
-  org: string;
-  project: string;
+  org?: string;
+  project?: string;
   repository?: string;
   sourceBranch?: string;
   targetBranch?: string;
@@ -109,10 +109,10 @@ export async function fetchAdoPrs(
   // Build base argv (without --creator)
   const baseArgv = [
     "repos", "pr", "list",
-    "--org", options.org,
-    "--project", options.project,
     "--output", "json",
   ];
+  if (options.org) baseArgv.push("--org", options.org);
+  if (options.project) baseArgv.push("--project", options.project);
   if (options.repository) baseArgv.push("--repository", options.repository);
   if (options.sourceBranch) baseArgv.push("--source-branch", options.sourceBranch);
   if (options.targetBranch) baseArgv.push("--target-branch", options.targetBranch);

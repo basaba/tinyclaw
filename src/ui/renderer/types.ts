@@ -57,9 +57,17 @@ export interface TinyClawAPI {
   listApprovals(): Promise<RunRecord[]>;
   resolveApproval(runId: string, approved: boolean): Promise<void>;
   readFile(filePath: string): Promise<string>;
+  writeFile(filePath: string, content: string): Promise<void>;
+  pickFile(options?: { defaultPath?: string }): Promise<string | null>;
+  listDir(dirPath?: string): Promise<{
+    cwd: string;
+    parent: string | null;
+    entries: Array<{ name: string; path: string; isDirectory: boolean }>;
+  }>;
+  homeDir(): Promise<{ home: string }>;
   onEvent(callback: (event: DaemonEventKind) => void): () => void;
   onChange(callback: () => void): () => void;
-  openDebugRepl(snapshotPath: string): Promise<number>;
+  openDebugRepl(snapshotPath: string, runId?: string): Promise<number>;
   writeDebugRepl(ptyId: number, data: string): void;
   onDebugReplData(ptyId: number, callback: (data: string) => void): () => void;
   closeDebugRepl(ptyId: number): void;

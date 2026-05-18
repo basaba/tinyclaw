@@ -1,0 +1,34 @@
+# Email tracker workflow
+#
+# Fetches unread emails from the last 24 hours, filters to new (unseen) ones,
+# summarizes them via Copilot, and sends the digest to Teams.
+#
+# Flow:
+#   1. Search unread inbox emails from the last 24 hours
+#   2. diff.key — filter to new (unseen) emails only
+#   3. Copilot summarizes new emails
+#   4. Send summary to Teams
+#
+# State:
+#   Stores processed email IDs in ~/.lobster/state/mail-tracker.json
+#
+# Prerequisites:
+#   - Agency CLI with mail MCP (`agency mcp mail`)
+#   - Authenticated via agency / Entra ID
+#
+# Usage:
+#   tinyclaw examples/mail/mail-tracker.yaml
+
+name: mail-tracker
+description: Track unread emails — summarize new ones and send to Teams
+
+steps:
+  - id: mail-tracker
+    pipeline: >
+      mail.search --since 1d --folder inbox --top 10 --order-by newest
+      | diff.key --key mail-tracker --field id
+      | where changed==true
+      | mail.read
+      | copilot --prompt "Summarize these emails as a digest.
+      For each email show the sender, subject, date, and a 1-2 sentence summary."
+      | teams.send --self --markdown

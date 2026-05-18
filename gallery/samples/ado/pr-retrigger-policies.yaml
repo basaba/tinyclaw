@@ -1,0 +1,103 @@
+# retrigger-devcm-policies.yaml — TinyClaw/Lobster workflow
+#
+# Monitors the devCM buddy build and retriggers PR policies when conditions are met.
+#
+# Run:       tinyclaw retrigger-devcm-policies.yaml
+# Validate:  tinyclaw retrigger-devcm-policies.yaml --dry-run
+# Schedule:  tinyclaw sched add --name retrigger-devcm --file retrigger-devcm-policies.yaml --schedule 'every 10m'
+
+name: "Retrigger devCM Policies"
+description: >
+  Polls the devCM buddy build and active PRs every run.
+  Retriggers "Is devCM green" when buddy succeeded/partiallySucceeded and the
+  policy is rejected/queued.  Retriggers "Built + UT validation" when expired.
+
+args:
+  org:
+    description: "Azure DevOps organization URL"
+    default: "https://dev.azure.com/msazure"
+  project:
+    description: "Azure DevOps project"
+    default: "One"
+  repo:
+    description: "Repository name"
+    default: "Azure-Kusto-Service"
+  target_branch:
+    description: "Target branch to monitor"
+    default: "devCM"
+  creator_email:
+    description: "PR creator email"
+  buddy_pipeline_id:
+    description: "Buddy pipeline ID for devCM-green check"
+    default: "273080"
+  devcm_green_build_def_id:
+    description: "Build definition ID for 'Is devCM green' policy"
+    default: "371414"
+  build_ut_build_def_id:
+    description: "Build definition ID for 'Built + UT validation' policy"
+    default: "269968"
+  ado_resource:
+    description: "Azure DevOps resource ID for token acquisition"
+    default: "499b84ac-1321-427f-aa17-267ca6975798"
+
+steps:
+  # ── Buddy build status ────────────────────────────────────────────────────
+  - id: check_buddy
+    pipeline: "exec --json --shell \"az pipelines runs list --pipeline-id ${buddy_pipeline_id} --top 5 -o json\" | where result!=null | head --n 1 | pick result,id,finishTime"
+    retry:
+      max: 2
+      delay_ms: 3000
+
+  # ── Fetch active PRs ─────────────────────────────────────────────────────
+  - id: fetch_prs
+    run: "az repos pr list --repository ${repo} --creator ${creator_email} --status active --target-branch ${target_branch} -o json"
+    retry:
+      max: 2
+      delay_ms: 3000
+
+  # ── Guard: no PRs → stop ─────────────────────────────────────────────────
+  - id: guard_no_prs
+    pipeline: "gate --when empty"
+    stdin: $fetch_prs.json
+
+  # ── Retrigger policies per PR ─────────────────────────────────────────────
+  - id: process_prs
+    for_each: $fetch_prs.json
+    concurrency: 5
+    steps:
+      - id: fetch_policies
+        run: "az repos pr policy list --id $item.json.pullRequestId -o json"
+        retry:
+          max: 2
+          delay_ms: 2000
+
+      # Extract "Is devCM green" policy entry
+      - id: devcm_green
+        pipeline: "compute defId='$.configuration.settings.buildDefinitionId' | where defId==${devcm_green_build_def_id} | head --n 1 | pick evaluationId,status"
+        stdin: $fetch_policies.json
+
+      # Retrigger "Is devCM green" if buddy OK and policy rejected/queued
+      - id: retrigger_devcm_green
+        when: "($check_buddy.json.result == 'succeeded' || $check_buddy.json.result == 'partiallySucceeded') && ($devcm_green.json.status == 'rejected' || $devcm_green.json.status == 'queued')"
+        run: "az rest --method patch --url ${org}/${project}/_apis/policy/evaluations/$devcm_green.json.evaluationId?api-version=7.0-preview --resource ${ado_resource} -o none"
+        on_error: continue
+
+      # Extract "Built + UT validation" policy entry
+      - id: build_ut
+        pipeline: "compute defId='$.configuration.settings.buildDefinitionId' | where defId==${build_ut_build_def_id} | head --n 1 | pick evaluationId,status,context"
+        stdin: $fetch_policies.json
+
+      # Retrigger "Built + UT validation" if expired
+      - id: retrigger_build_ut
+        when: "$build_ut.json.context.isExpired == true"
+        run: "az rest --method patch --url ${org}/${project}/_apis/policy/evaluations/$build_ut.json.evaluationId?api-version=7.0-preview --resource ${ado_resource} -o none"
+        on_error: continue
+
+      # Per-PR result summary
+      - id: pr_result
+        pipeline: "emit PR:$item.json.pullRequestId/devcmGreen=$devcm_green.json.status/buildUtExpired=$build_ut.json.context.isExpired"
+
+  # ── Final summary ──────────────────────────────────────────────────────────
+  - id: summary
+    pipeline: "pick pr_result"
+    stdin: $process_prs.json

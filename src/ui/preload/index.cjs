@@ -19,6 +19,10 @@ const api = {
   listApprovals: () => ipcRenderer.invoke("list-approvals"),
   resolveApproval: (runId, approved) => ipcRenderer.invoke("resolve-approval", runId, approved),
   readFile: (fp) => ipcRenderer.invoke("read-file", fp),
+  writeFile: (fp, content) => ipcRenderer.invoke("write-file", fp, content),
+  pickFile: (opts) => ipcRenderer.invoke("pick-file", opts),
+  listDir: (dirPath) => ipcRenderer.invoke("list-dir", dirPath),
+  homeDir: () => ipcRenderer.invoke("home-dir"),
 
   onEvent: (cb) => {
     const handler = (_, event) => cb(event);
@@ -31,7 +35,7 @@ const api = {
     return () => ipcRenderer.removeListener("daemon-change", handler);
   },
 
-  openDebugRepl: (path) => ipcRenderer.invoke("open-debug-repl", path),
+  openDebugRepl: (path, runId) => ipcRenderer.invoke("open-debug-repl", path, runId),
   writeDebugRepl: (id, data) => ipcRenderer.send("write-debug-repl", id, data),
   onDebugReplData: (id, cb) => {
     const ch = `pty-data-${id}`;

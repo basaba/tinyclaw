@@ -1,0 +1,70 @@
+# Azure DevOps PR Monitor Workflow
+#
+# Monitors active PRs in an Azure DevOps project and reports changes
+# (new PRs, closed PRs, updated reviews/status) across runs.
+#
+# Prerequisites:
+#   - Azure CLI with azure-devops extension (`az extension add --name azure-devops`)
+#   - Authenticated via `az login`
+#
+# Args (pass via --args-json):
+#   org         (required) Azure DevOps org URL, e.g. "https://dev.azure.com/myorg"
+#   project     (required) Project name
+#   repository  (optional) Repository name filter
+#   targetBranch(optional) Target branch filter (e.g. "main")
+#   creator     (optional) PR creator filter
+#   reviewer    (optional) PR reviewer filter
+#   status      (optional) "active" | "completed" | "abandoned" | "all" (default: active)
+#   top         (optional) Max PRs to return (default: 50)
+#
+# Run:
+#   tinyclaw workflows/ado-pr-monitor.lobster \
+#     --args-json '{"org":"https://dev.azure.com/myorg","project":"MyProject","status":"active"}'
+#
+# Schedule via TUI / sched:
+#   tinyclaw sched add \
+#     --name ado-prs \
+#     --file workflows/ado-pr-monitor.lobster \
+#     --schedule "every 5m" \
+#     --args '{"org":"https://dev.azure.com/myorg","project":"MyProject","status":"active"}'
+
+name: ado-pr-monitor
+description: Monitor Azure DevOps PRs and report changes
+
+args:
+  repository:
+    description: "Repository"
+    default: "Azure-Kusto-Service"
+  targetBranch:
+    description: "Target branch filter"
+    default: null
+  creator:
+    description: "PR creator filter"
+    default: null
+  reviewer:
+    description: "PR reviewer filter"
+    default: null
+  status:
+    description: "PR status filter (active/completed/abandoned/all)"
+    default: "active"
+  top:
+    description: "Max PRs to return"
+    default: "20"
+  days:
+    description: "Only include PRs created within the last N days"
+    default: "30"
+
+steps:
+  - id: monitor
+    pipeline: >
+      ado.pr.monitor
+      --status "${status}"
+      --top "${top}"
+      --repository "${repository}"
+      --target-branch "${targetBranch}"
+      --creator "${creator}"
+      --reviewer "${reviewer}"
+      --days "${days}"
+      | where changed==true
+      | copilot --prompt "Summarize these PRs"
+      | teams.send --self --markdown

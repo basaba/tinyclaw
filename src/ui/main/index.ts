@@ -2,11 +2,11 @@
  * Electron main process — manages BrowserWindow, reuses the existing
  * TinyClaw DaemonClient, and exposes IPC handlers for the renderer.
  */
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, dialog } from "electron";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DaemonClient } from "../../tui/scheduler/daemon-client.js";
-import { spawnDaemon } from "../../tui/scheduler/spawn.js";
+import { connectToDaemon } from "../shared/daemon.js";
 import type { WorkflowEntry } from "../../tui/scheduler/types.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -46,34 +46,12 @@ async function createWindow(): Promise<void> {
 }
 
 async function connectDaemon(): Promise<void> {
-  client = new DaemonClient();
-
-  // Spawn daemon if not running
-  if (!DaemonClient.isDaemonRunning()) {
-    console.error("Daemon not running, starting…");
-    const pid = spawnDaemon();
-    if (pid) console.error(`Daemon started (pid ${pid}).`);
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-
-  // Retry connection
-  let connected = false;
-  for (let attempt = 0; attempt < 5; attempt++) {
-    try {
-      await client.connect();
-      connected = true;
-      break;
-    } catch {
-      await new Promise((r) => setTimeout(r, 500));
-    }
-  }
-
-  if (!connected) {
-    console.error("Cannot connect to daemon after multiple attempts.");
+  try {
+    client = await connectToDaemon();
+  } catch (err: any) {
+    console.error(err.message ?? String(err));
     return;
   }
-
-  console.error("Connected to TinyClaw daemon");
 
   // Forward daemon events to renderer
   client.on("event", (event: any) => {
@@ -110,6 +88,58 @@ function registerIpcHandlers(): void {
     const fs = await import("node:fs/promises");
     return fs.readFile(filePath, "utf-8");
   });
+  ipcMain.handle("write-file", async (_, filePath: string, content: string) => {
+    const fs = await import("node:fs/promises");
+    await fs.writeFile(filePath, content, "utf-8");
+  });
+  ipcMain.handle("pick-file", async (_, options?: { defaultPath?: string }) => {
+    if (!mainWindow) return null;
+    let defaultPath = options?.defaultPath;
+    if (defaultPath) {
+      const path = await import("node:path");
+      const fs = await import("node:fs/promises");
+      try {
+        const stat = await fs.stat(defaultPath);
+        if (stat.isFile()) defaultPath = path.dirname(defaultPath);
+      } catch {
+        defaultPath = undefined;
+      }
+    }
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ["openFile"],
+      defaultPath,
+      filters: [
+        { name: "Workflow", extensions: ["yaml", "yml"] },
+        { name: "All Files", extensions: ["*"] },
+      ],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return result.filePaths[0];
+  });
+  ipcMain.handle("list-dir", async (_, dirPath?: string) => {
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    const os = await import("node:os");
+    const cwd = dirPath ? path.resolve(dirPath) : os.homedir();
+    const items = await fs.readdir(cwd, { withFileTypes: true });
+    const entries = items
+      .filter((i) => !i.name.startsWith("."))
+      .map((i) => ({
+        name: i.name,
+        path: path.join(cwd, i.name),
+        isDirectory: i.isDirectory(),
+      }))
+      .sort((a, b) => {
+        if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+    const parent = path.dirname(cwd);
+    return { cwd, parent: parent === cwd ? null : parent, entries };
+  });
+  ipcMain.handle("home-dir", async () => {
+    const os = await import("node:os");
+    return { home: os.homedir() };
+  });
 
   // Debug REPL — spawn child process
   let ptyCounter = 0;
@@ -119,12 +149,14 @@ function registerIpcHandlers(): void {
     const { spawn } = await import("node:child_process");
     const ptyId = ++ptyCounter;
 
-    // Use the current node + tinyclaw CLI
-    const tinyClawBin = process.platform === "win32" ? "tinyclaw.cmd" : "tinyclaw";
-    const child = spawn(tinyClawBin, ["debug", snapshotPath], {
+    // Run the bundled CLI directly via the current binary.
+    // In Electron, ELECTRON_RUN_AS_NODE makes process.execPath behave as Node.
+    const cliPath = join(__dirname, "..", "..", "cli.js");
+    const child = spawn(process.execPath, [cliPath, "debug", snapshotPath], {
       stdio: ["pipe", "pipe", "pipe"],
       shell: false,
       windowsHide: true,
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
     });
 
     ptyProcesses.set(ptyId, child);

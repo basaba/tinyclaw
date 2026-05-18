@@ -41,6 +41,15 @@ Load these as needed:
 
 ## Part II — TinyClaw Extension
 
+### Installation
+
+```bash
+npm install -g @basaba/tinyclaw       # Install the CLI globally
+tinyclaw --help                        # Verify installation
+```
+
+Requires Node.js 20+. Source: https://github.com/basaba/tinyclaw
+
 ### Extended CLI
 
 ```bash

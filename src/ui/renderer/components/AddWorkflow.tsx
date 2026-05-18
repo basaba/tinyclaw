@@ -1,5 +1,9 @@
 import React, { useState } from "react";
 import type { WorkflowEntry } from "../types";
+import { ScheduleEditor } from "./ScheduleEditor";
+import { ArgsEditor } from "./ArgsEditor";
+import { FileEditorModal } from "./FileEditorModal";
+import { pickFile } from "../api/picker";
 
 interface Props {
   onDone: () => void;
@@ -9,10 +13,12 @@ export function AddWorkflow({ onDone }: Props) {
   const [name, setName] = useState("");
   const [filePath, setFilePath] = useState("");
   const [schedule, setSchedule] = useState("");
-  const [argsText, setArgsText] = useState("");
+  const [args, setArgs] = useState<Record<string, unknown> | undefined>();
+  const [argsError, setArgsError] = useState<string | undefined>();
   const [debug, setDebug] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [fileEditorOpen, setFileEditorOpen] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,16 +26,11 @@ export function AddWorkflow({ onDone }: Props) {
       setError("Name and file path are required");
       return;
     }
-
-    let args: Record<string, unknown> | undefined;
-    if (argsText.trim()) {
-      try {
-        args = JSON.parse(argsText);
-      } catch {
-        setError("Args must be valid JSON");
-        return;
-      }
+    if (argsError) {
+      setError(argsError);
+      return;
     }
+    setError("");
 
     const workflow: WorkflowEntry = {
       id: name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-"),
@@ -56,7 +57,7 @@ export function AddWorkflow({ onDone }: Props) {
       <button className="back-link" onClick={onDone}>← Back</button>
       <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 20 }}>Add Workflow</h2>
 
-      <form onSubmit={handleSubmit} style={{ maxWidth: 500 }}>
+      <form onSubmit={handleSubmit} style={{ maxWidth: 700 }}>
         <div className="form-group">
           <label>Name</label>
           <input
@@ -70,31 +71,50 @@ export function AddWorkflow({ onDone }: Props) {
 
         <div className="form-group">
           <label>File Path</label>
-          <input
-            className="form-input mono"
-            value={filePath}
-            onChange={(e) => setFilePath(e.target.value)}
-            placeholder="C:\path\to\workflow.yaml"
-          />
+          <div style={{ display: "flex", gap: 6 }}>
+            <input
+              className="form-input mono"
+              value={filePath}
+              onChange={(e) => setFilePath(e.target.value)}
+              placeholder="C:\path\to\workflow.yaml"
+              style={{ flex: 1 }}
+            />
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={async () => {
+                const picked = await pickFile({ defaultPath: filePath || undefined });
+                if (picked) setFilePath(picked);
+              }}
+              title="Browse for a workflow file"
+            >
+              Browse…
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setFileEditorOpen(true)}
+              disabled={!filePath.trim()}
+              title="View or edit the workflow file"
+            >
+              View / Edit
+            </button>
+          </div>
         </div>
 
         <div className="form-group">
-          <label>Schedule (cron or "every Xm/h")</label>
-          <input
-            className="form-input mono"
-            value={schedule}
-            onChange={(e) => setSchedule(e.target.value)}
-            placeholder="every 30m"
-          />
+          <label>Schedule</label>
+          <ScheduleEditor value={schedule} onChange={setSchedule} />
         </div>
 
         <div className="form-group">
-          <label>Args (JSON, optional)</label>
-          <textarea
-            className="form-input mono"
-            value={argsText}
-            onChange={(e) => setArgsText(e.target.value)}
-            placeholder='{"key": "value"}'
+          <label>Args</label>
+          <ArgsEditor
+            initialArgs={undefined}
+            onChange={({ args, error }) => {
+              setArgs(args);
+              setArgsError(error);
+            }}
           />
         </div>
 
@@ -118,6 +138,13 @@ export function AddWorkflow({ onDone }: Props) {
           <button type="button" className="btn" onClick={onDone}>Cancel</button>
         </div>
       </form>
+
+      {fileEditorOpen && (
+        <FileEditorModal
+          filePath={filePath.trim()}
+          onClose={() => setFileEditorOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -129,7 +129,8 @@ function formatChangeMessage(
 
 function buildKey(options: AdoPrMonitorOptions): string {
   if (options.key) return options.key;
-  const parts = [`${options.org}/${options.project}`];
+  const base = [options.org, options.project].filter(Boolean).join("/") || "default";
+  const parts = [base];
   if (options.repository) parts.push(`repo=${options.repository}`);
   if (options.sourceBranch) parts.push(`src=${options.sourceBranch}`);
   if (options.targetBranch) parts.push(`tgt=${options.targetBranch}`);
@@ -211,14 +212,15 @@ export async function adoPrMonitor(
   }
 
   const totalPrs = Object.keys(snapshot).length;
+  const projectLabel = options.project || "default";
   const message = changed
-    ? formatChangeMessage(options.project, summary, totalPrs)
-    : `No changes in ${options.project} (${totalPrs} PRs)`;
+    ? formatChangeMessage(projectLabel, summary, totalPrs)
+    : `No changes in ${projectLabel} (${totalPrs} PRs)`;
 
   if (options.changesOnly && !changed) {
     return {
       kind: "ado.pr.monitor",
-      project: options.project,
+      project: options.project || "default",
       key,
       changed: false,
       totalPrs,
@@ -232,7 +234,7 @@ export async function adoPrMonitor(
 
   return {
     kind: "ado.pr.monitor",
-    project: options.project,
+    project: options.project || "default",
     key,
     changed,
     totalPrs,

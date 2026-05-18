@@ -1,5 +1,9 @@
 import React, { useState } from "react";
 import type { WorkflowEntry } from "../types";
+import { ScheduleEditor } from "./ScheduleEditor";
+import { ArgsEditor } from "./ArgsEditor";
+import { FileEditorModal } from "./FileEditorModal";
+import { pickFile } from "../api/picker";
 
 interface Props {
   workflow: WorkflowEntry;
@@ -10,25 +14,20 @@ export function EditWorkflow({ workflow, onDone }: Props) {
   const [name, setName] = useState(workflow.name);
   const [filePath, setFilePath] = useState(workflow.filePath);
   const [schedule, setSchedule] = useState(workflow.schedule);
-  const [argsText, setArgsText] = useState(
-    workflow.args ? JSON.stringify(workflow.args, null, 2) : "",
-  );
+  const [args, setArgs] = useState<Record<string, unknown> | undefined>(workflow.args);
+  const [argsError, setArgsError] = useState<string | undefined>();
   const [debug, setDebug] = useState(workflow.debug ?? false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [fileEditorOpen, setFileEditorOpen] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    let args: Record<string, unknown> | undefined;
-    if (argsText.trim()) {
-      try {
-        args = JSON.parse(argsText);
-      } catch {
-        setError("Args must be valid JSON");
-        return;
-      }
+    if (argsError) {
+      setError(argsError);
+      return;
     }
+    setError("");
 
     const patch: Partial<WorkflowEntry> = {};
     if (name.trim() !== workflow.name) patch.name = name.trim();
@@ -59,7 +58,7 @@ export function EditWorkflow({ workflow, onDone }: Props) {
         Edit: {workflow.name}
       </h2>
 
-      <form onSubmit={handleSubmit} style={{ maxWidth: 500 }}>
+      <form onSubmit={handleSubmit} style={{ maxWidth: 700 }}>
         <div className="form-group">
           <label>Name</label>
           <input className="form-input" value={name} onChange={(e) => setName(e.target.value)} />
@@ -67,20 +66,49 @@ export function EditWorkflow({ workflow, onDone }: Props) {
 
         <div className="form-group">
           <label>File Path</label>
-          <input className="form-input mono" value={filePath} onChange={(e) => setFilePath(e.target.value)} />
+          <div style={{ display: "flex", gap: 6 }}>
+            <input
+              className="form-input mono"
+              value={filePath}
+              onChange={(e) => setFilePath(e.target.value)}
+              style={{ flex: 1 }}
+            />
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={async () => {
+                const picked = await pickFile({ defaultPath: filePath || undefined });
+                if (picked) setFilePath(picked);
+              }}
+              title="Browse for a workflow file"
+            >
+              Browse…
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setFileEditorOpen(true)}
+              disabled={!filePath.trim()}
+              title="View or edit the workflow file"
+            >
+              View / Edit
+            </button>
+          </div>
         </div>
 
         <div className="form-group">
           <label>Schedule</label>
-          <input className="form-input mono" value={schedule} onChange={(e) => setSchedule(e.target.value)} />
+          <ScheduleEditor value={schedule} onChange={setSchedule} />
         </div>
 
         <div className="form-group">
-          <label>Args (JSON)</label>
-          <textarea
-            className="form-input mono"
-            value={argsText}
-            onChange={(e) => setArgsText(e.target.value)}
+          <label>Args</label>
+          <ArgsEditor
+            initialArgs={workflow.args}
+            onChange={({ args, error }) => {
+              setArgs(args);
+              setArgsError(error);
+            }}
           />
         </div>
 
@@ -104,6 +132,13 @@ export function EditWorkflow({ workflow, onDone }: Props) {
           <button type="button" className="btn" onClick={onDone}>Cancel</button>
         </div>
       </form>
+
+      {fileEditorOpen && (
+        <FileEditorModal
+          filePath={filePath.trim()}
+          onClose={() => setFileEditorOpen(false)}
+        />
+      )}
     </div>
   );
 }

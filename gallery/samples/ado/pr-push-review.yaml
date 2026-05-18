@@ -1,0 +1,52 @@
+# PR Push Review
+#
+# Monitors active PRs targeting devCM in Azure-Kusto-Service.
+# When a new push is detected (lastMergeSourceCommit changes),
+# triggers a Copilot review of the changed PR.
+#
+# Uses diff.key with a composite key (pullRequestId:lastMergeSourceCommit)
+# to detect when a PR gets a new push.
+#
+# Usage:
+#   tinyclaw examples/pr-push-review.yaml
+#   tinyclaw sched add --name pr-push-review --file examples/pr-push-review.yaml --schedule 'every 1h'
+
+args:
+  cwd:
+    description: "Working directory for the workflow"
+    default: "."
+  repository:
+    description: "Azure DevOps repository name"
+    default: "${env:ADO_REPO}"
+  branch:
+    description: "Azure DevOps branch name"
+    default: "${env:ADO_BRANCH}"
+  creator:
+    description: "PR creator filter (alias1,alias2,...)"
+    default: null
+
+name: pr-push-review
+description: Monitor PRs for new pushes and trigger Copilot review
+
+cwd: ${cwd}
+
+steps:
+  # 1. Fetch active PRs
+  - id: prlist
+    pipeline: >
+      ado.pr.monitor
+      --repository '${repository}'
+      --target-branch '${branch}'
+      --creator '${creator}'
+      --status active
+      | diff.key --key pr-push-review --field pullRequestId,lastMergeSourceCommit
+      | where changed==true
+      
+  # 2. Copilot review for each pushed PR
+  - id: review
+    for_each: $prlist.json
+    steps:
+      - id: analyze
+        pipeline: >
+          agency.copilot "Review this PR and provide feedback." --mcp ado
+        stdin: $item.json

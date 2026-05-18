@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "samples": [
+    {
+      "id": "ado-pr-monitor",
+      "name": "PR Monitor",
+      "description": "Monitor Azure DevOps PRs and report changes",
+      "category": "ado",
+      "file": "samples/ado/pr-monitor.yaml",
+      "args": ["repository", "targetBranch", "creator", "reviewer", "status", "top", "days"],
+      "tags": ["azure-devops", "pull-request", "monitoring"]
+    },
+    {
+      "id": "ado-pr-push-review",
+      "name": "PR Auto Reviewer",
+      "description": "Monitor PRs for new pushes and trigger Copilot review",
+      "category": "ado",
+      "file": "samples/ado/pr-push-review.yaml",
+      "args": ["cwd", "repository", "branch", "creator"],
+      "tags": ["azure-devops", "pull-request", "code-review", "copilot"]
+    },
+    {
+      "id": "ado-pr-adversarial-review",
+      "name": "PR Adversarial Reviewer",
+      "description": "Run adversarial reviewer on recent PRs by an author and email results",
+      "category": "ado",
+      "file": "samples/ado/pr-adversarial-review.yaml",
+      "args": ["org", "project", "repository", "repoPath", "creator", "status", "days", "mailTo"],
+      "tags": ["azure-devops", "pull-request", "code-review", "copilot", "email"]
+    },
+    {
+      "id": "ado-build-investigate",
+      "name": "Build Investigate",
+      "description": "Investigate Azure DevOps build test failures with Copilot",
+      "category": "ado",
+      "file": "samples/ado/build-investigate.yaml",
+      "args": ["workdir", "team", "channel", "build_id", "ado_resource_id"],
+      "tags": ["azure-devops", "build", "test-failures", "copilot"]
+    },
+    {
+      "id": "ado-pr-retrigger-policies",
+      "name": "Retrigger PR policies",
+      "description": "Retrigger PR expired policies, and retrigger devCM policy when build becomes green",
+      "category": "ado",
+      "file": "samples/ado/pr-retrigger-policies.yaml",
+      "args": ["repository", "targetBranch", "creator", "reviewer", "status", "top", "days"],
+      "tags": ["azure-devops", "pull-request", "monitoring"]
+    },
+    {
+      "id": "mail-tracker",
+      "name": "Mail Tracker",
+      "description": "Track unread emails — summarize new ones and send to Teams",
+      "category": "mail",
+      "file": "samples/mail/mail-tracker.yaml",
+      "args": [],
+      "tags": ["email", "summary", "teams", "digest"]
+    },
+    {
+      "id": "mail-investigate",
+      "name": "Trigger Copilot via Mail",
+      "description": "Investigate issues from @@@investigate emails and reply with findings",
+      "category": "mail",
+      "file": "samples/mail/mail-investigate.yaml",
+      "args": ["cwd", "sender"],
+      "tags": ["email", "copilot", "investigation", "auto-reply"]
+    },
+    {
+      "id": "daily-diary",
+      "name": "Daily Diary",
+      "description": "Daily diary — summarize emails and Teams chats into a markdown file",
+      "category": "diary",
+      "file": "samples/diary/daily-diary.yaml",
+      "args": ["output_dir"],
+      "tags": ["diary", "email", "teams", "summary", "copilot"]
+    }
+  ]
+}

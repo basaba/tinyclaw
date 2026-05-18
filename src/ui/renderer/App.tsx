@@ -8,6 +8,7 @@ import { RunHistory } from "./components/RunHistory";
 import { RunDetail } from "./components/RunDetail";
 import { YamlView } from "./components/YamlView";
 import { GraphView } from "./components/GraphView";
+import { Gallery } from "./components/Gallery";
 
 type View =
   | { screen: "list" }
@@ -16,7 +17,8 @@ type View =
   | { screen: "history"; workflowId: string }
   | { screen: "run-detail"; run: RunRecord; fromWorkflowId?: string }
   | { screen: "yaml-view"; filePath: string; fromView?: View }
-  | { screen: "graph-view"; filePath: string };
+  | { screen: "graph-view"; filePath: string }
+  | { screen: "gallery" };
 
 export function App() {
   const { connected, workflows, liveOutput, refresh } = useDaemon();
@@ -39,6 +41,7 @@ export function App() {
     (filePath: string) => setView({ screen: "graph-view", filePath }),
     [],
   );
+  const goGallery = useCallback(() => setView({ screen: "gallery" }), []);
 
   const renderView = () => {
     switch (view.screen) {
@@ -54,6 +57,8 @@ export function App() {
             onRemove={(id) => window.api.removeWorkflow(id).then(refresh)}
             onViewYaml={goYaml}
             onViewGraph={goGraph}
+            onGallery={goGallery}
+            onSelectRun={(run, fromId) => goRunDetail(run, fromId)}
           />
         );
       case "add":
@@ -94,6 +99,8 @@ export function App() {
         );
       case "graph-view":
         return <GraphView filePath={view.filePath} onBack={goList} />;
+      case "gallery":
+        return <Gallery onBack={goList} />;
     }
   };
 
@@ -108,9 +115,6 @@ export function App() {
       <main className="app-content">
         {renderView()}
       </main>
-      <footer className="app-footer">
-        TinyClaw Desktop — Lobster Workflow Manager
-      </footer>
     </div>
   );
 }

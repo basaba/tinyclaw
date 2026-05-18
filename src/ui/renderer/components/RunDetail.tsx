@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import type { RunRecord } from "../types";
 import { DebugRepl } from "./DebugRepl";
+import { FileEditorModal } from "./FileEditorModal";
 
 interface Props {
   run: RunRecord;
@@ -32,6 +33,7 @@ export function RunDetail({ run: initialRun, liveOutput, onBack, onOpenFile }: P
   const [run, setRun] = useState(initialRun);
   const [activeTab, setActiveTab] = useState<"details" | "output" | "logs" | "debug">("details");
   const [showDebug, setShowDebug] = useState(false);
+  const [fileEditorPath, setFileEditorPath] = useState<string | null>(null);
 
   // Refresh run data periodically if running
   useEffect(() => {
@@ -83,7 +85,8 @@ export function RunDetail({ run: initialRun, liveOutput, onBack, onOpenFile }: P
             <button
               className="back-link"
               style={{ margin: 0, fontSize: 13 }}
-              onClick={() => onOpenFile(run.input.filePath)}
+              onClick={() => setFileEditorPath(run.input.filePath)}
+              title="View / edit the workflow file"
             >
               {run.input.filePath}
             </button>
@@ -155,7 +158,7 @@ export function RunDetail({ run: initialRun, liveOutput, onBack, onOpenFile }: P
       )}
 
       {activeTab === "debug" && run.debugSnapshotPath && showDebug && (
-        <DebugRepl snapshotPath={run.debugSnapshotPath} />
+        <DebugRepl snapshotPath={run.debugSnapshotPath} runId={run.id} />
       )}
 
       <div className="toolbar" style={{ marginTop: 16 }}>
@@ -171,6 +174,13 @@ export function RunDetail({ run: initialRun, liveOutput, onBack, onOpenFile }: P
           🗑 Delete Run
         </button>
       </div>
+
+      {fileEditorPath && (
+        <FileEditorModal
+          filePath={fileEditorPath}
+          onClose={() => setFileEditorPath(null)}
+        />
+      )}
     </div>
   );
 }
