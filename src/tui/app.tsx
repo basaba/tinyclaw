@@ -192,7 +192,7 @@ export function App({ client }: AppProps) {
         )}
 
         {view.screen === "gallery" && (
-          <Gallery availableHeight={contentHeight} onBack={goList} />
+          <Gallery availableHeight={contentHeight} client={client} onBack={goList} />
         )}
       </Box>
 

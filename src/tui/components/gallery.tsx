@@ -3,13 +3,17 @@ import { Box, Text, useInput } from "ink";
 import {
   fetchManifest,
   filterSamples,
+  fetchSampleContent,
   installSample,
   isSampleInstalled,
   type GallerySample,
 } from "../../gallery/index.js";
 
+import type { DaemonClient } from "../scheduler/daemon-client.js";
+
 interface Props {
   availableHeight?: number;
+  client: DaemonClient;
   onBack: () => void;
 }
 
@@ -19,9 +23,10 @@ type Status =
   | { kind: "installing"; sample: GallerySample }
   | { kind: "installed"; sample: GallerySample; filePath: string }
   | { kind: "error"; message: string }
-  | { kind: "confirm-overwrite"; sample: GallerySample };
+  | { kind: "confirm-overwrite"; sample: GallerySample }
+  | { kind: "viewing"; sample: GallerySample; content: string; scroll: number };
 
-export function Gallery({ availableHeight, onBack }: Props) {
+export function Gallery({ availableHeight, client, onBack }: Props) {
   const [samples, setSamples] = useState<GallerySample[]>([]);
   const [search, setSearch] = useState("");
   const [cursor, setCursor] = useState(0);
@@ -58,6 +63,21 @@ export function Gallery({ availableHeight, onBack }: Props) {
       const result = await installSample(sample, overwrite);
       if (result.success) {
         setInstalled((prev) => new Set([...prev, sample.id]));
+        // Register with daemon so it appears in the workflow list
+        try {
+          const argsMap: Record<string, unknown> = {};
+          for (const a of sample.args) argsMap[a] = "";
+          await client.addWorkflow({
+            id: sample.id,
+            name: sample.name,
+            filePath: result.filePath,
+            schedule: "",
+            enabled: false,
+            args: Object.keys(argsMap).length > 0 ? argsMap : undefined,
+          });
+        } catch {
+          // May already be registered
+        }
         setStatus({ kind: "installed", sample, filePath: result.filePath });
       } else if (result.alreadyExists) {
         setStatus({ kind: "confirm-overwrite", sample });
@@ -65,10 +85,48 @@ export function Gallery({ availableHeight, onBack }: Props) {
         setStatus({ kind: "error", message: result.error ?? "Unknown error" });
       }
     },
+    [client],
+  );
+
+  const handleView = useCallback(
+    async (sample: GallerySample) => {
+      setStatus({ kind: "loading" });
+      try {
+        const content = await fetchSampleContent(sample);
+        setStatus({ kind: "viewing", sample, content, scroll: 0 });
+      } catch (err) {
+        setStatus({
+          kind: "error",
+          message: err instanceof Error ? err.message : String(err),
+        });
+      }
+    },
     [],
   );
 
   useInput((input, key) => {
+    // Viewing mode: scroll or dismiss
+    if (status.kind === "viewing") {
+      if (key.escape || input === "q") {
+        setStatus({ kind: "ready" });
+        return;
+      }
+      if (key.upArrow) {
+        setStatus({ ...status, scroll: Math.max(0, status.scroll - 1) });
+        return;
+      }
+      if (key.downArrow) {
+        setStatus({ ...status, scroll: status.scroll + 1 });
+        return;
+      }
+      // Install from preview
+      if (input === "i") {
+        handleInstall(status.sample);
+        return;
+      }
+      return;
+    }
+
     // Search mode: capture typed characters
     if (searchMode) {
       if (key.escape) {
@@ -131,6 +189,10 @@ export function Gallery({ availableHeight, onBack }: Props) {
       handleInstall(filtered[cursor]);
       return;
     }
+    if ((input === "v" || input === "V") && filtered[cursor]) {
+      handleView(filtered[cursor]);
+      return;
+    }
   });
 
   // Ensure cursor is within bounds
@@ -142,6 +204,38 @@ export function Gallery({ availableHeight, onBack }: Props) {
     Math.min(safeCursor - Math.floor(maxVisible / 2), filtered.length - maxVisible),
   );
   const visible = filtered.slice(scrollOffset, scrollOffset + maxVisible);
+
+  // Preview mode rendering
+  if (status.kind === "viewing") {
+    const lines = status.content.split("\n");
+    const previewHeight = Math.max(5, (availableHeight ?? 20) - 6);
+    const viewLines = lines.slice(status.scroll, status.scroll + previewHeight);
+    return (
+      <Box flexDirection="column">
+        <Box marginBottom={1}>
+          <Text bold color="cyan">
+            📄 {status.sample.name}
+          </Text>
+          <Text color="gray"> [{status.sample.category}]</Text>
+        </Box>
+        <Box flexDirection="column">
+          {viewLines.map((line, i) => (
+            <Text key={status.scroll + i} color="white">
+              {line}
+            </Text>
+          ))}
+        </Box>
+        <Box marginTop={1}>
+          <Text color="gray">
+            ↑↓:scroll  i:install  esc/q:back
+            {lines.length > previewHeight
+              ? `  (${status.scroll + 1}-${Math.min(status.scroll + previewHeight, lines.length)}/${lines.length})`
+              : ""}
+          </Text>
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Box flexDirection="column">

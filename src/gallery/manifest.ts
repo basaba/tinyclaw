@@ -167,18 +167,37 @@ export async function fetchManifest(): Promise<GalleryManifest> {
 
 /**
  * Fetch the raw YAML content for a gallery sample.
+ * Falls back to the bundled file if the remote fetch fails.
  */
 export async function fetchSampleContent(
   sample: GallerySample,
 ): Promise<string> {
-  const url = `${baseUrl()}/${sample.file}`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
-  if (!res.ok) {
+  // 1. Try remote fetch
+  try {
+    const url = `${baseUrl()}/${sample.file}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+    if (res.ok) {
+      return res.text();
+    }
+  } catch {
+    // Network error — fall through to bundled.
+  }
+
+  // 2. Try bundled local file
+  const bundledPath = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "..",
+    "gallery",
+    sample.file,
+  );
+  try {
+    return readFileSync(bundledPath, "utf8");
+  } catch {
     throw new Error(
-      `Failed to fetch sample "${sample.name}": ${res.status} ${res.statusText}`,
+      `Failed to fetch sample "${sample.name}": not available remotely or locally`,
     );
   }
-  return res.text();
 }
 
 // ---------------------------------------------------------------------------

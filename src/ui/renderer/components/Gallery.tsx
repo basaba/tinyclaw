@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import Editor from "@monaco-editor/react";
 
 interface GallerySample {
   id: string;
@@ -21,6 +22,8 @@ export function Gallery({ onBack }: Props) {
   const [loading, setLoading] = useState(true);
   const [installing, setInstalling] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  const [preview, setPreview] = useState<{ sample: GallerySample; content: string } | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
   const loadSamples = useCallback(async () => {
     setLoading(true);
@@ -64,6 +67,22 @@ export function Gallery({ onBack }: Props) {
       setMessage({ text: "Network error during install", type: "error" });
     }
     setInstalling(null);
+  };
+
+  const handleView = async (id: string) => {
+    setLoadingPreview(true);
+    try {
+      const res = await fetch("/api/galleryView", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([id]),
+      });
+      const data = await res.json();
+      setPreview({ sample: data.result.sample, content: data.result.content });
+    } catch {
+      setMessage({ text: "Failed to load workflow preview", type: "error" });
+    }
+    setLoadingPreview(false);
   };
 
   const filtered = samples.filter((s) => {
@@ -137,22 +156,72 @@ export function Gallery({ onBack }: Props) {
                         </span>
                       ))}
                     </div>
-                    <button
-                      className="btn-install"
-                      onClick={() => handleInstall(sample.id)}
-                      disabled={installing === sample.id}
-                    >
-                      {installing === sample.id
-                        ? "Installing..."
-                        : sample.installed
-                          ? "Reinstall"
-                          : "Install"}
-                    </button>
+                    <div className="card-actions">
+                      <button
+                        className="btn-view"
+                        onClick={() => handleView(sample.id)}
+                        disabled={loadingPreview}
+                      >
+                        View
+                      </button>
+                      <button
+                        className="btn-install"
+                        onClick={() => handleInstall(sample.id)}
+                        disabled={installing === sample.id}
+                      >
+                        {installing === sample.id
+                          ? "Installing..."
+                          : sample.installed
+                            ? "Reinstall"
+                            : "Install"}
+                      </button>
+                    </div>
                   </div>
                 ))}
             </div>
           </div>
         ))
+      )}
+
+      {/* Preview modal */}
+      {preview && (
+        <div className="gallery-preview-overlay" onClick={() => setPreview(null)}>
+          <div className="gallery-preview-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="preview-header">
+              <h3>{preview.sample.name}</h3>
+              <div className="preview-header-actions">
+                <button
+                  className="btn-install"
+                  onClick={() => {
+                    handleInstall(preview.sample.id);
+                    setPreview(null);
+                  }}
+                >
+                  {preview.sample.installed ? "Reinstall" : "Install"}
+                </button>
+                <button className="btn-back" onClick={() => setPreview(null)}>✕</button>
+              </div>
+            </div>
+            <div className="preview-editor">
+              <Editor
+                height="100%"
+                language="yaml"
+                value={preview.content}
+                theme="vs-dark"
+                options={{
+                  readOnly: true,
+                  minimap: { enabled: false },
+                  fontSize: 13,
+                  tabSize: 2,
+                  scrollBeyondLastLine: false,
+                  automaticLayout: true,
+                  wordWrap: "on",
+                  lineNumbers: "on",
+                }}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -206,7 +206,33 @@ async function invokeApi(client: DaemonClient, method: string, args: unknown[]):
       const sample = manifest.samples.find((s) => s.id === args[0]);
       if (!sample) throw new Error(`Sample not found: ${args[0]}`);
       const overwrite = args[1] === true;
-      return installSample(sample, overwrite);
+      const result = await installSample(sample, overwrite);
+      // Register the workflow with the daemon so it appears in the list
+      if (result.success) {
+        const argsMap: Record<string, unknown> = {};
+        for (const a of sample.args) argsMap[a] = "";
+        try {
+          await client.addWorkflow({
+            id: sample.id,
+            name: sample.name,
+            filePath: result.filePath,
+            schedule: "",
+            enabled: false,
+            args: Object.keys(argsMap).length > 0 ? argsMap : undefined,
+          });
+        } catch {
+          // Workflow may already be registered — ignore duplicate errors
+        }
+      }
+      return result;
+    }
+    case "galleryView": {
+      const { fetchManifest, fetchSampleContent } = await import("../../gallery/manifest.js");
+      const manifest = await fetchManifest();
+      const sample = manifest.samples.find((s) => s.id === args[0]);
+      if (!sample) throw new Error(`Sample not found: ${args[0]}`);
+      const content = await fetchSampleContent(sample);
+      return { content, sample };
     }
     default:
       throw new Error(`Unknown API method: ${method}`);

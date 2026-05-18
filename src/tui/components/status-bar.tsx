@@ -18,7 +18,7 @@ export function StatusBar({ view, schedulerRunning }: Props) {
     "run-detail": "↑↓:Scroll  v:View file  y:Approve  n:Reject  esc:Back",
     "yaml-view": "↑↓:Scroll  PgUp/PgDn:Page  esc:Back",
     "graph-view": "↑↓←→:Navigate  Tab:Cycle  Enter:Expand  esc:Back",
-    gallery: "↑↓:Navigate  /:Search  Enter:Install  esc:Back",
+    gallery: "↑↓:Navigate  /:Search  v:View  Enter:Install  esc:Back",
   };
 
   return (
