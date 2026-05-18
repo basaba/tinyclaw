@@ -38,6 +38,15 @@
       "tags": ["azure-devops", "build", "test-failures", "copilot"]
     },
     {
+      "id": "ado-pr-retrigger-policies",
+      "name": "Retrigger PR policies",
+      "description": "Retrigger PR expired policies, and retrigger devCM policy when build becomes green",
+      "category": "ado",
+      "file": "samples/ado/pr-retrigger-policies.yaml",
+      "args": ["repository", "targetBranch", "creator", "reviewer", "status", "top", "days"],
+      "tags": ["azure-devops", "pull-request", "monitoring"]
+    },
+    {
       "id": "mail-tracker",
       "name": "Mail Tracker",
       "description": "Track unread emails — summarize new ones and send to Teams",
