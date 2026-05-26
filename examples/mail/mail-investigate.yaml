@@ -1,6 +1,7 @@
 # Email investigation workflow
 #
-# Monitors your inbox for emails containing the @@@investigate mnemonic.
+# Monitors your inbox for emails containing the @@@investigate mnemonic
+# OR with [ErrorsDetectionAutomation][NullReferenceErrors] in the subject.
 # When found, reads the email body, sends it to Agency Copilot for
 # investigation, and replies with the results.
 #
@@ -9,8 +10,8 @@
 #   is only investigated once, even if multiple emails arrive in the same thread.
 #
 # Flow:
-#   1. Search inbox for emails from self
-#   2. Client-side filter for @@@investigate in preview
+#   1. Search inbox for emails from sender
+#   2. Client-side filter for @@@investigate in preview OR error detection in subject
 #   3. diff.key by conversationId — only process new conversation threads
 #   4. For each new thread: read full body → copilot investigates → reply
 #
@@ -27,7 +28,7 @@
 #   Schedule: every 5 min in the TUI
 
 name: mail-investigate
-description: Investigate issues from @@@investigate emails and reply with findings
+description: Investigate issues from @@@investigate emails or NullReferenceErrors alerts
 
 args:
   cwd:
@@ -40,12 +41,13 @@ cwd: "${cwd}"
 
 steps:
 
-  # 1. Fetch recent emails from self, filter for @@@investigate, deduplicate
+  # 1. Fetch recent emails, filter for triggers, deduplicate
   - id: new-threads
     pipeline: >
-      mail.search --folder inbox --top 50 --order-by newest --search 'from:${sender}'
-      | compute _flag='contains(preview, "@@@investigate")'
-      | where _flag==true
+      mail.search --folder inbox --top 50 --order-by newest
+      | compute _isNullRef='contains(subject, "[ErrorsDetectionAutomation][NullReferenceErrors]")'
+      | compute _mailHasKeyword='contains(preview, "@@@investigate") && contains(from.emailAddress.address, "${sender}")'
+      | where _isNullRef==true || _mailHasKeyword==true
       | diff.key --key mail-investigate --field conversationId
       | where changed==true
 
@@ -57,12 +59,12 @@ steps:
       - id: analysis
         pipeline: >
           mail.read --id $item.json.id
-          | copilot "Investigate the issue described below.
+          | agency.copilot "Investigate the issue described below.
           Provide a clear, structured analysis with:
           1. Problem summary
           2. Likely root cause(s)
           3. Recommended next steps or resolution
           4. Any relevant context or references
 
-          Be thorough but concise. Format your response clearly."
+          Be thorough but concise. Format your response clearly." --mcp 'kusto --service-uri https://kuskusprod.kusto.windows.net'
           | mail.reply --id $item.json.id --markdown
