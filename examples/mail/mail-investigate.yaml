@@ -6,8 +6,10 @@
 # investigation, and replies with the results.
 #
 # Deduplication:
-#   Uses diff.key with conversationId to ensure each conversation thread
-#   is only investigated once, even if multiple emails arrive in the same thread.
+#   1. Within a batch: sort by receivedDateTime desc, then dedupe by conversationId
+#      so only the latest email per thread is processed.
+#   2. Across runs: diff.key with conversationId ensures each conversation thread
+#      is only investigated once, even if it reappears in future fetches.
 #
 # Flow:
 #   1. Search inbox for emails from sender
@@ -42,12 +44,16 @@ cwd: "${cwd}"
 steps:
 
   # 1. Fetch recent emails, filter for triggers, deduplicate
+  #    sort newest-first then dedupe by conversationId so only the latest
+  #    email per thread is kept before cross-run diff
   - id: new-threads
     pipeline: >
       mail.search --folder inbox --top 50 --order-by newest
       | compute _isNullRef='contains(subject, "[ErrorsDetectionAutomation][NullReferenceErrors]")'
       | compute _mailHasKeyword='contains(preview, "@@@investigate") && contains(from.emailAddress.address, "${sender}")'
       | where _isNullRef==true || _mailHasKeyword==true
+      | sort --key receivedDateTime --desc
+      | dedupe --key conversationId
       | diff.key --key mail-investigate --field conversationId
       | where changed==true
 
