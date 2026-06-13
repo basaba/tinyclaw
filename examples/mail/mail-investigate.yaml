@@ -73,4 +73,4 @@ steps:
           4. Any relevant context or references
 
           Be thorough but concise. Format your response clearly." --mcp 'kusto --service-uri https://kuskusprod.kusto.windows.net'
-          | mail.reply --id $item.json.id --markdown
+          | mail.reply --id $item.json.id --reply-all --markdown
