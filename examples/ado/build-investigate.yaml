@@ -18,12 +18,9 @@ args:
   workdir:
     description: "Working directory for the Copilot investigation step"
     default: "${config:KUSTO_REPO_PATH}"
-  team:
-    description: "Teams team ID to post results to"
-    default: "${config:TEAMS_KUSTOCM_TEAM_ID}"
-  channel:
-    description: "Teams channel ID to post results to"
-    default: "${config:TEAMS_DRI_LOG_CHANNEL_ID}"
+  to:
+    description: "Email recipient for investigation results"
+    default: "ilayr_org@microsoft.com"
   build_id:
     description: "Build id of devCM"
     default: "${config:ADO_DEVCM_BUILD_DEF_ID}"
@@ -78,7 +75,7 @@ steps:
     
   # 5. Ensure the repo is up to date before Copilot investigates
   - id: git-pull
-    run: git pull
+    run: git pull --prune
 
   # 6. Reload skills
   - id: reload-skills
@@ -89,7 +86,7 @@ steps:
     pipeline: >
       agency.copilot "/cm-e2e-investigation: Please investigate these failures and suggest root causes and next steps. (Ignore DummyReportCleanupFailure and dont mention it),
       Please provide executive summary first (keep it brief), and then the details after"
-      | teams.send --team-id ${team} --channel-id ${channel} --markdown
+      | mail.send --to ${to} --subject "Build Investigation: ${build_id}" --markdown
     stdin: $failures.json
 
   # 8. Mark this build as investigated
