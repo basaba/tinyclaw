@@ -24,11 +24,13 @@ function runAz(
         env: opts.env as NodeJS.ProcessEnv,
         stdio: ["ignore", "pipe", "pipe"],
         shell: true,
+        windowsHide: true,
       });
     } else {
       child = spawn("az", argv, {
         env: opts.env as NodeJS.ProcessEnv,
         stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true,
       });
     }
 

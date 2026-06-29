@@ -1,6 +1,6 @@
 # Lobster Language & Extension Specification
 
-> **Version:** 1.0 — derived from source as of April 2026  
+> **Version:** 1.1 — derived from source as of May 2026  
 > **Audience:** AI agents, automation authors, and contributors
 
 Lobster is an OpenClaw-native workflow shell: typed (JSON-first) pipelines, jobs, and approval gates. It is designed for deterministic, resumable automation — not ad-hoc LLM re-planning loops.
@@ -189,6 +189,7 @@ Used by `compute`, `where` (extended mode), and workflow `when`/`condition` fiel
 | `coalesce(a, b, ...)` | ...any → any | First non-null/non-undefined value |
 | `is_null(v)` | any → bool | True if `null` or `undefined` |
 | `exists(v)` | any → bool | True if not `undefined` |
+| `iff(cond, a, b)` | bool, any, any → any | Ternary: returns `a` if `cond` is truthy, else `b` |
 
 **Predicate functions** (`every`, `some`, `count`) use `@` to reference the current element:
 ```
@@ -205,6 +206,7 @@ every(votes, @ == 0)
 coalesce(nickname, fullName, "Unknown")
 days_since(createdAt) < 30
 concat(first, " ", last)
+iff(age >= 18, "adult", "minor")
 ```
 
 ---
@@ -424,6 +426,14 @@ Comma-separated list of field names to keep.
 ```
 
 Default: 10 items.
+
+#### `tail` — Take last N items
+
+```
+... | tail --n 5
+```
+
+Default: 10 items. Counterpart to `head`; returns the last N items from the stream.
 
 #### `dedupe` — Remove duplicates
 
@@ -906,7 +916,7 @@ steps:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `for_each` | string | — | Reference to array or object (e.g. `$step.json`). A single object is treated as a one-element array. |
+| `for_each` | string | — | Reference to array or object (e.g. `$step.json`). A single object is treated as a one-element array. `null` or `undefined` references are treated as empty arrays (zero iterations). |
 | `item_var` | string | `"item"` | Variable name for current item |
 | `index_var` | string | `"index"` | Variable name for 0-based index |
 | `include_unmatched` | boolean | `false` | Keep iterations where all sub-steps were skipped |

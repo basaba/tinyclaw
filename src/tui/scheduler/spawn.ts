@@ -35,6 +35,7 @@ export function spawnDaemon(): number | null {
     detached: true,
     stdio: "ignore",
     cwd: PROJECT_ROOT,
+    windowsHide: true,
     // Windows .cmd shims require shell to resolve; on Unix direct exec is fine
     ...(IS_WINDOWS && isTsx ? { shell: true } : {}),
   });
