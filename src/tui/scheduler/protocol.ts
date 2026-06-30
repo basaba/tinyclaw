@@ -12,7 +12,7 @@ export type DaemonRequest =
   | { cmd: "remove-workflow"; id: string }
   | { cmd: "toggle-workflow"; id: string }
   | { cmd: "update-workflow"; id: string; patch: Partial<WorkflowEntry> }
-  | { cmd: "run-now"; id: string }
+  | { cmd: "run-now"; id: string; dryRun?: boolean }
   | { cmd: "get-history"; workflowId: string }
   | { cmd: "list-approvals" }
   | { cmd: "resolve-approval"; runId: string; approved: boolean }

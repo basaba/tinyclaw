@@ -76,7 +76,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle("toggle-workflow", (_, id: string) => d().toggleWorkflow(id));
   ipcMain.handle("update-workflow", (_, id: string, patch: Partial<WorkflowEntry>) =>
     d().updateWorkflow(id, patch));
-  ipcMain.handle("run-now", (_, id: string) => d().runNow(id));
+  ipcMain.handle("run-now", (_, id: string, dryRun?: boolean) => d().runNow(id, dryRun));
   ipcMain.handle("get-history", (_, workflowId: string) => d().getHistory(workflowId));
   ipcMain.handle("get-run", (_, runId: string) => d().getRun(runId));
   ipcMain.handle("delete-run", (_, runId: string) => d().deleteRun(runId));

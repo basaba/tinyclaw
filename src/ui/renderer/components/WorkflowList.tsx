@@ -7,7 +7,7 @@ interface Props {
   onAdd: () => void;
   onEdit: (id: string) => void;
   onHistory: (id: string) => void;
-  onRunNow: (id: string) => void;
+  onRunNow: (id: string, dryRun?: boolean) => void;
   onToggle: (id: string) => void;
   onRemove: (id: string) => void;
   onViewYaml: (filePath: string) => void;
@@ -228,6 +228,13 @@ export function WorkflowList({
                 <div style={{ display: "flex", gap: 4 }}>
                   <button className="btn btn-sm" onClick={() => onRunNow(wf.id)}>
                     Run
+                  </button>
+                  <button
+                    className="btn btn-sm"
+                    title="Validate and print the execution plan without running"
+                    onClick={() => onRunNow(wf.id, true)}
+                  >
+                    Dry run
                   </button>
                   <button className="btn btn-sm" onClick={() => onEdit(wf.id)}>
                     Edit

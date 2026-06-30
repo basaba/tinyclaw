@@ -31,7 +31,9 @@ function formatDuration(ms?: number): string {
 
 export function RunDetail({ run: initialRun, liveOutput, onBack, onOpenFile }: Props) {
   const [run, setRun] = useState(initialRun);
-  const [activeTab, setActiveTab] = useState<"details" | "output" | "logs" | "debug">("details");
+  const [activeTab, setActiveTab] = useState<"details" | "output" | "logs" | "debug">(
+    initialRun.dryRun ? "logs" : "details",
+  );
   const [showDebug, setShowDebug] = useState(false);
   const [fileEditorPath, setFileEditorPath] = useState<string | null>(null);
 
@@ -55,6 +57,11 @@ export function RunDetail({ run: initialRun, liveOutput, onBack, onOpenFile }: P
       <div className="card">
         <div className="card-header">
           <span className="card-title">Run Detail</span>
+          {run.dryRun && (
+            <span className="badge" title="Plan only — no steps were executed">
+              🔎 Dry run
+            </span>
+          )}
           {statusBadge(run.status)}
         </div>
 

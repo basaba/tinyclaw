@@ -128,8 +128,8 @@ export class DaemonClient extends EventEmitter {
     if (resp.type === "error") throw new Error(resp.message);
   }
 
-  async runNow(id: string): Promise<void> {
-    const resp = await this.send({ cmd: "run-now", id });
+  async runNow(id: string, dryRun = false): Promise<void> {
+    const resp = await this.send({ cmd: "run-now", id, dryRun });
     if (resp.type === "error") throw new Error(resp.message);
   }
 

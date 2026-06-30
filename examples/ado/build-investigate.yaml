@@ -20,7 +20,7 @@ args:
     default: "${config:KUSTO_REPO_PATH}"
   to:
     description: "Email recipient for investigation results"
-    default: "ilayr_org@microsoft.com"
+    default: "ilayr_org_fte@microsoft.com"
   build_id:
     description: "Build id of devCM"
     default: "${config:ADO_DEVCM_BUILD_DEF_ID}"
@@ -86,10 +86,21 @@ steps:
     pipeline: >
       agency.copilot "/cm-e2e-investigation: Please investigate these failures and suggest root causes and next steps. (Ignore DummyReportCleanupFailure and dont mention it),
       Please provide executive summary first (keep it brief), and then the details after"
-      | mail.send --to ${to} --subject "Build Investigation: ${build_id}" --markdown
     stdin: $failures.json
 
-  # 8. Mark this build as investigated
+  # 8. Remove the first paragraph from the investigation output
+  - id: trim-output
+    pipeline: >
+      copilot --prompt "Remove the first paragraph from the following text and return the rest as-is. Do not add any commentary." --model gpt-5-mini
+    stdin: $investigate.stdout
+
+  # 9. Send the trimmed investigation results via email
+  - id: send-email
+    pipeline: >
+      mail.send --to ${to} --subject "Build Investigation: $latest-build.json.0.buildNumber" --markdown
+    stdin: $trim-output.stdout
+
+  # 10. Mark this build as investigated
   - id: mark-seen
     pipeline: "diff.key.set --key ado-build-investigate:${build_id} --field id"
     stdin: $latest-build.json

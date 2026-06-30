@@ -107,10 +107,10 @@ export class SchedulerEngine extends EventEmitter {
     }
   }
 
-  async runNow(workflowId: string): Promise<RunRecord> {
+  async runNow(workflowId: string, dryRun = false): Promise<RunRecord> {
     const wf = this.getWorkflows().find((w) => w.id === workflowId);
     if (!wf) throw new Error(`Workflow ${workflowId} not found`);
-    return this.executeWorkflow(wf, "manual");
+    return this.executeWorkflow(wf, "manual", dryRun);
   }
 
   listPendingApprovals(): RunRecord[] {
@@ -256,6 +256,7 @@ export class SchedulerEngine extends EventEmitter {
   private async executeWorkflow(
     wf: WorkflowEntry,
     triggeredBy: TriggerType,
+    dryRun = false,
   ): Promise<RunRecord> {
     const run: RunRecord = {
       id: randomUUID(),
@@ -263,6 +264,7 @@ export class SchedulerEngine extends EventEmitter {
       triggeredBy,
       triggeredAt: new Date().toISOString(),
       status: "running",
+      ...(dryRun ? { dryRun: true } : {}),
       input: {
         filePath: wf.filePath,
         args: wf.args,
@@ -317,6 +319,7 @@ export class SchedulerEngine extends EventEmitter {
           stderr,
           env: { ...process.env, LOBSTER_LLM_PROVIDER: "copilot" },
           ...(wf.debug ? { debug: true } : {}),
+          ...(dryRun ? { dryRun: true } : {}),
         },
       });
 

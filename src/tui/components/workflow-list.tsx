@@ -257,6 +257,10 @@ export function WorkflowList({ client, workflows, onAdd, onEdit, onHistory, onVi
       client.runNow(wf.id).catch(() => {});
       onRefresh();
     }
+    if (input === "D") {
+      client.runNow(wf.id, true).catch(() => {});
+      onRefresh();
+    }
     if (input === "o") {
       client.getHistory(wf.id).then((runs) => {
         if (runs.length > 0) {

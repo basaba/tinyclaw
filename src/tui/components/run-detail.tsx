@@ -260,6 +260,7 @@ export function RunDetail({ run: initialRun, availableHeight, client, liveOutput
         <Box>
           <Text color="gray">Status:    </Text>
           <Text color={statusColor}>{run.status}</Text>
+          {run.dryRun && <Text color="cyan"> 🔎 dry run (plan only)</Text>}
         </Box>
         <Box>
           <Text color="gray">Started:   </Text>

@@ -73,7 +73,7 @@ export function installWebBridge(): void {
     removeWorkflow: (id) => call("removeWorkflow", id),
     toggleWorkflow: (id) => call("toggleWorkflow", id),
     updateWorkflow: (id, patch) => call("updateWorkflow", id, patch),
-    runNow: (id) => call("runNow", id),
+    runNow: (id, dryRun) => call("runNow", id, dryRun),
     getHistory: (wfId) => call("getHistory", wfId),
     getRun: (runId) => call("getRun", runId),
     deleteRun: (runId) => call("deleteRun", runId),

@@ -52,7 +52,7 @@ export function App() {
             onAdd={goAdd}
             onEdit={goEdit}
             onHistory={goHistory}
-            onRunNow={(id) => window.api.runNow(id).then(refresh)}
+            onRunNow={(id, dryRun) => window.api.runNow(id, dryRun).then(refresh)}
             onToggle={(id) => window.api.toggleWorkflow(id).then(refresh)}
             onRemove={(id) => window.api.removeWorkflow(id).then(refresh)}
             onViewYaml={goYaml}

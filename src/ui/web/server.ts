@@ -173,7 +173,7 @@ async function invokeApi(client: DaemonClient, method: string, args: unknown[]):
     case "removeWorkflow":  return client.removeWorkflow(args[0] as string);
     case "toggleWorkflow":  return client.toggleWorkflow(args[0] as string);
     case "updateWorkflow":  return client.updateWorkflow(args[0] as string, args[1] as any);
-    case "runNow":          return client.runNow(args[0] as string);
+    case "runNow":          return client.runNow(args[0] as string, args[1] as boolean | undefined);
     case "getHistory":      return client.getHistory(args[0] as string);
     case "getRun":          return client.getRun(args[0] as string);
     case "deleteRun":       return client.deleteRun(args[0] as string);

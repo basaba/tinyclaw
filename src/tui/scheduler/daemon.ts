@@ -68,7 +68,7 @@ function handleRequest(req: DaemonRequest): DaemonResponse | Promise<DaemonRespo
       return { type: "ok", message: "updated" };
 
     case "run-now":
-      engine.runNow(req.id).catch(() => {});
+      engine.runNow(req.id, req.dryRun).catch(() => {});
       return { type: "ok", message: "triggered" };
 
     case "get-history":

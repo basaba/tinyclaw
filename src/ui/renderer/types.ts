@@ -23,6 +23,7 @@ export interface RunRecord {
   completedAt?: string;
   durationMs?: number;
   status: "running" | "success" | "error" | "pending-approval" | "rejected";
+  dryRun?: boolean;
   input: {
     filePath: string;
     args?: Record<string, unknown>;
@@ -49,7 +50,7 @@ export interface TinyClawAPI {
   removeWorkflow(id: string): Promise<void>;
   toggleWorkflow(id: string): Promise<void>;
   updateWorkflow(id: string, patch: Partial<WorkflowEntry>): Promise<void>;
-  runNow(id: string): Promise<void>;
+  runNow(id: string, dryRun?: boolean): Promise<void>;
   getHistory(workflowId: string): Promise<RunRecord[]>;
   getRun(runId: string): Promise<RunRecord | null>;
   deleteRun(runId: string): Promise<void>;

@@ -30,6 +30,7 @@ export interface RunRecord {
   completedAt?: string;
   durationMs?: number;
   status: "running" | "success" | "error" | "pending-approval" | "rejected";
+  dryRun?: boolean;
   input: {
     filePath: string;
     args?: Record<string, unknown>;

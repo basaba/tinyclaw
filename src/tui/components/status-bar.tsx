@@ -11,7 +11,7 @@ export function StatusBar({ view, schedulerRunning }: Props) {
   const status = schedulerRunning ? "🟢 Running" : "🔴 Stopped";
 
   const keys: Record<string, string> = {
-    list: "a:Add  e:Edit  d:Delete  r:Run  o:Output  v:YAML  g:Graph  s:Samples  Tab:Approvals  space:Enable/Disable  enter:History  q:Quit",
+    list: "a:Add  e:Edit  d:Delete  r:Run  D:DryRun  o:Output  v:YAML  g:Graph  s:Samples  Tab:Approvals  space:Enable/Disable  enter:History  q:Quit",
     add: "Tab:Next  Shift+Tab:Back  esc:Cancel  Ctrl+O:View file",
     edit: "Tab:Next  Shift+Tab:Back  esc:Cancel  Ctrl+O:View file",
     history: "enter:Detail  d:Delete  c:Clear  v:View file  esc:Back",
