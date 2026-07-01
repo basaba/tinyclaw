@@ -81,26 +81,40 @@ steps:
   - id: reload-skills
     run: copilot -p "/skills reload"
 
-  # 7. Run agency copilot to investigate failures in the repo context
+  # 7. Run agency copilot to investigate failures in the repo context.
+  #    The prompt enforces a strict, deterministic Markdown template so the
+  #    output format is stable across runs.
   - id: investigate
     pipeline: >
-      agency.copilot "/cm-e2e-investigation: Please investigate these failures and suggest root causes and next steps. (Ignore DummyReportCleanupFailure and dont mention it),
-      Please provide executive summary first (keep it brief), and then the details after"
+      agency.copilot "/cm-e2e-investigation: Investigate the failing tests provided as JSON on stdin.
+      Ignore DummyReportCleanupFailure completely and do not mention it anywhere.
+
+      Respond with EXACTLY the following Markdown structure and nothing else.
+      Do not add any preamble, sign-off, or extra commentary before or after it.
+      Use these exact headings, in this exact order:
+
+      ## Executive Summary
+      A brief (2-4 sentence) summary of the overall failure picture.
+
+      ## Failures
+      A Markdown table with these exact columns and one row per failed test:
+      | Test | Root Cause | Confidence |
+      | --- | --- | --- |
+
+      ## Root Causes
+      A bulleted list explaining each distinct root cause in more detail.
+
+      ## Next Steps
+      A numbered list of concrete, actionable next steps."
     stdin: $failures.json
 
-  # 8. Remove the first paragraph from the investigation output
-  - id: trim-output
-    pipeline: >
-      copilot --prompt "Remove the first paragraph from the following text and return the rest as-is. Do not add any commentary." --model gpt-5-mini
-    stdin: $investigate.stdout
-
-  # 9. Send the trimmed investigation results via email
+  # 8. Send the investigation results via email
   - id: send-email
     pipeline: >
       mail.send --to ${to} --subject "Build Investigation: $latest-build.json.0.buildNumber" --markdown
-    stdin: $trim-output.stdout
+    stdin: $investigate.stdout
 
-  # 10. Mark this build as investigated
+  # 9. Mark this build as investigated
   - id: mark-seen
     pipeline: "diff.key.set --key ado-build-investigate:${build_id} --field id"
     stdin: $latest-build.json
