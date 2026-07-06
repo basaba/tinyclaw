@@ -1,4 +1,5 @@
 import { createCopilotCommand, type LobsterCommand } from "./commands/copilot.js";
+import { createCopilotSkillCommand } from "./commands/copilot-skill.js";
 import { createMcpCallCommand } from "./commands/mcp.js";
 import { createAdoPrMonitorCommand } from "./commands/ado-pr-monitor.js";
 import { createTeamsSendCommand } from "./commands/teams.js";
@@ -54,6 +55,7 @@ export async function buildRegistry(
 
   const commands: LobsterCommand[] = [
     createCopilotCommand(opts.getClient, opts.ensureStarted),
+    createCopilotSkillCommand(opts.getClient, opts.ensureStarted),
     createMcpCallCommand(opts.getMcpServers),
     createAdoPrMonitorCommand(),
     createTeamsSendCommand(opts.getMcpServers),
