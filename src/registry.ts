@@ -13,6 +13,11 @@ import {
   createMailSearchCommand,
   createMailReadCommand,
   createMailReplyCommand,
+  createMailUpdateCommand,
+  createMailFlagCommand,
+  createMailDeleteCommand,
+  createMailForwardCommand,
+  createMailAttachmentsCommand,
 } from "./commands/mail.js";
 import type { CopilotBridgeClient } from "./copilot/client.js";
 
@@ -64,6 +69,11 @@ export async function buildRegistry(
     createMailSearchCommand(opts.getMcpServers),
     createMailReadCommand(opts.getMcpServers),
     createMailReplyCommand(opts.getMcpServers),
+    createMailUpdateCommand(opts.getMcpServers),
+    createMailFlagCommand(opts.getMcpServers),
+    createMailDeleteCommand(opts.getMcpServers),
+    createMailForwardCommand(opts.getMcpServers),
+    createMailAttachmentsCommand(opts.getMcpServers),
     createFormatMd2HtmlCommand(),
     createAgencyCopilotCommand(),
     createKustoQueryCommand(),
