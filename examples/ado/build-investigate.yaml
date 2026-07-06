@@ -72,6 +72,14 @@ steps:
           --resource ${ado_resource_id}
           --output json
 
+  # Guard: halt gracefully if no test runs had failures. The for_each above
+  # omits iterations whose failed-tests sub-step was skipped (no failures),
+  # so $failures.json is an empty array when nothing failed — nothing to
+  # investigate, so stop before pulling the repo and invoking Copilot.
+  - id: guard-no-failures
+    pipeline: "gate --when empty --message 'No test failures found — nothing to investigate'"
+    stdin: $failures.json
+
     
   # 5. Ensure the repo is up to date before Copilot investigates
   - id: git-pull
