@@ -6,6 +6,8 @@ import { createTeamsMessagesCommand, createTeamsRepliesCommand, createTeamsReply
 import { createFormatMd2HtmlCommand } from "./commands/format.js";
 import { createAgencyCopilotCommand } from "./commands/agency-copilot.js";
 import { createKustoQueryCommand } from "./commands/kusto.js";
+import { createSchedRunsCommand } from "./commands/sched-runs.js";
+import { createGithubIssueUpsertCommand } from "./commands/github-issue.js";
 import {
   createMailSendCommand,
   createMailSearchCommand,
@@ -65,6 +67,8 @@ export async function buildRegistry(
     createFormatMd2HtmlCommand(),
     createAgencyCopilotCommand(),
     createKustoQueryCommand(),
+    createSchedRunsCommand(),
+    createGithubIssueUpsertCommand(),
     ...(opts.extraCommands ?? []),
     ...pluginCommands,
   ];
