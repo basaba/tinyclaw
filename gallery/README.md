@@ -45,4 +45,5 @@ To add a new sample, create a workflow YAML in `gallery/samples/<category>/` and
 - **ado** — Azure DevOps workflows (PR monitoring, build investigation, code review)
 - **mail** — Email automation (tracking, investigation, auto-reply)
 - **diary** — Personal productivity (daily summaries)
+- **observability** — Monitor scheduled-run health (e.g. surface failures as GitHub issues)
 - **general** — General-purpose examples

@@ -1,0 +1,67 @@
+# Run Observability → GitHub Issues
+#
+# Surfaces the health of your other TinyClaw scheduled workflows as GitHub
+# issues. It reads the scheduler run history and maintains ONE persistent
+# issue per workflow, updated in place to reflect that workflow's latest
+# settled run (✅ healthy / ❌ failing). A comment is posted only when a
+# workflow's status actually transitions, so there is no per-run noise.
+#
+# How it works:
+#   sched.runs --latest        emits each workflow's most recent *settled* run
+#                              (in-flight running/pending-approval runs are
+#                              skipped, so issues never flap through them).
+#   github.issue.upsert        reconciles a GitHub issue per workflow via the
+#     --mode status            `gh` CLI (create → edit-in-place → reopen),
+#                              commenting only on real status transitions.
+#
+# Prerequisites:
+#   - GitHub CLI (`gh`) installed and authenticated (`gh auth login`) with
+#     `repo` scope on the target repository.
+#
+# Args (pass via --args-json):
+#   repo    (required) Target repo (owner/name) where issues are filed
+#   window  (optional) Only consider runs newer than this (e.g. 2h, 30m, 1d)
+#   labels  (optional) Comma-separated labels applied to observability issues
+#
+# Run:
+#   tinyclaw run-observability.yaml --args-json '{"repo":"owner/repo"}'
+#
+# Dry-run:
+#   tinyclaw run-observability.yaml --dry-run
+#
+# Schedule via sched:
+#   tinyclaw sched add \
+#     --name run-observability \
+#     --file run-observability.yaml \
+#     --schedule 'every 30m' \
+#     --args-json '{"repo":"owner/repo"}'
+
+name: "Run Observability → GitHub Issues"
+description: >
+  Surfaces tinyclaw scheduled-run health as one persistent GitHub issue per
+  workflow, updated in place with the latest success/failure. Uses sched.runs
+  as the data source piped into github.issue.upsert (via the gh CLI).
+
+args:
+  repo:
+    description: "Target repo (owner/name) where observability issues are filed"
+    default: "owner/repo"
+  window:
+    description: "Only consider runs newer than this (e.g. 2h, 30m, 1d)"
+    default: "2h"
+  labels:
+    description: "Comma-separated labels applied to observability issues"
+    default: "tinyclaw-run"
+
+steps:
+  # ── Reconcile a persistent status issue per workflow ────────────────
+  # `--latest` emits each workflow's most recent settled run; `--mode status`
+  # keeps one open issue per workflow, updated in place to show the latest
+  # success or failure (never auto-closed, comments only on status transitions).
+  - id: reconcile
+    pipeline: >
+      sched.runs --since ${window} --latest
+      | github.issue.upsert --repo ${repo} --labels ${labels} --mode status
+    retry:
+      max: 2
+      delay_ms: 3000

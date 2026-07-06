@@ -81,6 +81,15 @@
       "file": "samples/diary/daily-diary.yaml",
       "args": ["output_dir"],
       "tags": ["diary", "email", "teams", "summary", "copilot"]
+    },
+    {
+      "id": "run-observability",
+      "name": "Run Observability → GitHub Issues",
+      "description": "Maintain one persistent GitHub issue per scheduled workflow reflecting its latest run health",
+      "category": "observability",
+      "file": "samples/observability/run-observability.yaml",
+      "args": ["repo", "window", "labels"],
+      "tags": ["observability", "github", "issues", "monitoring", "scheduler"]
     }
   ]
 }

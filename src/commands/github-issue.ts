@@ -261,6 +261,11 @@ async function processStatus(
   opts: { repo: string; labels: string[]; logTail: number },
 ): Promise<IssueUpsertResult> {
   const { repo, labels, logTail } = opts;
+  // Never let a transient run (running/pending-approval) drive the persisted
+  // status — it would flap the issue through spurious transitions.
+  if (run.status !== "success" && run.status !== "error" && run.status !== "rejected") {
+    return { workflow: run.key, status: run.status, action: "noop" };
+  }
   const primaryLabel = labels[0] ?? DEFAULT_LABEL;
   const existing = await findIssue(repo, primaryLabel, run.key);
   const title = statusTitle(run);

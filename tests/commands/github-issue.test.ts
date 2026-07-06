@@ -241,6 +241,18 @@ describe("github.issue.upsert command", () => {
       expect(ghCalls.some((a) => a[0] === "issue" && a[1] === "comment")).toBe(false);
     });
 
+    it("ignores a transient running run (no create, no comment)", async () => {
+      const cmd = createGithubIssueUpsertCommand();
+      const { output } = await cmd.run({
+        input: inputOf(record("wf-a", "running")),
+        args: { repo: "o/r", mode: "status" },
+      });
+      const [res] = await collect(output);
+      expect(res.action).toBe("noop");
+      expect(issuesInRepo).toHaveLength(0);
+      expect(ghCalls.some((a) => a[0] === "issue" && a[1] === "comment")).toBe(false);
+    });
+
     it("reopens a manually-closed status issue to keep it live", async () => {
       issuesInRepo.push({
         number: 6,

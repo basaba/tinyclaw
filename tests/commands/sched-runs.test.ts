@@ -117,6 +117,40 @@ describe("sched.runs command", () => {
     expect(beta.status).toBe("error");
   });
 
+  it("--latest skips a transient running run and reports the last settled run", async () => {
+    loadHistory.mockReturnValue({
+      runs: [
+        // Newest wf-a run is in-flight; it must not overwrite the prior success.
+        run("1", "wf-a", "running", "2026-01-01T13:00:00Z"),
+        run("2", "wf-a", "success", "2026-01-01T12:00:00Z"),
+        run("3", "wf-a", "error", "2026-01-01T11:00:00Z"),
+        // wf-b only has a running run — nothing settled to report yet.
+        run("4", "wf-b", "running", "2026-01-01T10:00:00Z"),
+      ],
+    });
+    const cmd = createSchedRunsCommand();
+    const { output } = await cmd.run({ input: emptyInput, args: { latest: true } });
+    const items = await collect(output);
+    expect(items).toHaveLength(1);
+    expect(items[0].workflowId).toBe("wf-a");
+    expect(items[0].status).toBe("success");
+    expect(items[0].id).toBe("2");
+  });
+
+  it("--latest skips pending-approval as transient", async () => {
+    loadHistory.mockReturnValue({
+      runs: [
+        run("1", "wf-a", "pending-approval", "2026-01-01T13:00:00Z"),
+        run("2", "wf-a", "error", "2026-01-01T12:00:00Z"),
+      ],
+    });
+    const cmd = createSchedRunsCommand();
+    const { output } = await cmd.run({ input: emptyInput, args: { latest: true } });
+    const items = await collect(output);
+    expect(items).toHaveLength(1);
+    expect(items[0].status).toBe("error");
+  });
+
   it("respects --limit", async () => {
     loadHistory.mockReturnValue({
       runs: [

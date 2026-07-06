@@ -32,6 +32,13 @@ function asStream(items: unknown[]): AsyncIterable<unknown> {
 
 const SINCE_RE = /^(\d+)\s*(s|sec|seconds?|m|min|minutes?|h|hr|hours?|d|days?)$/i;
 
+/**
+ * Statuses that represent a finished run. Transient states (running,
+ * pending-approval) are excluded from --latest so a workflow's persisted
+ * state never flaps through an in-progress run.
+ */
+const SETTLED_STATUSES = new Set(["success", "error", "rejected"]);
+
 /** Parse a relative duration like "2h", "30m", "1d" into milliseconds. */
 export function parseSinceMs(expr: string): number | null {
   const m = SINCE_RE.exec(expr.trim());
@@ -72,7 +79,7 @@ export function createSchedRunsCommand(): LobsterCommand {
           latest: {
             type: "boolean",
             description:
-              "Emit only the most recent run per workflow (current state). Ignores --status filtering so a workflow's latest success/failure is reported as-is.",
+              "Emit only the most recent settled run per workflow (current state). Skips transient running/pending-approval runs and ignores --status filtering so a workflow's latest success/failure is reported as-is.",
           },
         },
         required: [],
@@ -86,14 +93,15 @@ export function createSchedRunsCommand(): LobsterCommand {
         "Usage:",
         "  sched.runs --status error --since 2h",
         "  sched.runs --status error,rejected --workflow wf-abc123 --limit 20",
-        "  sched.runs --since 2h --latest    # current state per workflow",
+        "  sched.runs --since 2h --latest    # current settled state per workflow",
         "  sched.runs --status all --since 1d",
         "",
         "Each emitted item is a run record enriched with workflowName and",
         "workflowFile. Intended to be piped into github.issue.upsert.",
         "Default status filter is 'error,rejected' (failures only).",
-        "With --latest, only each workflow's most recent run is emitted",
-        "(status filter is bypassed) — ideal for open-or-close observability.",
+        "With --latest, only each workflow's most recent settled run is emitted",
+        "(running/pending-approval are skipped; status filter is bypassed) —",
+        "ideal for open-or-close observability without transient flapping.",
       ].join("\n");
     },
     async run({ input, args }: { input: AsyncIterable<unknown>; args: Record<string, unknown> }) {
@@ -138,10 +146,14 @@ export function createSchedRunsCommand(): LobsterCommand {
         })
         .sort((a, b) => b.triggeredAt.localeCompare(a.triggeredAt));
 
-      // Keep only the most recent run per workflow (current state).
+      // Keep only the most recent settled run per workflow (current state).
+      // Transient runs (running/pending-approval) are skipped so an in-flight
+      // run never overwrites the last known success/failure and produces
+      // spurious "recovered"/"failing" transitions.
       if (latest) {
         const seen = new Set<string>();
         runs = runs.filter((r) => {
+          if (!SETTLED_STATUSES.has(r.status)) return false;
           if (seen.has(r.workflowId)) return false;
           seen.add(r.workflowId);
           return true;
